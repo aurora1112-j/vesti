@@ -41,7 +41,7 @@ export type CapsuleState = "RECORDING" | "STANDBY" | "PAUSED" | "SAVED";
 
 export type CaptureMode = "full_mirror" | "smart_denoise" | "curator";
 
-export type PageId = "timeline" | "dashboard" | "settings";
+export type PageId = "timeline" | "insights" | "dashboard" | "settings";
 
 export type LlmProvider = "modelscope";
 

@@ -17,6 +17,19 @@ Local-first AI conversation memory hub. This repo contains a Plasmo extension
 - `documents/` - engineering docs and roadmap
 - `architecture/` - system design notes
 
+## MVP Scope (platform support)
+Back-end capture in MVP is limited to ChatGPT and Claude. Gemini and DeepSeek
+remain as UI buttons/placeholders only and do not connect to parsing or storage.
+
+Platform support matrix:
+| Platform | MVP Backend Capture | UI Button |
+| --- | --- | --- |
+| ChatGPT | Yes | Yes |
+| Claude | Yes | Yes |
+| Gemini | No (UI-only) | Yes |
+| DeepSeek | No (UI-only) | Yes |
+
+
 ## Plasmo Extension (capture pipeline)
 Quick start (PowerShell):
 ```

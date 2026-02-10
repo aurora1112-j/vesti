@@ -1,0 +1,124 @@
+﻿import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: ["./src/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        "bg-primary": "hsl(var(--bg-primary))",
+        "bg-secondary": "hsl(var(--bg-secondary))",
+        "bg-tertiary": "hsl(var(--bg-tertiary))",
+        "surface-card": "hsl(var(--surface-card))",
+        "surface-card-hover": "hsl(var(--surface-card-hover))",
+        "surface-card-active": "hsl(var(--surface-card-active))",
+        "surface-ai-message": "hsl(var(--surface-ai-message))",
+        "text-primary": "hsl(var(--text-primary))",
+        "text-secondary": "hsl(var(--text-secondary))",
+        "text-tertiary": "hsl(var(--text-tertiary))",
+        "text-inverse": "hsl(var(--text-inverse))",
+        "accent-primary": "hsl(var(--accent-primary))",
+        "accent-primary-hover": "hsl(var(--accent-primary-hover))",
+        "accent-primary-active": "hsl(var(--accent-primary-active))",
+        "accent-primary-light": "hsl(var(--accent-primary-light))",
+        "accent-primary-muted": "hsl(var(--accent-primary-muted))",
+        "border-default": "hsl(var(--border-default))",
+        "border-subtle": "hsl(var(--border-subtle))",
+        "border-focus": "hsl(var(--border-focus))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
+        "chatgpt-bg": "hsl(var(--chatgpt-bg))",
+        "chatgpt-text": "hsl(var(--chatgpt-text))",
+        "chatgpt-border": "hsl(var(--chatgpt-border))",
+        "claude-bg": "hsl(var(--claude-bg))",
+        "claude-text": "hsl(var(--claude-text))",
+        "claude-border": "hsl(var(--claude-border))",
+        "gemini-bg": "hsl(var(--gemini-bg))",
+        "gemini-text": "hsl(var(--gemini-text))",
+        "gemini-border": "hsl(var(--gemini-border))",
+        "deepseek-bg": "hsl(var(--deepseek-bg))",
+        "deepseek-text": "hsl(var(--deepseek-text))",
+        "deepseek-border": "hsl(var(--deepseek-border))",
+        "capsule-bg": "hsl(var(--capsule-bg))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+      },
+      fontFamily: {
+        sans: ["var(--font-ui)"],
+        serif: ["var(--font-serif)"],
+        mono: ["var(--font-mono)"],
+      },
+      fontSize: {
+        "vesti-xs": ["11px", { lineHeight: "1.3" }],
+        "vesti-sm": ["12px", { lineHeight: "1.5" }],
+        "vesti-base": ["13px", { lineHeight: "1.5" }],
+        "vesti-md": ["14px", { lineHeight: "1.5" }],
+        "vesti-lg": ["16px", { lineHeight: "1.7" }],
+        "vesti-xl": ["18px", { lineHeight: "1.3" }],
+        "vesti-2xl": ["22px", { lineHeight: "1.3" }],
+      },
+      borderRadius: {
+        DEFAULT: "8px",
+        xs: "4px",
+        sm: "6px",
+        md: "8px",
+        lg: "12px",
+        full: "9999px",
+      },
+      boxShadow: {
+        "card-hover": "var(--shadow-card-hover)",
+        popover: "var(--shadow-popover)",
+        capsule: "var(--shadow-capsule)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+
+export default config;

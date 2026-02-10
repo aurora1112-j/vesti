@@ -10,25 +10,53 @@ type LogScope =
   | "llm";
 
 const DEBUG = true;
+const LOG_PREFIX = "\u{1F680} [Vesti]";
+const STYLE_PREFIX = "color: #00d2ff; font-weight: 700;";
+const STYLE_SCOPE = "color: #8a8a8a; font-weight: 600;";
+const STYLE_MSG = "color: #222;";
+const STYLE_SUCCESS = "color: #1f9d55; font-weight: 700;";
+const STYLE_WARN = "color: #b7791f; font-weight: 700;";
+const STYLE_ERROR = "color: #c53030; font-weight: 700;";
+
+function format(scope: LogScope, message: string) {
+  return `%c${LOG_PREFIX} %c[${scope}] %c${message}`;
+}
 
 export const logger = {
   info(scope: LogScope, message: string, data?: unknown) {
     if (!DEBUG) return;
     if (data !== undefined) {
-      console.log(`[${scope}] ${message}`, data);
+      console.log(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_MSG, data);
     } else {
-      console.log(`[${scope}] ${message}`);
+      console.log(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_MSG);
+    }
+  },
+  success(scope: LogScope, message: string, data?: unknown) {
+    if (!DEBUG) return;
+    if (data !== undefined) {
+      console.log(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_SUCCESS, data);
+    } else {
+      console.log(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_SUCCESS);
     }
   },
   warn(scope: LogScope, message: string, data?: unknown) {
     if (!DEBUG) return;
     if (data !== undefined) {
-      console.warn(`[${scope}] ${message}`, data);
+      console.warn(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_WARN, data);
     } else {
-      console.warn(`[${scope}] ${message}`);
+      console.warn(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_WARN);
     }
   },
   error(scope: LogScope, message: string, error: Error) {
-    console.error(`[${scope}] ${message}`, error);
+    console.error(format(scope, message), STYLE_PREFIX, STYLE_SCOPE, STYLE_ERROR, error);
+  },
+  group(label: string, fn: () => void) {
+    if (!DEBUG) return;
+    console.groupCollapsed(`%c${LOG_PREFIX} %c${label}`, STYLE_PREFIX, STYLE_SCOPE);
+    try {
+      fn();
+    } finally {
+      console.groupEnd();
+    }
   },
 };

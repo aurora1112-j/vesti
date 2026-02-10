@@ -40,7 +40,13 @@ export class CapturePipeline {
       };
 
       await this.sender({ conversation, messages });
-      logger.info("capture", "Captured conversation", {
+      window.dispatchEvent(new CustomEvent("vesti:capture"));
+      if (chrome?.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+          void chrome.runtime.lastError;
+        });
+      }
+      logger.success("capture", "Captured conversation", {
         platform,
         messageCount: messages.length,
       });

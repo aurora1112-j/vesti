@@ -1,4 +1,4 @@
-
+﻿
 import { isRequestMessage } from "../lib/messaging/protocol";
 import type { RequestMessage, ResponseMessage } from "../lib/messaging/protocol";
 import { deduplicateAndSave } from "../lib/core/middleware/deduplicate";
@@ -185,6 +185,40 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
   }
 }
 
+function openSidepanelForTab(tabId: number): void {
+  if (!chrome?.sidePanel?.open) {
+    logger.warn("background", "sidePanel API not available");
+    return;
+  }
+  chrome.sidePanel.setOptions({ tabId, path: "sidepanel.html", enabled: true }, () => {
+    chrome.sidePanel.open({ tabId }, () => {
+      void chrome.runtime.lastError;
+    });
+  });
+}
+
+chrome.runtime.onMessage.addListener((message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+  if (!message || typeof message !== "object") return;
+  const type = (message as { type?: string }).type;
+  if (type !== "OPEN_SIDEPANEL") return;
+
+  const tabId = sender.tab?.id;
+  if (typeof tabId === "number") {
+    openSidepanelForTab(tabId);
+    sendResponse?.({ ok: true });
+    return;
+  }
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeId = tabs[0]?.id;
+    if (typeof activeId === "number") {
+      openSidepanelForTab(activeId);
+    }
+    sendResponse?.({ ok: true });
+  });
+
+  return true;
+});
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
     if (!isRequestMessage(message)) return;
@@ -198,3 +232,4 @@ chrome.runtime.onMessage.addListener(
     return true;
   }
 );
+

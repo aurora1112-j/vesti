@@ -21,10 +21,10 @@ export class ConversationObserver {
         window.clearTimeout(this.debounceTimer);
       }
 
-      const delay = this.parser.isGenerating() ? 2000 : 500;
+      const DEBOUNCE_MS = 1000;
       this.debounceTimer = window.setTimeout(() => {
         void this.pipeline.capture();
-      }, delay);
+      }, DEBOUNCE_MS);
     });
 
     const targetNode = document.querySelector("main") || document.body;
