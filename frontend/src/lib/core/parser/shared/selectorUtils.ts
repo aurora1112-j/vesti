@@ -27,5 +27,16 @@ export function hasAnySelector(root: Element, selectors: string[]): boolean {
 }
 
 export function safeTextContent(el: Element | null): string {
-  return (el?.textContent || "").trim();
+  if (!el) return "";
+  try {
+    const text = (el.textContent || "").trim();
+    if (text) return text;
+    if (el instanceof HTMLElement) {
+      const inner = (el.innerText || "").trim();
+      if (inner) return inner;
+    }
+  } catch {
+    // ignore parsing errors and fall back to empty
+  }
+  return "";
 }

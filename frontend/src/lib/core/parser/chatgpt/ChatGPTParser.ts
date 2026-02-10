@@ -10,9 +10,9 @@ import {
 
 const SELECTORS = {
   messageBlocks: [
+    "[data-message-author-role]",
     "[data-testid^=\"conversation-turn\"]",
     "[data-message-id]",
-    "[data-message-author-role]",
   ],
   userRole: ["[data-message-author-role=\"user\"]"],
   assistantRole: ["[data-message-author-role=\"assistant\"]"],
