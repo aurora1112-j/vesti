@@ -47,6 +47,10 @@ pnpm install
 pnpm dev
 ```
 
+## MVP Guide
+See `documents/mvp_guide.md` for MVP ??????????Sidepanel??????ModelScope ?????????
+
+
 ## Notes
 - This repo contains both the Plasmo extension and a UI prototype. They are
   intentionally separate while the integration is in progress.
