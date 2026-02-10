@@ -1,7 +1,8 @@
-Hackathon：心迹·Vesti工程规格文档
+﻿Hackathon：心迹·Vesti工程规格文档
 00_Meta 顶层设计
 项目定位： 一款 Local-First 的浏览器插件，自动捕获用户在多个 AI 聊天平台（ChatGPT / Claude / Gemini / DeepSeek）的对话记录，提供统一的时间轴回顾、全文检索和量化可视化面板。
 一句话：一个在本地集成不同chatbot平台聊天记录并提供摘要&可视化回顾的中台（chrome浏览器插件）
+MVP 范围确认：后端捕获仅支持 ChatGPT + Claude；Gemini / DeepSeek 仅保留前端按钮与占位展示，不接入解析/存储。
 MoSCoW 优先级图例
 在本文档中，每个功能点都附有以下优先级标记，用于指导开发顺序和取舍决策。
  
@@ -25,6 +26,9 @@ Shadow DOM 注意事项： 注入宿主页面的 Content Script 组件（胶囊�
  
 点击图片可查看完整电子表格
 容量预估： Chrome 的 IndexedDB 配额约为磁盘可用空间的 60%（通常数 GB 级），对本地对话存储而言远超需求。MVP 阶段无需担忧存储上限，但仍应在设置页展示已用空间以建立用户信任。
+2.4.1 AI Insights（LLM 摘要/周报）🔴 Must
+说明：接入 ModelScope 推理 API 生成摘要与周报。API Key 由用户本地保存（chrome.storage.local），仅发送 content_text 文本，默认中文输出。
+
 2.5 Visualization（可视化）🟢 Could
  
 点击图片可查看完整电子表格
@@ -36,7 +40,6 @@ Shadow DOM 注意事项： 注入宿主页面的 Content Script 组件（胶囊�
 以下技术和能力在本次黑客松中明确排除，以控制范围：
 •	后端服务器 / 云端同步： 纯 Local-First，不搭建任何后端。
 •	多设备登录 / 账号系统： 不做用户认证。
-•	LLM API 调用（AI 摘要/周报）： "灵感"功能仅预留入口图标，不接入模型。
 •	Firefox / Safari 适配： 仅支持 Chromium 内核浏览器。
 •	国际化 (i18n)： MVP 仅支持中文界面。
 
@@ -76,6 +79,8 @@ Plain Text
 │  Background Service Worker                              │
 │  Zustand Store ↔ SidePanel / Popup UI                   │
 └─────────────────────────────────────────────────────────┘
+
+MVP 说明：仅 ChatGPT + Claude 进入捕获与入库流程；Gemini / DeepSeek 保留前端按钮，不触发后端。
 
 11_Data_Schema: 数据模型定义
 我们将数据分为两层：会话 (Conversation) 和 消息 (Message)。这符合大多数 LLM 的数据结构，也方便进行统计。
@@ -118,7 +123,8 @@ interface Conversation {
   stat_tokens: number;        // 估算 Token 消耗量 🟢 Could
 }
 
-type Platform = 'ChatGPT' | 'Doubao' | 'Gemini' | 'DeepSeek';
+type Platform = 'ChatGPT' | 'Claude' | 'Gemini' | 'DeepSeek';
+MVP 平台策略：ChatGPT/Claude 具备完整捕获与入库；Gemini/DeepSeek 仅 UI 占位（不接入后端）。
 关键设计决策说明：
 snippet 字段在写入时截取，而非在渲染时从 messages 中实时计算。这样列表页只需查 conversations 表即可完成渲染，避免了 N+1 查询问题。url 字段支持"跳转原页面"功能，从 Content Script 中的 window.location.href 采集。
 is_trash 字段用于智能降噪模式的软删除。被过滤的对话不会真正消失，而是打上标记，不出现在主 Timeline 中，但用户可在"回收站"中找回。这是一个 Should-have 功能，如果时间紧迫，可以先硬删，后续再补回收站逻辑。
@@ -189,7 +195,7 @@ interface ParsedMessage {
   htmlContent: string;     // 🟡 Should：MVP 可先忽略
   timestamp?: number;      // 部分平台可从 DOM 提取时间
 }
-MVP 交付范围： 首轮冲刺优先实现 ChatGPT Parser 和 Deepseek/豆包 Parser（用户量最大的两个平台）。Gemini 和 Claude 的 Parser 作为 Should-have，在 ChatGPT + Claude 跑通后再补。每个 Parser 的选择器映射表示例如下：
+MVP 交付范围： 首轮冲刺仅实现 ChatGPT + Claude Parser（完整捕获/入库）。Gemini / DeepSeek 仅保留前端按钮与状态标识，不接入解析/存储。后续扩展平台时继续沿用 IParser + Selector Map 的策略即可。每个 Parser 的选择器映射表示例如下：
 TypeScript
 // chatgpt-parser.ts — 选择器映射（示意，需根据实际 DOM 调整）
 const SELECTORS = {
@@ -261,7 +267,7 @@ HeatmapGrid: 统计图表组件。
 对话卡片是整个应用的"原子单元"，也是用户接触最频繁的组件。设计原则是渐进式披露 (Progressive Disclosure)——默认极简，交互时才展开细节。
 默认静态展示（Always Visible）🔴 Must：
 •	标题 (Title)： 自动生成的对话摘要，单行截断。
-•	平台标签 (Platform Tag)： 带有特定背景色的胶囊标签（如 Gemini 绿色、Claude 橙色、ChatGPT 绿色、DeepSeek 蓝色）。
+•	平台标签 (Platform Tag)： 带有特定背景色的胶囊标签（如 Gemini 绿色、Claude 橙色、ChatGPT 绿色、DeepSeek 蓝色）。MVP 中 Gemini/DeepSeek 仅作为 UI 标签/按钮占位。
 •	时间戳 (Timestamp)： 相对时间显示（如"1 分钟前"、"3 小时前"），超过 7 天显示绝对日期。
 Hover 渐进披露（On Hover）🔴 Must：
 当鼠标悬停在卡片上时，展开以下额外信息和操作：
@@ -327,7 +333,7 @@ MVP 最小实现： 只做"复制文本"一个按钮。复制代码和分享功�
 •	导出数据 🟡 Should： 导出为 JSON。Markdown 和 TXT 格式作为 Could-have。
 •	清空数据： 危险操作，需二次确认。
 关于 (About) 🔴 Must： 版本号、作者、项目链接。
-支持平台状态 🟡 Should： 展示已适配的 AI 列表，以勾选状态标识。
+支持平台状态 🟡 Should： 展示已适配的 AI 列表，以勾选状态标识（ChatGPT/Claude 已接入；Gemini/DeepSeek 按钮占位）。
 MVP 降级： 设置页只保留"全量镜像"一个模式（不需要 Radio Group），加上存储信息和清空按钮。智能降噪和策展人模式的配置 UI 后置。
 34.2 Capsule Widget（胶囊悬浮条 — 注入宿主页面）🔴 Must
 这是插件在第三方网页（ChatGPT / Claude 等）上的"驻外大使"。设计目标：足够轻量、不遮挡聊天内容、清晰展示当前工作状态。
@@ -354,17 +360,17 @@ MVP 降级： 胶囊始终以展开态显示，不做收缩/展开动效。不�
 第一轮冲刺（必须完成，产品可用的底线）🔴 Must
 1.	Plasmo 项目脚手架搭建 — 配置 React + TypeScript + Tailwind + shadcn/ui。
 2.	Dexie 数据库初始化 — conversations 和 messages 两张表，含索引。
-3.	Content Script: MutationObserver + 防抖 — 在 ChatGPT 上验证 DOM 监听可用。
-4.	ChatGPT Parser 实现 — 提取标题、消息列表、Session UUID。
+3.	Content Script: MutationObserver + 防抖 — 在 ChatGPT/Claude 上验证 DOM 监听可用。
+4.	ChatGPT + Claude Parser 实现 — 提取标题、消息列表、Session UUID。
 5.	去重中间件 (Deduplication) — 基于 uuid 的增量更新逻辑。
 6.	全量镜像模式 — 页面加载即自动录制，数据写入 IndexedDB。
 7.	胶囊悬浮条（基础版） — Shadow DOM 注入，显示"自动保存中"静态状态。
-8.	SidePanel: Timeline Feed — 对话卡片列表，按时间倒序，展示标题+平台标签+时间。
+8.	SidePanel: Timeline Feed — 对话卡片列表，按时间倒序，展示标题+平台标签+时间（Gemini/DeepSeek 仅按钮占位）。
 9.	SidePanel: 全局搜索 — 基于 title 的子串搜索。
 10.	SidePanel: Reader View（基础版） — 点击卡片进入详情，去边框化消息流。
-11.	设置页（基础版） — 存储用量展示 + 清空数据按钮 + 关于信息。
+11.	设置页（基础版） — 存储用量展示 + 清空数据按钮 + 关于信息 + 平台状态（ChatGPT/Claude 已接入；Gemini/DeepSeek 按钮占位）。
+12.	AI Insights：ModelScope 配置 + 摘要/周报生成（Insights 页 + 设置页）。
 第二轮冲刺（高优，显著提升体验）🟡 Should
-12.	Deepseek/豆包 Parser 实现。
 13.	智能降噪中间件 + is_trash 回收站逻辑。
 14.	筛选面板（日期 + 平台）。
 15.	Hover 渐进披露： 卡片 Hover 展示摘要和操作栏。
@@ -374,8 +380,8 @@ MVP 降级： 胶囊始终以展开态显示，不做收缩/展开动效。不�
 19.	胶囊悬浮条自动收缩 + 保存反馈动效。
 20.	导出为 JSON。
 21.	策展人模式 + 状态机完整四态。
-22.	Gemini / Claude Parser。
 第三轮冲刺（锦上添花）🟢 Could
+22.	Gemini / DeepSeek Parser（后续接入，当前仅前端按钮）。
 23.	Dashboard: KPI 卡片 + Active Streak。
 24.	Dashboard: Contribution Heatmap。
 25.	Dashboard: Platform Radar 饼图。
@@ -388,7 +394,6 @@ MVP 降级： 胶囊始终以展开态显示，不做收缩/展开动效。不�
 32.	Message 的 content_html / content_markdown 保存。
 明确不做 ⚫ Won't
 •	云端同步 / 多设备登录。
-•	LLM API 接入（AI 摘要、周报生成）。
 •	Firefox / Safari 适配。
 •	国际化 (i18n)。
 •	移动端适配。

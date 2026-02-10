@@ -1,4 +1,10 @@
-梳理一下针对 DeepSeek、ChatGPT、豆包三个平台的攻关路线图和知识体系。
+﻿梳理一下针对 ChatGPT、Claude 两个平台的攻关路线图和知识体系。
+MVP 范围确认：后端仅支持 ChatGPT + Claude；Gemini / DeepSeek 仅保留前端按钮，后端暂不接入。
+新增：LLM 摘要/周报接入（ModelScope）
+- 设置页配置（baseUrl / modelId / API Key）
+- 协议扩展 + offscreen 调用
+- Insights 页 UI 与缓存展示
+
 探索性攻关路线图
 阶段一：建立观察基础设施（1-2天）
 第一步是建立一个"DOM 侦探系统"，让你能够快速理解每个平台的页面结构。在真正写 Parser 之前，你需要先"看见"这些平台是如何组织对话数据的。
@@ -23,7 +29,7 @@ observer.observe(targetNode, {
 });
 运行后开始一段对话，观察控制台输出，记录下消息容器的选择器规律。
 阶段二：逐平台破解 DOM 结构（3-4天）
-按照 ChatGPT → DeepSeek → 豆包的顺序逐个攻克。这个顺序是有原因的：ChatGPT 作为最成熟的平台，网上有较多逆向经验可参考；DeepSeek 的界面设计借鉴了不少 ChatGPT 的模式；豆包作为国内产品可能 DOM 结构差异最大，放在最后处理可以利用前两个平台积累的经验。
+按照 ChatGPT → Claude 的顺序逐个攻克。这个顺序是有原因的：ChatGPT 作为最成熟的平台，网上有较多逆向经验可参考；Claude 的 DOM 与交互细节变化相对频繁，放在第二阶段更稳妥。
 针对每个平台，你需要找到五个关键信息：
 第一，对话容器的根选择器。这通常是包裹所有消息的最外层 div，在 React 应用中可能带有 id="__next" 或 id="root" 这样的标识。
 第二，单条消息的节点特征。寻找能唯一标识一条消息的 DOM 特征，比如 data-message-id 属性，或者特定的 class 命名模式（如 .message-wrapper、.conversation-turn 等）。
@@ -31,7 +37,7 @@ observer.observe(targetNode, {
 第四，内容提取路径。消息的文本内容存储在哪个子节点中？是直接的 textContent 还是需要处理 innerHTML？代码块是否有特殊的包裹结构（通常是 <pre><code> 组合）？
 第五，会话元数据位置。对话标题在哪里？是否有唯一的 session ID 或 conversation ID 可以用于去重？这些信息通常藏在 URL 参数、页面标题元素或者某个隐藏的 data 属性中。
 实用技巧：使用浏览器的"检查元素"功能时，右键点击某个消息，选择"复制 → 复制选择器"，可以快速获得该元素的 CSS 选择器路径。但要注意，自动生成的选择器往往过于具体（包含很多索引号），你需要手动简化成更通用的模式。
-阶段三：实现 Parser 接口（2-3天）根据文档中定义的 IParser 接口，为每个平台创建独立的实现类。这里的核心思想是"选择器映射表"模式，将所有 DOM 查询逻辑集中管理。
+阶段三：实现 Parser 接口（2-3天）根据文档中定义的 IParser 接口，为 ChatGPT/Claude 创建独立的实现类。这里的核心思想是"选择器映射表"模式，将所有 DOM 查询逻辑集中管理。
 以 ChatGPT 为例，你的 Parser 结构应该是这样的：
 typescript// chatgpt-parser.ts
 class ChatGPTParser implements IParser {
@@ -285,4 +291,4 @@ Breakpoint Debugging（断点调试）：在 Chrome DevTools 的 Sources 面板�
 实验三：Dexie 读写性能
 创建一个包含 1000 条模拟会话记录的测试数据集，测试查询和写入的响应时间。IndexedDB 的性能在不同浏览器中差异较大，提前测试可以避免后期的性能瓶颈。
 实验四：跨平台 UUID 提取
-在 ChatGPT、DeepSeek、豆包三个平台上，手动查看 URL 结构和页面元素，找出各自的会话 ID 存储位置。有些平台可能没有显式的 URL 参数，需要从 LocalStorage 或页面的 <script> 标签中提取。
+在 ChatGPT、Claude 两个平台上，手动查看 URL 结构和页面元素，找出各自的会话 ID 存储位置。有些平台可能没有显式的 URL 参数，需要从 LocalStorage 或页面的 <script> 标签中提取。Gemini/DeepSeek 先保留前端按钮，后端解析暂缓。
