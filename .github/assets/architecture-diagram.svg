@@ -1,0 +1,37 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="720" fill="#FAF9F5"/>
+  <text x="640" y="70" text-anchor="middle" font-size="28" fill="#1A1A1A" font-family="Arial, sans-serif">Vesti Capture Architecture</text>
+
+  <!-- External platforms -->
+  <rect x="80" y="140" width="220" height="90" rx="16" fill="#F3F4F6" stroke="#EEECE5"/>
+  <text x="190" y="195" text-anchor="middle" font-size="18" fill="#1A1A1A" font-family="Arial, sans-serif">ChatGPT</text>
+
+  <rect x="80" y="280" width="220" height="90" rx="16" fill="#F7D6B8" stroke="#EEECE5"/>
+  <text x="190" y="335" text-anchor="middle" font-size="18" fill="#1A1A1A" font-family="Arial, sans-serif">Claude</text>
+
+  <!-- Core pipeline -->
+  <rect x="420" y="140" width="240" height="110" rx="18" fill="#F0EEE6" stroke="#EEECE5"/>
+  <text x="540" y="200" text-anchor="middle" font-size="18" fill="#1A1A1A" font-family="Arial, sans-serif">Observer</text>
+
+  <rect x="740" y="140" width="240" height="110" rx="18" fill="#F0EEE6" stroke="#EEECE5"/>
+  <text x="860" y="200" text-anchor="middle" font-size="18" fill="#1A1A1A" font-family="Arial, sans-serif">Parser</text>
+
+  <rect x="1060" y="140" width="200" height="110" rx="18" fill="#F0EEE6" stroke="#EEECE5"/>
+  <text x="1160" y="200" text-anchor="middle" font-size="18" fill="#1A1A1A" font-family="Arial, sans-serif">Storage</text>
+
+  <!-- Arrows -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#3266AD" />
+    </marker>
+  </defs>
+  <line x1="300" y1="185" x2="420" y2="185" stroke="#3266AD" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="300" y1="325" x2="420" y2="185" stroke="#3266AD" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="660" y1="195" x2="740" y2="195" stroke="#3266AD" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="980" y1="195" x2="1060" y2="195" stroke="#3266AD" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <!-- IndexedDB -->
+  <rect x="1040" y="300" width="220" height="90" rx="16" fill="#F0EEE6" stroke="#EEECE5"/>
+  <text x="1150" y="355" text-anchor="middle" font-size="16" fill="#1A1A1A" font-family="Arial, sans-serif">IndexedDB</text>
+  <line x1="1160" y1="250" x2="1150" y2="300" stroke="#3266AD" stroke-width="3" marker-end="url(#arrow)"/>
+</svg>
