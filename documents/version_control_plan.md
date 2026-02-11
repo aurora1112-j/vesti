@@ -1,0 +1,210 @@
+﻿# Vesti 版本控制与发布规范（v1.0.0+）
+
+状态：Active  
+生效范围：自 `v1.0.0` 之后的全部开发与发布  
+最后更新：2026-02-11
+
+---
+
+## 1. 目标与原则
+
+本规范用于将仓库从“单主分支 + 临时发布”升级为可持续的工程发布体系。
+
+核心目标：
+- 让每次改动有清晰来源（分支）
+- 让每次发布可追踪、可回滚（annotated tag）
+- 让版本号在 Git 与扩展包层面保持一致（tag <-> package version）
+
+核心原则：
+- `main` 只承载可发布代码
+- 所有开发通过短生命周期分支 + PR 合并
+- 已发布 tag 不可变
+- 发布前必须完成 changelog 和版本号对齐
+
+---
+
+## 2. 基线定义
+
+- 当前稳定基线：`v1.0.0`
+- 基线说明：MVP 收官版本
+- 从 `v1.0.0` 开始，禁止继续“直接在 main 开发 + 临时打包发布”
+
+---
+
+## 3. 分支模型（Trunk-Based Lite）
+
+### 3.1 分支角色
+
+- `main`：唯一发布主线（受保护，禁止直推）
+- `feature/<topic>`：新功能开发
+- `fix/<topic>`：普通缺陷修复
+- `docs/<topic>`：文档类改动
+- `chore/<topic>`：工程维护类改动
+- `release/vX.Y.Z-rc.N`：发布候选分支（短生命周期）
+- `hotfix/vX.Y.Z`：线上紧急修复分支（从 `main` 拉取）
+
+### 3.2 合并策略
+
+- 常规开发：`feature|fix|docs|chore` -> PR -> `main`
+- 发布候选：从 `main` 切 `release/*` 做候选验证，通过后回合并 `main` 并打正式 tag
+- 紧急修复：`hotfix/*` -> PR -> `main` -> 打 patch tag
+
+### 3.3 仓库保护建议（GitHub Settings）
+
+- 打开 branch protection（`main`）
+- 禁止 force push
+- 要求 PR review（至少 1 人）
+- 要求通过基础检查（build/typecheck）
+
+---
+
+## 4. 标签与版本策略（SemVer + pre-release）
+
+### 4.1 版本格式
+
+- 正式版：`vX.Y.Z`
+- 预发布：`vX.Y.Z-rc.N` / `vX.Y.Z-beta.N`
+
+### 4.2 版本递增规则
+
+- Patch（`+0.0.1`）：缺陷修复、行为兼容
+- Minor（`+0.1.0`）：新增功能、向后兼容
+- Major（`+1.0.0`）：不兼容变更
+
+### 4.3 标签要求
+
+- 统一使用 annotated tag：`git tag -a`
+- 已发布 tag 不可重写、不可复用
+- 发现问题发布新版本（例如 `v1.0.1`），禁止覆盖旧 tag
+
+---
+
+## 5. 版本号强绑定（Git tag <-> package version）
+
+发布前必须保证：
+- `v1.0.1` -> `frontend/package.json` 的 `version = "1.0.1"`
+- `v1.1.0-rc.1` -> `frontend/package.json` 的 `version = "1.1.0-rc.1"`
+
+不满足时，禁止发布。
+
+建议发布前执行校验：
+
+```bash
+# 查看当前扩展版本号
+node -p "require('./frontend/package.json').version"
+
+# 查看准备发布的 tag
+git describe --tags --abbrev=0
+```
+
+---
+
+## 6. 常规发布 SOP（功能发布）
+
+1. 从 `main` 拉分支：`feature/*` 或 `fix/*`
+2. 完成开发与验证（至少 build 通过）
+3. 提交 PR 并合并到 `main`
+4. 更新 `CHANGELOG.md`（将目标变更从 `Unreleased` 整理到版本块）
+5. 更新 `frontend/package.json` 版本号
+6. 可选：创建候选分支并打 RC 标签验证
+   - `release/vX.Y.Z-rc.N`
+   - `git tag -a vX.Y.Z-rc.N -m "..."`
+7. 正式发布：
+   - `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
+   - `git push origin main`
+   - `git push origin vX.Y.Z`
+8. 归档交付物到 `release/`（命名建议：`Vesti_MVP_vX.Y.Z.zip`）
+
+---
+
+## 7. Hotfix SOP（线上紧急修复）
+
+1. 从 `main` 切 `hotfix/vX.Y.Z`
+2. 仅修复阻断问题，禁止混入新功能
+3. 快速验证（build + 关键路径手测）
+4. PR 合并 `main`
+5. 更新 changelog 对应 patch 版本块
+6. 更新 `frontend/package.json` 到 patch 版本
+7. 打补丁 tag 并推送
+
+---
+
+## 8. 回滚与追溯策略
+
+- 任意线上版本可通过 tag 回溯：
+
+```bash
+git checkout v1.0.0
+```
+
+- 回滚原则：
+  - 优先“发布新修复版本”而非重写历史
+  - 不删除或修改已发布 tag
+
+---
+
+## 9. 命令清单（可直接复制）
+
+### 9.1 新功能分支
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/<topic>
+```
+
+### 9.2 修复分支
+
+```bash
+git checkout -b fix/<topic>
+```
+
+### 9.3 候选发布（可选）
+
+```bash
+git checkout -b release/v1.0.1-rc.1
+git tag -a v1.0.1-rc.1 -m "Release candidate v1.0.1-rc.1"
+git push origin release/v1.0.1-rc.1
+git push origin v1.0.1-rc.1
+```
+
+### 9.4 正式发布
+
+```bash
+git checkout main
+git pull origin main
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin main
+git push origin v1.0.1
+```
+
+---
+
+## 10. 常见错误与禁止操作
+
+禁止：
+- 直接在 `main` 开发并直推
+- 修改/覆盖已发布 tag
+- 未更新 changelog 即发布
+- `package.json` 版本与发布 tag 不一致
+- 在 hotfix 分支混入无关功能
+
+---
+
+## 11. 责任分工（默认）
+
+- 开发者：分支开发、PR、自测、更新对应文档
+- 发布负责人：核对 changelog、版本号、tag、release 包
+- 评审者：确认改动范围、风险与发布说明一致
+
+---
+
+## 12. 发布前检查清单
+
+- [ ] 目标分支已合并到 `main`
+- [ ] `CHANGELOG.md` 已完成版本整理
+- [ ] `frontend/package.json` 版本号与目标 tag 一致
+- [ ] `pnpm build` 通过
+- [ ] 发布 tag 为 annotated tag
+- [ ] tag 已推送到远程
+- [ ] `release/` 交付物命名符合版本号

@@ -103,3 +103,15 @@
 ## 9) 备注
 - 所有安排以 Local-First 原则为底线
 - Gemini / DeepSeek 继续保持 UI 占位，后端接入后置
+
+---
+
+## 10) 版本治理与发布流程（自 v1.0.0 起）
+
+- 后续开发统一使用分支流：`feature/*`、`fix/*`、`docs/*`、`chore/*`，禁止直接在 `main` 开发。
+- 发布流程与命名规范以 `documents/version_control_plan.md` 为唯一准则。
+- 每次发布前必须同步完成两件事：
+  - 更新 `CHANGELOG.md`（整理 `Unreleased` -> 目标版本）
+  - 对齐 `frontend/package.json` 的 `version` 与目标 Git tag
+- 发布标签统一使用 annotated tag（`git tag -a`），禁止覆盖已发布 tag。
+- 交付包归档到 `release/`，建议命名 `Vesti_MVP_vX.Y.Z.zip`。
