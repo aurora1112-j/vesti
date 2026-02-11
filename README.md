@@ -1,5 +1,7 @@
-﻿<p align="center">
+<p align="center">
   <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
+  <br>
+  <sub>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</sub>
 </p>
 
 <div align="center">
