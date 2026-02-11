@@ -3,10 +3,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/React-18-3266AD?style=flat-square&logo=react&logoColor=white&labelColor=F7F6F2" />
-  <img src="https://img.shields.io/badge/TypeScript-Strict-3266AD?style=flat-square&logo=typescript&logoColor=white&labelColor=F7F6F2" />
-  <img src="https://img.shields.io/badge/Plasmo-v0.90.5-D4860A?style=flat-square&labelColor=F7F6F2" />
-  <img src="https://img.shields.io/badge/License-MIT-6B6B6B?style=flat-square&labelColor=F7F6F2" />
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+
+![Plasmo](https://img.shields.io/badge/Plasmo-090909?style=for-the-badge&logo=googlechrome&logoColor=white)
+
+![MIT License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 </p>
 
 ## 👋 项目介绍
