@@ -5,11 +5,10 @@
 </p>
 
 <div align="center">
-  
-https://github.com/user-attachments/assets/ae64b809-765a-488d-9070-f6ccaf59d2f1
+
+https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
 
   <br>
-  
   <sub>🎥 视频演示：从捕获对话到本地搜索</sub>
 
 </div>
