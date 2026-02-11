@@ -239,4 +239,6 @@ AI功能方面，目前只实现了基于ModelScope API的单会话摘要。更�
 心迹的诞生离不开开源社区的贡献。我们使用了Plasmo、Dexie.js、Tailwind CSS、shadcn/ui等优秀的开源项目,感谢这些工具的开发者。我们也感谢Claude Code和Codex在产品设计和代码开发过程中提供的协助,这个项目本身就是人机协作的成果。
 最重要的是,感谢每一位使用心迹的用户。你们的对话数据是私密的思维轨迹,选择信任我们的产品意味着很大的信心。我们承诺始终坚持本地优先的原则,让数据主权牢牢掌握在你们手中。
 
-**心迹 Vesti —— 让思维有迹可循**
+<div align="center">
+  <img src="https://img.shields.io/badge/心迹%20Vesti-让思维有迹可循-4B0082?style=for-the-badge&logo=sparkles&logoColor=FFD700&labelColor=20232A" alt="心迹 Vesti —— 让思维有迹可循">
+</div>
