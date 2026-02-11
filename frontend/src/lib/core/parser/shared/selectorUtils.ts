@@ -1,4 +1,29 @@
-﻿export function queryFirst(selectors: string[]): Element | null {
+export interface CandidateNormalizationOptions {
+  minTextLength?: number;
+  noiseContainerSelectors?: string[];
+  noiseTextPatterns?: RegExp[];
+}
+
+export interface CandidateNormalizationResult {
+  nodes: Element[];
+  droppedNoise: number;
+}
+
+function sortByDocumentOrder(nodes: Element[]): Element[] {
+  return [...nodes].sort((a, b) => {
+    if (a === b) return 0;
+    const pos = a.compareDocumentPosition(b);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+}
+
+export function uniqueNodesInDocumentOrder(nodes: Iterable<Element>): Element[] {
+  return sortByDocumentOrder(Array.from(new Set(nodes)));
+}
+
+export function queryFirst(selectors: string[]): Element | null {
   for (const selector of selectors) {
     const el = document.querySelector(selector);
     if (el) return el;
@@ -14,8 +39,32 @@ export function queryAll(selectors: string[]): Element[] {
   return [];
 }
 
+export function queryAllUnique(selectors: string[]): Element[] {
+  const nodes: Element[] = [];
+  for (const selector of selectors) {
+    document.querySelectorAll(selector).forEach((node) => nodes.push(node));
+  }
+  return uniqueNodesInDocumentOrder(nodes);
+}
+
+export function queryAllWithinUnique(root: Element, selectors: string[]): Element[] {
+  const nodes: Element[] = [];
+  for (const selector of selectors) {
+    if (root.matches(selector)) {
+      nodes.push(root);
+    }
+    root.querySelectorAll(selector).forEach((node) => nodes.push(node));
+  }
+  return uniqueNodesInDocumentOrder(nodes);
+}
+
+export function matchesAnySelector(root: Element, selectors: string[]): boolean {
+  return selectors.some((selector) => root.matches(selector));
+}
+
 export function queryFirstWithin(root: Element, selectors: string[]): Element | null {
   for (const selector of selectors) {
+    if (root.matches(selector)) return root;
     const el = root.querySelector(selector);
     if (el) return el;
   }
@@ -23,7 +72,58 @@ export function queryFirstWithin(root: Element, selectors: string[]): Element | 
 }
 
 export function hasAnySelector(root: Element, selectors: string[]): boolean {
-  return selectors.some((selector) => root.querySelector(selector) !== null);
+  return selectors.some(
+    (selector) => root.matches(selector) || root.querySelector(selector) !== null,
+  );
+}
+
+export function closestAnySelector(root: Element, selectors: string[]): Element | null {
+  let current: Element | null = root;
+  while (current) {
+    if (matchesAnySelector(current, selectors)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+export function normalizeCandidateNodes(
+  nodes: Element[],
+  options: CandidateNormalizationOptions = {},
+): CandidateNormalizationResult {
+  const minTextLength = options.minTextLength ?? 1;
+  const noiseContainerSelectors = options.noiseContainerSelectors ?? [];
+  const noiseTextPatterns = options.noiseTextPatterns ?? [];
+
+  let droppedNoise = 0;
+  const kept: Element[] = [];
+
+  for (const node of uniqueNodesInDocumentOrder(nodes)) {
+    const inNoiseContainer = noiseContainerSelectors.some(
+      (selector) => node.closest(selector) !== null,
+    );
+    if (inNoiseContainer) {
+      droppedNoise += 1;
+      continue;
+    }
+
+    const normalizedText = safeTextContent(node).replace(/\s+/g, " ").trim();
+    if (normalizedText.length < minTextLength) {
+      droppedNoise += 1;
+      continue;
+    }
+
+    const matchesNoisePattern = noiseTextPatterns.some((pattern) =>
+      pattern.test(normalizedText),
+    );
+    if (matchesNoisePattern) {
+      droppedNoise += 1;
+      continue;
+    }
+
+    kept.push(node);
+  }
+
+  return { nodes: kept, droppedNoise };
 }
 
 export function safeTextContent(el: Element | null): string {
@@ -36,7 +136,7 @@ export function safeTextContent(el: Element | null): string {
       if (inner) return inner;
     }
   } catch {
-    // ignore parsing errors and fall back to empty
+    // Ignore parsing errors and fall back to empty.
   }
   return "";
 }

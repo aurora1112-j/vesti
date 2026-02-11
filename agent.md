@@ -2,9 +2,12 @@
 
 ## Skills Index
 
+- `skills/parser-debugging/SKILL.md` — Parser 故障排查与修复 SOP（Claude/ChatGPT）
+
 - `skills/markdown-writing/SKILL.md` — Markdown/README 排版与编码 SOP（保留原文、结构化分段、徽章/表格规范、UTF-8 BOM）
 
 > agent.md 仅保留核心原则，部门法/流程细则统一放在 skills/ 目录。
+> Constitutional boundary: `agent.md` defines stable architecture/quality constraints, while `skills/` hosts fast-iterating task SOPs. If conflicts appear, `agent.md` takes precedence.
 
 > This document serves as the development specification for the AI Coding Agent. Please strictly adhere to the following principles before generating any code.
 
@@ -12,7 +15,7 @@
 
 You are developing a **Local-First** browser extension, where the core values are privacy protection and user data sovereignty. This means every line of code must revolve around "Local First." Any feature requiring network requests (except for necessary web searches) should be questioned. The data flow is always: Host Page DOM → Content Script Parsing → Local IndexedDB, never passing through any remote server.
 
-The project adopts a layered architecture with a clear separation of concerns. The bottom layer is the Core Engine (Observer + Parser + Middleware + Database), the middle is the State Management Layer, and the top is the UI Presentation Layer. Each layer must be independently testable and replaceable, with no direct cross-layer dependencies allowed. When writing a module, always ask yourself: Does this module only depend on the interfaces it is supposed to know?
+The project adopts a layered architecture with a clear separation of concerns. The bottom layer is the Core Engine (Observer + Parser + Middleware + Database), the middle is the Service and Messaging Coordination Layer, and the top is the UI Presentation Layer. Each layer must be independently testable and replaceable, with no direct cross-layer dependencies allowed. When writing a module, always ask yourself: Does this module only depend on the interfaces it is supposed to know?
 
 ## Core Principles of Code Quality
 
@@ -36,9 +39,9 @@ Every asynchronous operation must have a clear error boundary. Use `Promise.catc
 
 ### Performance Optimization at Design Stage
 
-MutationObserver triggers callbacks on every minute change in the DOM. During AI stream output, this may trigger hundreds of times per second. Therefore, debouncing is not an optional optimization but a mandatory design element. The debounce delay should be determined through actual testing; 2000ms is the suggested value, but different platforms have different output speeds and may require dynamic adjustment.
+MutationObserver triggers callbacks on every minute change in the DOM. During AI stream output, this may trigger hundreds of times per second. Therefore, debouncing is not an optional optimization but a mandatory design element. Use `1000ms` as the default baseline, then tune per platform based on measured stream behavior. Always keep a manual-save fallback path when auto-capture timing is uncertain.
 
-Database queries must fully utilize indexes. When you execute `db.conversations.where('platform').equals('ChatGPT')`, Dexie uses an index for quick positioning with a time complexity of . However, if you use `db.conversations.filter(c => c.platform === 'ChatGPT')`, it performs a full table scan , which will cause lag with large datasets. The compound index `[platform+created_at]` is already defined in the Schema; ensure your query statements hit this index.
+Database queries must fully utilize indexes. When you execute `db.conversations.where('platform').equals('ChatGPT')`, Dexie uses an index for quick positioning (roughly `O(log n)` lookup behavior). However, if you use `db.conversations.filter(c => c.platform === 'ChatGPT')`, it performs an in-memory full table scan (`O(n)`), which will cause lag with large datasets. The compound index `[platform+created_at]` is already defined in the Schema; ensure your query statements hit this index.
 
 DOM operations must be batched. Do not frequently call `querySelector` inside a loop. Instead, use `querySelectorAll` to get all nodes at once and process them in memory. Extracting a message list should follow: Get Container → Get All Child Nodes → Batch Parse → Batch Write to Database, rather than: Get Container → Loop (Get Single Node → Parse → Write).
 
@@ -50,7 +53,7 @@ Each Parser should be a completely independent module; code changes in the ChatG
 
 Middleware must be pure functions or asynchronous functions with explicit side effects. The signature for a deduplication middleware should be `async function deduplicate(conversation: Conversation, messages: Message[]): Promise<{ conversation: Conversation, messages: Message[] } | null>`, returning the processed data or `null` (indicating it should be discarded). Middleware is not allowed to modify the passed object directly; it should return a new object or use an immutable update pattern.
 
-Communication between UI components and the data layer must go through the Zustand Store or Chrome Runtime Message API. UI components are not allowed to import Dexie instances directly. The benefit of this is the ability to easily switch storage solutions in the future (e.g., migrating from IndexedDB to OPFS) without the UI layer being aware.
+Communication between UI components and the data layer must go through service interfaces and/or Chrome Runtime Message API. UI components are not allowed to import Dexie instances directly. The benefit of this is the ability to easily switch storage solutions in the future (e.g., migrating from IndexedDB to OPFS) without the UI layer being aware.
 
 State Machine transitions must have clear type constraints. Use TypeScript's Discriminated Union to represent different states:
 
@@ -91,6 +94,8 @@ private findMessageContainer(): Element | null {
 }
 
 ```
+
+Role parsing must follow a role-first strategy: locate role-anchored nodes first, then extract content. Never treat a mixed conversation turn container as one message if it contains both user and assistant subtrees. If role cannot be determined from node attributes, test IDs, or nearest role-bearing ancestor, drop the node and record it as `droppedUnknownRole` instead of defaulting blindly to `ai`.
 
 ### Manifest V3 Limitations and Solutions
 
@@ -140,11 +145,13 @@ ChatGPT usually adds a loading icon with the class name `.result-streaming` at t
 
 Claude might use different mechanisms, such as adding a `data-is-streaming="true"` attribute to the message container, or inserting a cursor element after the last message node.
 
-Doubao (豆包) and DeepSeek require actual observation to determine. A generic fallback scheme is: when the DOM stops changing for more than 2 seconds, consider the output complete. This threshold needs tuning in practice; too short may capture incomplete messages, while too long makes the plugin feel unresponsive.
+Gemini / DeepSeek / Doubao are future-platform targets and must not weaken current MVP reliability. Before enabling any new platform, capture real DOM samples first and define platform-specific completion rules. As a temporary generic fallback, treat output as complete only when the DOM stops changing for more than 2 seconds and keep manual-save available.
 
 In the MutationObserver callback, do not directly execute time-consuming operations (like database writes). Set a flag and process in batches within the debounced `setTimeout` callback. This prevents blocking the UI thread.
 
 ### Consistency Guarantees for Incremental Updates
+
+Conversation lookup and creation must follow a stable sequence: resolve by platform UUID first, then fallback to normalized URL, and only then create a new conversation after a transaction-level double-check. This avoids duplicate conversations when URL watchers and manual save run close together.
 
 When a user continues chatting in the same conversation, your system will detect an increase in `message_count` and needs to perform an incremental update. Note the following details:
 
@@ -227,6 +234,8 @@ const logger = {
 
 ```
 
+For parser diagnostics, always emit a compact stats object at the end of each capture pass: `totalCandidates`, `keptMessages`, `roleDistribution`, `droppedUnknownRole`, and `droppedNoise`. If `roleDistribution` only has one side in a non-empty conversation, log a warning and include up to three sample snippets for inspection.
+
 In the production environment, detailed logs should be disabled via a configuration switch, keeping only error logs. You can use the environment variable `process.env.NODE_ENV === 'development'` to judge.
 
 For hard-to-reproduce issues (like parsing failures caused by specific conversation formats), add a "Snapshot" feature in the code: when an exception is detected, automatically serialize the current DOM structure, parsing results, and error information into JSON and store it in `chrome.storage.local` for later analysis.
@@ -253,7 +262,7 @@ Before submitting every Pull Request (or letting the Coding Agent generate code)
 
 **Architecture Check**: Do dependencies between modules comply with layering principles? Do UI components access the database directly? Does the Parser contain platform-independent generic logic (if so, it should be extracted to a common module)?
 
-**Maintainability Check**: Do variable names clearly express business meaning? Does complex logic have explanatory comments? Are magic numbers (like 2000ms) extracted as named constants?
+**Maintainability Check**: Do variable names clearly express business meaning? Does complex logic have explanatory comments? Are timing thresholds (like debounce milliseconds) extracted as named constants?
 
 **Testing Check**: Do critical pure functions have corresponding unit tests? Are boundary conditions covered by tests?
 

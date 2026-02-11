@@ -1,33 +1,46 @@
 ﻿---
 name: vesti-markdown-writing
-description: README/Markdown 排版与编码 SOP（保留原文、结构化分段、徽章/表格规范、UTF-8 BOM）
+description: README/Markdown formatting and encoding SOP. Use for README/docs restructuring while preserving original text and writing UTF-8 BOM output for Windows compatibility.
 ---
 
 # Vesti Markdown Writing Skill
 
-## 适用范围
+## Scope
 
-用于 README / Docs 的排版与编码规范执行，强调不改写原文，只做结构化排版。
+Use this skill for README/docs layout updates when content must stay semantically unchanged and only structure/presentation can be adjusted.
 
-## 必须遵守（Do）
+## Relationship With agent.md
 
-- 原文不删改、不改写，保持语义与用词完全一致
-- 必须保留段落与空行，避免压缩成单段
-- H2 使用 Emoji；H3 简洁、不要加粗
-- 徽章必须使用 `style=flat-square` 且按指定色值
-- Tech Stack 必须用 HTML 表格
-- 所有中文文档输出为 UTF-8 BOM（Windows 兼容）
+- `agent.md` is the constitutional layer (stable architecture and quality boundaries).
+- This skill is a procedural layer for Markdown/README execution details.
+- If any instruction conflicts, follow `agent.md`.
 
-## 禁止项（Don’t）
+## Do
 
-- 禁止合并段落导致“挤在一起”
-- 禁止随意换字、删句或改写原文
-- 禁止使用默认亮色徽章或非指定配色
-- 禁止用无序列表替代要求的 HTML 表格
+- Preserve original wording; do not rewrite or summarize user-provided body text unless explicitly asked.
+- Preserve paragraph breaks and blank lines.
+- Use emoji-decorated H2 and simple H3 headings when requested.
+- Use `style=flat-square` for badges with user-specified colors.
+- Use HTML table for Tech Stack sections when requested.
+- Save Chinese-facing docs as UTF-8 BOM.
 
-## 校验清单
+## Don't
 
-- README 渲染后段落层级清晰、无挤压
-- BOM 生效（Windows/IDE 打开无 ??? 乱码）
-- 徽章样式与色值正确
-- Tech Stack 表格已插入且对齐清晰
+- Do not collapse paragraphs into one block.
+- Do not silently change wording, tone, or meaning.
+- Do not switch to default bright badge colors if a palette is specified.
+- Do not replace required HTML tables with unordered lists.
+
+## Procedure
+
+1. Lock source copy from the user and keep it intact.
+2. Apply only structural formatting (headings, spacing, tables, callouts, image blocks).
+3. Save files with UTF-8 BOM when Chinese content/Windows compatibility matters.
+4. Validate rendering and confirm no `???` artifacts.
+
+## Validation Checklist
+
+- Layout is readable and section hierarchy is clear.
+- Windows editors display Chinese text correctly (no `???`).
+- Badge styles and colors match the requested spec.
+- Required HTML table sections are present.

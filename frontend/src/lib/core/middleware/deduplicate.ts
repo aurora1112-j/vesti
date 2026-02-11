@@ -1,59 +1,106 @@
-﻿import type { ConversationDraft, ParsedMessage } from "../../messaging/protocol";
+import type { ConversationDraft, ParsedMessage } from "../../messaging/protocol";
 import { db } from "../../db/schema";
 import type { ConversationRecord, MessageRecord } from "../../db/schema";
+
+function normalizeText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function buildParsedSignatures(messages: ParsedMessage[]): string[] {
+  return messages.map((message) => `${message.role}|${normalizeText(message.textContent)}`);
+}
+
+function buildStoredSignatures(messages: MessageRecord[]): string[] {
+  return [...messages]
+    .sort((a, b) => {
+      if (a.created_at !== b.created_at) return a.created_at - b.created_at;
+      const aId = a.id ?? 0;
+      const bId = b.id ?? 0;
+      return aId - bId;
+    })
+    .map((message) => `${message.role}|${normalizeText(message.content_text)}`);
+}
+
+function signaturesMatch(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function sanitizeIncomingMessages(messages: ParsedMessage[]): ParsedMessage[] {
+  return messages.filter((message) => normalizeText(message.textContent).length > 0);
+}
 
 export async function deduplicateAndSave(
   conversation: ConversationDraft,
   messages: ParsedMessage[]
 ): Promise<{ saved: boolean; newMessages: number; conversationId?: number }> {
   return db.transaction("rw", db.conversations, db.messages, async () => {
+    const cleanMessages = sanitizeIncomingMessages(messages);
+    if (cleanMessages.length === 0) {
+      return { saved: false, newMessages: 0 };
+    }
+
     const existing = await db.conversations
       .where("uuid")
       .equals(conversation.uuid)
       .first();
 
     if (existing && existing.id !== undefined) {
-      if (conversation.message_count <= existing.message_count) {
+      const existingMessages = await db.messages
+        .where("conversation_id")
+        .equals(existing.id)
+        .toArray();
+
+      const incomingSignatures = buildParsedSignatures(cleanMessages);
+      const storedSignatures = buildStoredSignatures(existingMessages);
+
+      if (signaturesMatch(incomingSignatures, storedSignatures)) {
         return { saved: false, newMessages: 0, conversationId: existing.id };
       }
 
-      const newCount = conversation.message_count - existing.message_count;
-      const newMessages = messages.slice(-newCount);
+      await db.messages.where("conversation_id").equals(existing.id).delete();
 
-      await db.conversations.update(existing.id, {
-        updated_at: conversation.updated_at,
-        message_count: conversation.message_count,
-        snippet: conversation.snippet,
-      } as Partial<ConversationRecord>);
-
-      const inserts: MessageRecord[] = newMessages.map((m) => ({
+      const baseTimestamp = Date.now();
+      const inserts: MessageRecord[] = cleanMessages.map((message, index) => ({
         conversation_id: existing.id!,
-        role: m.role,
-        content_text: m.textContent,
-        created_at: m.timestamp ?? Date.now(),
+        role: message.role,
+        content_text: message.textContent,
+        created_at: message.timestamp ?? baseTimestamp + index,
       }));
 
       await db.messages.bulkAdd(inserts);
 
+      await db.conversations.update(existing.id, {
+        updated_at: conversation.updated_at,
+        message_count: cleanMessages.length,
+        snippet: cleanMessages[0]?.textContent.slice(0, 100) ?? conversation.snippet,
+      } as Partial<ConversationRecord>);
+
       return {
         saved: true,
-        newMessages: newMessages.length,
+        newMessages: Math.max(0, cleanMessages.length - existingMessages.length),
         conversationId: existing.id,
       };
     }
 
-    const record: ConversationRecord = { ...conversation };
+    const record: ConversationRecord = {
+      ...conversation,
+      message_count: cleanMessages.length,
+      snippet: cleanMessages[0]?.textContent.slice(0, 100) ?? conversation.snippet,
+    };
+
     const conversationId = await db.conversations.add(record);
 
-    const inserts: MessageRecord[] = messages.map((m) => ({
+    const baseTimestamp = Date.now();
+    const inserts: MessageRecord[] = cleanMessages.map((message, index) => ({
       conversation_id: conversationId,
-      role: m.role,
-      content_text: m.textContent,
-      created_at: m.timestamp ?? Date.now(),
+      role: message.role,
+      content_text: message.textContent,
+      created_at: message.timestamp ?? baseTimestamp + index,
     }));
 
     await db.messages.bulkAdd(inserts);
 
-    return { saved: true, newMessages: messages.length, conversationId };
+    return { saved: true, newMessages: cleanMessages.length, conversationId };
   });
 }
