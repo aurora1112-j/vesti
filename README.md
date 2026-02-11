@@ -1,7 +1,7 @@
 <p align="center">
   <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
   <br>
-  <sub>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</sub>
+  <b>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</b>
 </p>
 
 <div align="center">
@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
 
 <b>🎥 视频演示：捕获对话与其他试验功能</b>
 
-  <br><br>
+  <br>
 
   ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
   ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
