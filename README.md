@@ -2,15 +2,14 @@
   <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
 </p>
 
-<p align="center">
+<div align="center">
+
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-
 ![Plasmo](https://img.shields.io/badge/Plasmo-090909?style=for-the-badge&logo=googlechrome&logoColor=white)
+![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-![MIT License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-</p>
+</div>
 
 ## 👋 项目介绍
 
