@@ -107,6 +107,12 @@ https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
   </a>
 </div>
 
+<a href="https://vesti-landing-page0211.vercel.app/">
+    <img src=".github/assets/landing-page-preview.png" alt="Vesti 官网预览" width="80%" style="border-radius: 10px; border: 1px solid #30363d;">
+  </a>
+  <br><sub>👆 点击预览图访问官网，体验更精美的介绍页面</sub>
+</div>
+
 ### 🛠️ 安装步骤
 
 #### 1. 解压安装包
