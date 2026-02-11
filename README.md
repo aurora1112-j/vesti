@@ -94,18 +94,39 @@ https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
 └── .github/assets/    # README 图像资源
 ```
 
-## 🚀 快速开始（离线安装版）
-### 无需编程环境，三步即可体验心迹 Vesti！
+## 🚀 快速开始 (离线安装版)
 
-### 安装步骤
+无需配置编程环境，三步即可体验心迹 Vesti！请先访问以下任一项目主页下载最新版本的安装包 (`.zip` 文件)：
 
-下载与解压：下载 Vesti_v1.0.zip 安装包，将其解压到本地任意位置（请确保解压后的文件夹内包含 manifest.json 文件）。
+<div align="center">
+  <a href="https://vesti-landing-page0211.vercel.app/">
+    <img src="https://img.shields.io/badge/官网下载-Vercel-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel 官网下载">
+  </a>
+  <a href="https://modelscope.cn/studios/aurorasein/Vesti/summary">
+    <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载">
+  </a>
+</div>
 
-开启开发者模式：在 Chrome 浏览器地址栏输入 chrome://extensions/ 并回车。务必开启页面右上角的**“开发者模式”**开关。
+### 🛠️ 安装步骤
 
-加载插件：点击左上角的**“加载已解压的扩展程序”**按钮，选择第1步中解压得到的文件夹。
+#### 1. 解压安装包
+下载完成后，将 `Vesti_v1.0.zip` 解压到本地任意位置（例如 `D:\Vesti` 或 `~/Documents/Vesti`）。
+> ⚠️ **注意**：请确保解压后的文件夹内能直接看到 `manifest.json` 文件。安装完成后，**请勿删除或移动该文件夹**，否则插件将失效。
 
-安装完成后，Vesti 图标将出现在浏览器工具栏中。现在打开 DeepSeek 或 ChatGPT 网页开始对话，点击图标或侧边栏，即可看到你的对话已被自动捕获并生成“记忆胶囊”。
+#### 2. 开启开发者模式
+在 Chrome 浏览器地址栏输入 `chrome://extensions/` 并回车进入扩展管理页。务必开启页面右上角的 **“开发者模式 (Developer mode)”** 开关。
+
+#### 3. 加载插件
+点击左上角的 **“加载已解压的扩展程序 (Load unpacked)”** 按钮，选择第 1 步中解压得到的 **文件夹**。
+
+---
+
+### 🎉 安装成功！
+此时 Vesti 图标将出现在浏览器右上角的工具栏中（如果没有显示，请点击 🧩 拼图图标将其固定）。
+
+**现在，你可以：**
+1. 打开 **DeepSeek**、**ChatGPT** 或 **Claude** 网页版开始对话。
+2. 留意侧边栏或点击 Vesti 图标，你会发现你的思维轨迹已被自动捕获并生成了精美的“记忆胶囊”。
 
 ## 🚀 快速开始
 
