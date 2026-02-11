@@ -5,6 +5,16 @@
 </p>
 
 <div align="center">
+  
+https://github.com/user-attachments/assets/ae64b809-765a-488d-9070-f6ccaf59d2f1
+
+  <br>
+  
+  <sub>🎥 视频演示：从捕获对话到本地搜索</sub>
+
+</div>
+
+<div align="center">
 
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
