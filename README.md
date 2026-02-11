@@ -8,17 +8,14 @@
 
 https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
 
-  <br>
-  <sub>🎥 视频演示：从捕获对话到本地搜索</sub>
+<b>🎥 视频演示：捕获对话与其他试验功能</b>
 
-</div>
+  <br><br>
 
-<div align="center">
-
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Plasmo](https://img.shields.io/badge/Plasmo-090909?style=for-the-badge&logo=googlechrome&logoColor=white)
-![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+  ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+  ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+  ![Plasmo](https://img.shields.io/badge/Plasmo-090909?style=for-the-badge&logo=googlechrome&logoColor=white)
+  ![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 </div>
 
