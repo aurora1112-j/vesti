@@ -105,9 +105,10 @@ https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
   <a href="https://modelscope.cn/studios/aurorasein/Vesti/summary">
     <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载">
   </a>
-</div>
 
-<a href="https://vesti-landing-page0211.vercel.app/">
+  <br><br>
+
+  <a href="https://vesti-landing-page0211.vercel.app/">
     <img src=".github/assets/landing-page-preview.png" alt="Vesti 官网预览" width="80%" style="border-radius: 10px; border: 1px solid #30363d;">
   </a>
   <br><sub>👆 点击预览图访问官网，体验更精美的介绍页面</sub>
