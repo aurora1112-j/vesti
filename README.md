@@ -119,11 +119,55 @@ https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
 构建成功后，你会在frontend目录下看到一个build文件夹，其中的chrome-mv3-dev子目录就是可以加载的扩展程序。打开Chrome浏览器，在地址栏输入chrome://extensions/，进入扩展管理页面。确保右上角的开发者模式已开启，然后点击左上角的"加载已解压的扩展程序"按钮，选择刚才提到的chrome-mv3-dev目录。
 如果一切顺利，你会在扩展列表中看到心迹Vesti的图标。现在打开ChatGPT或Claude的网页，开始一段对话，你会发现心迹已经在后台默默工作了。点击浏览器右上角的心迹图标，或者通过侧边栏按钮打开心迹面板，你应该能看到刚才的对话已经被捕获并显示在时间轴中。
 
-## 🔌 配置ModelScope API
+### ⚙️ 配置 ModelScope API
 
-心迹的摘要功能需要调用ModelScope的大语言模型API。要启用这个功能，你需要先获取API密钥。访问ModelScope官网并注册账号，在控制台创建新的API密钥。请妥善保管这个密钥，不要与他人分享。
-在心迹的设置页面中，找到ModelScope配置区域。输入你的API密钥，并选择要使用的模型ID。我们推荐使用qwen系列模型，它们在中文理解和生成方面表现优秀。配置完成后，点击测试按钮验证连接是否成功。如果看到"连接成功"的提示，说明配置已完成。
-现在你可以在任何对话详情页中点击"生成摘要"按钮，系统会调用ModelScope API分析对话内容并生成结构化摘要。生成的摘要会被缓存在本地，下次查看同一对话时无需重新生成。
+心迹的摘要功能通过调用 ModelScope (魔搭社区) 的大模型 API 来实现。请按照以下步骤获取密钥并完成配置：
+
+#### 第一步：获取访问令牌 (Access Token)
+
+1. 访问 [ModelScope 官网](https://www.modelscope.cn/) 并注册/登录账号。
+2. 点击右上角头像进入「个人中心」，在左侧菜单栏找到并点击 **“访问控制”**。
+3. 进入 **“访问令牌”** 页面，复制以 `sdk_` 或 `git_` 开头的字符串。
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="30%">
+      <img src=".github/assets/modelscope-sidebar.jpg" alt="侧边栏菜单 - 访问控制" width="100%">
+      <br><sub>① ModelScope 个人中心侧边栏</sub>
+    </td>
+    <td align="center" width="70%">
+      <img src=".github/assets/modelscope-access-token.png" alt="复制访问令牌页面" width="100%">
+      <br><sub>② 复制生成的 Access Token</sub>
+    </td>
+  </tr>
+</table>
+</div>
+
+#### 第二步：在心迹中完成配置
+
+回到心迹扩展，点击右下角的设置图标进入设置页面，找到 ModelScope 配置区域。
+
+1.  **API Key**: 填入上一步复制的令牌字符串。
+2.  **Model ID**: 填入你想使用的模型 ID。
+    * *推荐使用 Qwen2.5-Coder 系列（如 `Qwen/Qwen2.5-Coder-32B-Instruct`），该系列在代码理解和响应速度上表现优异。*
+3.  **测试连接**: 配置完成后，务必点击 **"Test"** 按钮。如果看到 "连接成功" 提示，说明配置已完成。
+
+<div align="center">
+  <img src=".github/assets/vesti-settings-modelscope.png" alt="心迹设置页面 ModelScope 配置示例" width="80%">
+  <br><sub>✅ 最终配置效果示例（填入 ID 和 Key 后点击测试）</sub>
+</div>
+
+---
+
+#### 附录：如何查找其他模型 ID？
+
+如果你想尝试其他模型，可以在 ModelScope 的模型库中搜索。请确保复制的是形如 `组织名/模型名` （英文）的完整 ID 格式。
+
+<div align="center">
+  <img src=".github/assets/modelscope-model-ref.png" alt="ModelScope 模型库界面参考" width="100%">
+  <br><sub>参考：在模型库列表中查找模型 ID</sub>
+</div>
 
 ## 📖 使用指南
 
