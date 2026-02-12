@@ -27,6 +27,10 @@
 
   https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
   
+
+https://github.com/user-attachments/assets/9f3f04a6-4abd-4d46-bcb5-b0d12e1b732f
+
+
   <b>🎥 视频演示：捕获对话与其他试验功能</b>
 
   <br><br>
