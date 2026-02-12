@@ -1,5 +1,13 @@
 <div align="center">
 
+  <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
+
+  <br>
+
+  <b>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</b>
+
+  <br>
+
   <table border="0" width="100%">
     <tr>
       <td width="50%" align="center">
