@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { Sparkles, Eye, EyeOff, Loader2 } from "lucide-react";
-import type { InsightStatus, LlmConfig } from "~lib/types";
+import type { AsyncStatus, LlmConfig } from "~lib/types";
 import {
   getLlmSettings,
   setLlmSettings,
@@ -29,7 +29,7 @@ function getErrorMessage(error: unknown): string {
 export function SettingsPage() {
   const [llmSettings, setLlmSettingsState] = useState<LlmConfig>(buildDefaultSettings());
   const [showApiKey, setShowApiKey] = useState(false);
-  const [status, setStatus] = useState<InsightStatus>("idle");
+  const [status, setStatus] = useState<AsyncStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {

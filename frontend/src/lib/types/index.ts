@@ -55,10 +55,33 @@ export interface LlmConfig {
   updatedAt: number;
 }
 
+export type InsightFormat = "plain_text" | "structured_v1" | "fallback_plain_text";
+export type InsightStatus = "ok" | "fallback";
+
+export interface ConversationSummaryV1 {
+  topic_title: string;
+  key_takeaways: string[];
+  sentiment: "neutral" | "positive" | "negative";
+  action_items?: string[];
+  tech_stack_detected: string[];
+}
+
+export interface WeeklyReportV1 {
+  period_title: string;
+  main_themes: string[];
+  key_takeaways: string[];
+  action_items?: string[];
+  tech_stack_detected: string[];
+}
+
 export interface SummaryRecord {
   id: number;
   conversationId: number;
   content: string;
+  structured?: ConversationSummaryV1 | null;
+  format?: InsightFormat;
+  status?: InsightStatus;
+  schemaVersion?: "conversation_summary.v1";
   modelId: string;
   createdAt: number;
   sourceUpdatedAt: number;
@@ -69,10 +92,13 @@ export interface WeeklyReportRecord {
   rangeStart: number;
   rangeEnd: number;
   content: string;
+  structured?: WeeklyReportV1 | null;
+  format?: InsightFormat;
+  status?: InsightStatus;
+  schemaVersion?: "weekly_report.v1";
   modelId: string;
   createdAt: number;
   sourceHash: string;
 }
 
-export type InsightStatus = "idle" | "loading" | "ready" | "error";
-
+export type AsyncStatus = "idle" | "loading" | "ready" | "error";

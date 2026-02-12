@@ -3,12 +3,14 @@ import type {
   Message,
   DashboardStats,
   Platform,
+  InsightFormat,
+  InsightStatus,
   SummaryRecord,
   WeeklyReportRecord,
 } from "../types";
 import type { ConversationFilters } from "../messaging/protocol";
-import {
-  db,
+import { db } from "./schema";
+import type {
   ConversationRecord,
   MessageRecord,
   SummaryRecordRecord,
@@ -33,14 +35,42 @@ function toSummary(record: SummaryRecordRecord): SummaryRecord {
   if (record.id === undefined) {
     throw new Error("Summary record missing id");
   }
-  return record as SummaryRecord;
+
+  const summary = record as SummaryRecord;
+  const format: InsightFormat =
+    summary.format ?? (summary.structured ? "structured_v1" : "plain_text");
+  const status: InsightStatus =
+    summary.status ?? (summary.structured ? "ok" : "fallback");
+
+  return {
+    ...summary,
+    structured: summary.structured ?? null,
+    format,
+    status,
+    schemaVersion:
+      summary.schemaVersion ?? (summary.structured ? "conversation_summary.v1" : undefined),
+  };
 }
 
 function toWeeklyReport(record: WeeklyReportRecordRecord): WeeklyReportRecord {
   if (record.id === undefined) {
     throw new Error("Weekly report record missing id");
   }
-  return record as WeeklyReportRecord;
+
+  const weekly = record as WeeklyReportRecord;
+  const format: InsightFormat =
+    weekly.format ?? (weekly.structured ? "structured_v1" : "plain_text");
+  const status: InsightStatus =
+    weekly.status ?? (weekly.structured ? "ok" : "fallback");
+
+  return {
+    ...weekly,
+    structured: weekly.structured ?? null,
+    format,
+    status,
+    schemaVersion:
+      weekly.schemaVersion ?? (weekly.structured ? "weekly_report.v1" : undefined),
+  };
 }
 
 function dayKey(ts: number): string {

@@ -11,25 +11,16 @@ import {
   exportAllDataAsJson,
   clearAllData,
   getSummary,
-  saveSummary,
   getWeeklyReport,
-  saveWeeklyReport,
-  listConversationsByRange,
-  getConversationById,
 } from "../lib/db/repository";
 import { getLlmSettings, setLlmSettings } from "../lib/services/llmSettingsService";
+import { callModelScope } from "../lib/services/llmService";
 import {
-  buildSummaryPrompt,
-  buildWeeklyPrompt,
-  buildWeeklySourceHash,
-  callModelScope,
-  truncateForContext,
-} from "../lib/services/llmService";
+  generateConversationSummary,
+  generateWeeklyReport,
+} from "../lib/services/insightGenerationService";
 import type { LlmConfig } from "../lib/types";
 import { logger } from "../lib/utils/logger";
-
-const SUMMARY_MAX_CHARS = 12000;
-const WEEKLY_MAX_CHARS = 12000;
 
 function requireSettings(settings: LlmConfig | null): LlmConfig {
   if (!settings) {
@@ -90,11 +81,11 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
       }
       case "TEST_LLM_CONNECTION": {
         const settings = requireSettings(await getLlmSettings());
-        const content = await callModelScope(settings, "Reply with OK only.");
+        const result = await callModelScope(settings, "Reply with OK only.");
         return {
           ok: true,
           type: messageType,
-          data: { ok: true, message: content },
+          data: { ok: true, message: result.content },
         };
       }
       case "GET_CONVERSATION_SUMMARY": {
@@ -103,25 +94,10 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
       }
       case "GENERATE_CONVERSATION_SUMMARY": {
         const settings = requireSettings(await getLlmSettings());
-        const conversation = await getConversationById(
+        const record = await generateConversationSummary(
+          settings,
           message.payload.conversationId
         );
-        if (!conversation) {
-          throw new Error("CONVERSATION_NOT_FOUND");
-        }
-        const messages = await listMessages(message.payload.conversationId);
-        const prompt = truncateForContext(
-          buildSummaryPrompt(messages, "zh"),
-          SUMMARY_MAX_CHARS
-        );
-        const content = await callModelScope(settings, prompt);
-        const record = await saveSummary({
-          conversationId: conversation.id,
-          content,
-          modelId: settings.modelId,
-          createdAt: Date.now(),
-          sourceUpdatedAt: conversation.updated_at,
-        });
         return { ok: true, type: messageType, data: record };
       }
       case "GET_WEEKLY_REPORT": {
@@ -133,39 +109,11 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
       }
       case "GENERATE_WEEKLY_REPORT": {
         const settings = requireSettings(await getLlmSettings());
-        const conversations = await listConversationsByRange(
+        const record = await generateWeeklyReport(
+          settings,
           message.payload.rangeStart,
           message.payload.rangeEnd
         );
-        const sourceHash = buildWeeklySourceHash(
-          conversations,
-          message.payload.rangeStart,
-          message.payload.rangeEnd
-        );
-        if (conversations.length === 0) {
-          const record = await saveWeeklyReport({
-            rangeStart: message.payload.rangeStart,
-            rangeEnd: message.payload.rangeEnd,
-            content: "No conversations found for this range.",
-            modelId: settings.modelId,
-            createdAt: Date.now(),
-            sourceHash,
-          });
-          return { ok: true, type: messageType, data: record };
-        }
-        const prompt = truncateForContext(
-          buildWeeklyPrompt(conversations, "zh"),
-          WEEKLY_MAX_CHARS
-        );
-        const content = await callModelScope(settings, prompt);
-        const record = await saveWeeklyReport({
-          rangeStart: message.payload.rangeStart,
-          rangeEnd: message.payload.rangeEnd,
-          content,
-          modelId: settings.modelId,
-          createdAt: Date.now(),
-          sourceHash,
-        });
         return { ok: true, type: messageType, data: record };
       }
       default:

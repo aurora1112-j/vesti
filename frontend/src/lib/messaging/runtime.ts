@@ -34,7 +34,8 @@ export async function sendRequest<T extends keyof ResponseDataMap>(
 ): Promise<ResponseDataMap[T]> {
   const response = await sendMessageWithTimeout<T>(message, timeoutMs);
   if (!response.ok) {
-    throw new Error(response.error || "Request failed");
+    const failure = response as Extract<ResponseMessage<T>, { ok: false }>;
+    throw new Error(failure.error || "Request failed");
   }
   return response.data;
 }

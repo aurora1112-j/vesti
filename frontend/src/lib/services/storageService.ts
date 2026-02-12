@@ -9,6 +9,8 @@
 } from "../types";
 import { sendRequest } from "../messaging/runtime";
 
+const LONG_RUNNING_TIMEOUT_MS = 120000;
+
 export async function getConversations(filters?: {
   platform?: Platform;
   search?: string;
@@ -106,11 +108,14 @@ export async function getConversationSummary(
 export async function generateConversationSummary(
   conversationId: number
 ): Promise<SummaryRecord> {
-  return sendRequest({
-    type: "GENERATE_CONVERSATION_SUMMARY",
-    target: "offscreen",
-    payload: { conversationId },
-  }) as Promise<SummaryRecord>;
+  return sendRequest(
+    {
+      type: "GENERATE_CONVERSATION_SUMMARY",
+      target: "offscreen",
+      payload: { conversationId },
+    },
+    LONG_RUNNING_TIMEOUT_MS
+  ) as Promise<SummaryRecord>;
 }
 
 export async function getWeeklyReport(
@@ -128,10 +133,13 @@ export async function generateWeeklyReport(
   rangeStart: number,
   rangeEnd: number
 ): Promise<WeeklyReportRecord> {
-  return sendRequest({
-    type: "GENERATE_WEEKLY_REPORT",
-    target: "offscreen",
-    payload: { rangeStart, rangeEnd },
-  }) as Promise<WeeklyReportRecord>;
+  return sendRequest(
+    {
+      type: "GENERATE_WEEKLY_REPORT",
+      target: "offscreen",
+      payload: { rangeStart, rangeEnd },
+    },
+    LONG_RUNNING_TIMEOUT_MS
+  ) as Promise<WeeklyReportRecord>;
 }
 
