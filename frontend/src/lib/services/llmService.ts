@@ -17,6 +17,15 @@ const STRICT_JSON_SYSTEM_PROMPT =
 
 export type ModelScopeMode = "plain_text" | "json_mode" | "prompt_json";
 export type InferenceRoute = "proxy" | "modelscope";
+export type StreamExecutionStage =
+  | "stable_non_stream"
+  | "candidate_stream"
+  | "fallback_non_stream";
+
+interface StreamDecision {
+  stage: StreamExecutionStage;
+  reason: string;
+}
 
 export interface CallModelScopeOptions {
   responseFormat?: "json_object";
@@ -27,6 +36,8 @@ export interface CallModelScopeOptions {
 export interface ModelScopeCallResult {
   content: string;
   mode: ModelScopeMode;
+  streamStage: StreamExecutionStage;
+  streamReason: string;
 }
 
 export interface InferenceCallResult extends ModelScopeCallResult {
@@ -113,17 +124,16 @@ function buildPayload(
   config: LlmConfig,
   messages: ModelScopeMessage[],
   responseFormat?: "json_object",
-  streamRequested = false
+  streamDecision: StreamDecision = {
+    stage: "stable_non_stream",
+    reason: "not_requested",
+  }
 ): Record<string, unknown> {
-  const streamAllowed =
-    streamRequested &&
-    config.streamMode === "on" &&
-    config.reasoningPolicy !== "off";
-
-  if (streamRequested && !streamAllowed) {
+  if (streamDecision.stage === "fallback_non_stream") {
     logger.warn("llm", "Stream requested but downgraded to stable non-stream path", {
       streamMode: config.streamMode,
       reasoningPolicy: config.reasoningPolicy,
+      streamReason: streamDecision.reason,
     });
   }
 
@@ -136,8 +146,11 @@ function buildPayload(
   };
 
   // P1.5 hook: reserved for future stream/reasoning branch. Stable path keeps non-stream.
-  if (streamAllowed) {
+  if (streamDecision.stage === "candidate_stream") {
     payload.stream = false;
+    logger.info("llm", "Stream candidate path captured by P1.5 hook", {
+      streamReason: streamDecision.reason,
+    });
   }
 
   if (responseFormat) {
@@ -151,11 +164,14 @@ async function requestModelScope(
   config: LlmConfig,
   messages: ModelScopeMessage[],
   responseFormat?: "json_object",
-  streamRequested = false
+  streamDecision: StreamDecision = {
+    stage: "stable_non_stream",
+    reason: "not_requested",
+  }
 ): Promise<Response> {
   const baseUrl = config.baseUrl.replace(/\/+$/, "");
   const url = `${baseUrl}/chat/completions`;
-  const payload = buildPayload(config, messages, responseFormat, streamRequested);
+  const payload = buildPayload(config, messages, responseFormat, streamDecision);
 
   return fetch(url, {
     method: "POST",
@@ -171,10 +187,13 @@ async function requestProxyService(
   config: LlmConfig,
   messages: ModelScopeMessage[],
   responseFormat?: "json_object",
-  streamRequested = false
+  streamDecision: StreamDecision = {
+    stage: "stable_non_stream",
+    reason: "not_requested",
+  }
 ): Promise<Response> {
   const url = (config.proxyUrl || DEFAULT_PROXY_URL).trim();
-  const payload = buildPayload(config, messages, responseFormat, streamRequested);
+  const payload = buildPayload(config, messages, responseFormat, streamDecision);
 
   return fetch(url, {
     method: "POST",
@@ -193,13 +212,14 @@ async function callProvider(
 ): Promise<ModelScopeCallResult> {
   const baseSystemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
   const streamRequested = options.stream === true;
+  const streamDecision = resolveStreamDecision(config, streamRequested);
   const requester =
     route === "proxy" ? requestProxyService : requestModelScope;
 
   const request = (
     messages: ModelScopeMessage[],
     responseFormat?: "json_object"
-  ) => requester(config, messages, responseFormat, streamRequested);
+  ) => requester(config, messages, responseFormat, streamDecision);
 
   const baseMessages: ModelScopeMessage[] = [
     { role: "system", content: baseSystemPrompt },
@@ -213,6 +233,8 @@ async function callProvider(
       return {
         content: extractContent(data),
         mode: "json_mode",
+        streamStage: streamDecision.stage,
+        streamReason: streamDecision.reason,
       };
     }
 
@@ -253,6 +275,8 @@ async function callProvider(
     return {
       content: extractContent(promptJsonData),
       mode: "prompt_json",
+      streamStage: streamDecision.stage,
+      streamReason: streamDecision.reason,
     };
   }
 
@@ -267,7 +291,29 @@ async function callProvider(
   return {
     content: extractContent(data),
     mode: "plain_text",
+    streamStage: streamDecision.stage,
+    streamReason: streamDecision.reason,
   };
+}
+
+function resolveStreamDecision(
+  config: LlmConfig,
+  streamRequested: boolean
+): StreamDecision {
+  if (!streamRequested) {
+    return { stage: "stable_non_stream", reason: "not_requested" };
+  }
+
+  if (config.streamMode !== "on") {
+    return { stage: "fallback_non_stream", reason: "stream_mode_off" };
+  }
+
+  if (config.reasoningPolicy === "off") {
+    return { stage: "fallback_non_stream", reason: "reasoning_policy_off" };
+  }
+
+  // RC2 keeps stream disabled by default and routes candidates through stable path.
+  return { stage: "candidate_stream", reason: "reserved_for_future_rollout" };
 }
 
 function normalizeThinkHandlingPolicy(
@@ -416,4 +462,3 @@ export function buildWeeklySourceHash(
     .join("|");
   return `${rangeStart}-${rangeEnd}-${payload}`;
 }
-
