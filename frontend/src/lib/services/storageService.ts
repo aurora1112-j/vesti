@@ -10,6 +10,7 @@
 import { sendRequest } from "../messaging/runtime";
 
 const LONG_RUNNING_TIMEOUT_MS = 120000;
+const TEST_CONNECTION_TIMEOUT_MS = 30000;
 
 export async function getConversations(filters?: {
   platform?: Platform;
@@ -89,10 +90,13 @@ export async function setLlmSettings(settings: LlmConfig): Promise<void> {
 }
 
 export async function testLlmConnection(): Promise<{ ok: boolean; message?: string }> {
-  return sendRequest({
-    type: "TEST_LLM_CONNECTION",
-    target: "offscreen",
-  }) as Promise<{ ok: boolean; message?: string }>;
+  return sendRequest(
+    {
+      type: "TEST_LLM_CONNECTION",
+      target: "offscreen",
+    },
+    TEST_CONNECTION_TIMEOUT_MS
+  ) as Promise<{ ok: boolean; message?: string }>;
 }
 
 export async function getConversationSummary(

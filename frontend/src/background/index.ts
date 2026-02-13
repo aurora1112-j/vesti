@@ -14,22 +14,31 @@ import {
   getWeeklyReport,
 } from "../lib/db/repository";
 import { getLlmSettings, setLlmSettings } from "../lib/services/llmSettingsService";
-import { callModelScope } from "../lib/services/llmService";
+import { callInference } from "../lib/services/llmService";
 import {
   generateConversationSummary,
   generateWeeklyReport,
 } from "../lib/services/insightGenerationService";
 import type { LlmConfig } from "../lib/types";
 import { logger } from "../lib/utils/logger";
+import { getLlmAccessMode, normalizeLlmSettings } from "../lib/services/llmConfig";
 
 function requireSettings(settings: LlmConfig | null): LlmConfig {
   if (!settings) {
     throw new Error("LLM_CONFIG_MISSING");
   }
-  if (!settings.apiKey || !settings.modelId || !settings.baseUrl) {
+  const normalized = normalizeLlmSettings(settings);
+  const mode = getLlmAccessMode(normalized);
+  if (mode === "demo_proxy") {
+    if (!normalized.proxyUrl || !normalized.modelId) {
+      throw new Error("LLM_CONFIG_MISSING");
+    }
+    return normalized;
+  }
+  if (!normalized.apiKey || !normalized.modelId || !normalized.baseUrl) {
     throw new Error("LLM_CONFIG_MISSING");
   }
-  return settings;
+  return normalized;
 }
 
 async function handleRequest(message: RequestMessage): Promise<ResponseMessage> {
@@ -81,7 +90,7 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
       }
       case "TEST_LLM_CONNECTION": {
         const settings = requireSettings(await getLlmSettings());
-        const result = await callModelScope(settings, "Reply with OK only.");
+        const result = await callInference(settings, "Reply with OK only.");
         return {
           ok: true,
           type: messageType,

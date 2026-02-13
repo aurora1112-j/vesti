@@ -149,13 +149,160 @@ export function parseWeeklyReportObject(value: unknown): {
   };
 }
 
+function removeTrailingCommas(input: string): string {
+  let output = "";
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i];
+
+    if (inString) {
+      output += ch;
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      output += ch;
+      continue;
+    }
+
+    if (ch === ",") {
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) {
+        j += 1;
+      }
+      const next = input[j];
+      if (next === "}" || next === "]") {
+        continue;
+      }
+    }
+
+    output += ch;
+  }
+
+  return output;
+}
+
+function extractFencedBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  const re = /```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(text))) {
+    if (m[1]) {
+      blocks.push(m[1].trim());
+    }
+  }
+
+  return blocks;
+}
+
+function extractBalancedJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{") depth += 1;
+    if (ch === "}") depth -= 1;
+
+    if (depth === 0) {
+      return text.slice(start, i + 1);
+    }
+  }
+
+  return null;
+}
+
+function tryParseJsonCandidate(candidate: string): unknown | null {
+  const trimmed = candidate.trim().replace(/^\uFEFF/, "");
+  const attempts = [trimmed, removeTrailingCommas(trimmed)];
+
+  for (const attempt of attempts) {
+    if (!attempt) continue;
+
+    try {
+      let value: unknown = JSON.parse(attempt);
+
+      // Handle double-encoded JSON (a JSON string containing JSON).
+      for (let i = 0; i < 2; i += 1) {
+        if (typeof value !== "string") break;
+        const inner = value.trim();
+        if (!inner) break;
+        if (
+          (inner.startsWith("{") && inner.endsWith("}")) ||
+          (inner.startsWith("[") && inner.endsWith("]"))
+        ) {
+          try {
+            value = JSON.parse(inner);
+            continue;
+          } catch {
+            break;
+          }
+        }
+        break;
+      }
+
+      return value;
+    } catch {
+      // Keep trying.
+    }
+  }
+
+  return null;
+}
+
 export function parseJsonObjectFromText(text: string): unknown {
   const trimmed = text.trim();
-  const candidates = [trimmed];
+  const candidates: string[] = [];
 
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced?.[1]) {
-    candidates.push(fenced[1].trim());
+  if (trimmed) {
+    candidates.push(trimmed);
+  }
+
+  for (const block of extractFencedBlocks(trimmed)) {
+    if (block) {
+      candidates.push(block);
+    }
+  }
+
+  const balanced = extractBalancedJsonObject(trimmed);
+  if (balanced) {
+    candidates.push(balanced);
   }
 
   const firstBrace = trimmed.indexOf("{");
@@ -165,16 +312,16 @@ export function parseJsonObjectFromText(text: string): unknown {
   }
 
   for (const candidate of candidates) {
-    if (!candidate) continue;
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // Continue trying the next candidate.
+    const parsed = tryParseJsonCandidate(candidate);
+    if (parsed === null) continue;
+    if (typeof parsed === "object" && parsed !== null) {
+      return parsed;
     }
   }
 
   throw new Error("INVALID_JSON_PAYLOAD");
 }
+
 
 export const insightSchemaHints = {
   summary: {

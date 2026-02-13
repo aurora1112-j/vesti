@@ -1,4 +1,5 @@
-﻿import type { LlmConfig } from "../types";
+import type { LlmConfig } from "../types";
+import { buildDefaultLlmSettings, normalizeLlmSettings } from "./llmConfig";
 
 const STORAGE_KEY = "vesti_llm_settings";
 
@@ -18,15 +19,23 @@ export async function getLlmSettings(): Promise<LlmConfig | null> {
         reject(new Error(err.message));
         return;
       }
-      resolve((result[STORAGE_KEY] as LlmConfig | undefined) ?? null);
+
+      const raw = (result[STORAGE_KEY] as LlmConfig | undefined) ?? null;
+      if (!raw) {
+        resolve(buildDefaultLlmSettings());
+        return;
+      }
+
+      resolve(normalizeLlmSettings(raw));
     });
   });
 }
 
 export async function setLlmSettings(settings: LlmConfig): Promise<void> {
   const storage = getStorage();
+  const normalized = normalizeLlmSettings(settings);
   return new Promise((resolve, reject) => {
-    storage.set({ [STORAGE_KEY]: settings }, () => {
+    storage.set({ [STORAGE_KEY]: normalized }, () => {
       const err = chrome.runtime?.lastError;
       if (err) {
         reject(new Error(err.message));
@@ -36,4 +45,3 @@ export async function setLlmSettings(settings: LlmConfig): Promise<void> {
     });
   });
 }
-
