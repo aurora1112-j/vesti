@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { Sparkles, RefreshCw, Loader2, CalendarDays } from "lucide-react";
+import { CalendarDays, Loader2, RefreshCw } from "lucide-react";
 import type {
   AsyncStatus,
   Conversation,
@@ -12,10 +12,13 @@ import {
   getConversationSummary,
   getWeeklyReport,
 } from "~lib/services/storageService";
+import {
+  toChatSummaryData,
+  toWeeklySummaryData,
+} from "~lib/services/insightAdapter";
 import { PlatformTag } from "../components/PlatformTag";
 import { StructuredSummaryCard } from "../components/StructuredSummaryCard";
 import { StructuredWeeklyCard } from "../components/StructuredWeeklyCard";
-import { formatRange } from "../components/insightUiUtils";
 
 function formatDateTime(ts: number): string {
   const d = new Date(ts);
@@ -125,6 +128,14 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
     }
   };
 
+  const summaryData = summary
+    ? toChatSummaryData(summary, {
+        conversationTitle: conversation?.title,
+      })
+    : null;
+
+  const weeklyData = weeklyReport ? toWeeklySummaryData(weeklyReport) : null;
+
   return (
     <div className="flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-tertiary">
       <header className="flex h-8 shrink-0 items-center px-4">
@@ -133,10 +144,7 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
 
       <div className="flex flex-col gap-4 p-4">
         <section>
-          <h2 className="mb-2 flex items-center gap-1.5 text-vesti-sm font-medium text-text-secondary">
-            <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-            AI Summary
-          </h2>
+          <h2 className="mb-2 text-vesti-sm font-medium text-text-secondary">Conversation Summary</h2>
 
           <div className="rounded-md bg-surface-card p-3">
             {!conversation && (
@@ -173,23 +181,32 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                   {summary ? "Regenerate" : "Generate"}
                 </button>
 
-                <div className="min-h-[140px] rounded-md bg-bg-primary p-3 text-vesti-sm text-text-primary">
-                  {summaryStatus === "loading" && !summary && (
+                <div className="min-h-[160px] rounded-md bg-bg-primary p-3 text-vesti-sm text-text-primary">
+                  {summaryStatus === "loading" && !summaryData && (
                     <div className="flex items-center gap-2 text-text-tertiary">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating summary...
+                      Analyzing conversation context...
                     </div>
                   )}
 
                   {summaryStatus === "error" && (
-                    <p className="text-vesti-xs text-danger">{summaryError}</p>
+                    <div className="flex items-center gap-2 text-vesti-xs text-danger">
+                      <span>Failed to summarize. {summaryError}</span>
+                      <button
+                        type="button"
+                        onClick={handleGenerateSummary}
+                        className="text-vesti-xs text-text-secondary underline underline-offset-2"
+                      >
+                        Retry
+                      </button>
+                    </div>
                   )}
 
-                  {!summary && summaryStatus !== "loading" && summaryStatus !== "error" && (
+                  {!summaryData && summaryStatus !== "loading" && summaryStatus !== "error" && (
                     <p className="text-vesti-xs text-text-tertiary">No summary yet.</p>
                   )}
 
-                  {summary && <StructuredSummaryCard summary={summary} />}
+                  {summaryData && <StructuredSummaryCard data={summaryData} />}
                 </div>
 
                 {summary && (
@@ -205,20 +222,11 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
         <section>
           <h2 className="mb-2 flex items-center gap-1.5 text-vesti-sm font-medium text-text-secondary">
             <CalendarDays className="h-4 w-4" strokeWidth={1.75} />
-            Weekly Report
+            Weekly Summary
           </h2>
 
           <div className="rounded-md bg-surface-card p-3">
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-vesti-sm font-medium text-text-primary">Recent 7 days</p>
-                  <p className="text-vesti-xs text-text-tertiary">
-                    {formatRange(weeklyRange.rangeStart, weeklyRange.rangeEnd)}
-                  </p>
-                </div>
-              </div>
-
               <button
                 type="button"
                 onClick={handleGenerateWeekly}
@@ -233,23 +241,32 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                 {weeklyReport ? "Regenerate" : "Generate"}
               </button>
 
-              <div className="min-h-[140px] rounded-md bg-bg-primary p-3 text-vesti-sm text-text-primary">
-                {weeklyStatus === "loading" && !weeklyReport && (
+              <div className="min-h-[160px] rounded-md bg-bg-primary p-3 text-vesti-sm text-text-primary">
+                {weeklyStatus === "loading" && !weeklyData && (
                   <div className="flex items-center gap-2 text-text-tertiary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating weekly report...
+                    Analyzing weekly conversation context...
                   </div>
                 )}
 
                 {weeklyStatus === "error" && (
-                  <p className="text-vesti-xs text-danger">{weeklyError}</p>
+                  <div className="flex items-center gap-2 text-vesti-xs text-danger">
+                    <span>Failed to summarize. {weeklyError}</span>
+                    <button
+                      type="button"
+                      onClick={handleGenerateWeekly}
+                      className="text-vesti-xs text-text-secondary underline underline-offset-2"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 )}
 
-                {!weeklyReport && weeklyStatus !== "loading" && weeklyStatus !== "error" && (
-                  <p className="text-vesti-xs text-text-tertiary">No weekly report yet.</p>
+                {!weeklyData && weeklyStatus !== "loading" && weeklyStatus !== "error" && (
+                  <p className="text-vesti-xs text-text-tertiary">No weekly summary yet.</p>
                 )}
 
-                {weeklyReport && <StructuredWeeklyCard report={weeklyReport} />}
+                {weeklyData && <StructuredWeeklyCard data={weeklyData} />}
               </div>
 
               {weeklyReport && (
