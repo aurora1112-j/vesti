@@ -44,6 +44,11 @@ export type CaptureMode = "full_mirror" | "smart_denoise" | "curator";
 export type PageId = "timeline" | "insights" | "dashboard" | "settings";
 
 export type LlmProvider = "modelscope";
+export type LlmAccessMode = "demo_proxy" | "custom_byok";
+export type StreamMode = "off" | "on";
+export type ReasoningPolicy = "off" | "auto" | "force";
+export type CapabilitySource = "model_id_heuristic" | "provider_catalog";
+export type ThinkHandlingPolicy = "strip" | "keep_debug" | "keep_raw";
 
 export interface LlmConfig {
   provider: LlmProvider;
@@ -53,6 +58,14 @@ export interface LlmConfig {
   temperature: number;
   maxTokens: number;
   updatedAt: number;
+  mode?: LlmAccessMode;
+  proxyUrl?: string;
+  gatewayLock?: "modelscope";
+  customModelId?: string;
+  streamMode?: StreamMode;
+  reasoningPolicy?: ReasoningPolicy;
+  capabilitySource?: CapabilitySource;
+  thinkHandlingPolicy?: ThinkHandlingPolicy;
 }
 
 export type InsightFormat = "plain_text" | "structured_v1" | "fallback_plain_text";

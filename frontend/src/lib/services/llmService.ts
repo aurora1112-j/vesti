@@ -1,20 +1,38 @@
-﻿import type { Conversation, Message, LlmConfig } from "../types";
+import type {
+  Conversation,
+  LlmConfig,
+  Message,
+  ThinkHandlingPolicy,
+} from "../types";
 import { logger } from "../utils/logger";
+import {
+  DEFAULT_PROXY_URL,
+  getEffectiveModelId,
+  getLlmAccessMode,
+} from "./llmConfig";
 
 const SYSTEM_PROMPT = "You are a careful technical summarization assistant.";
 const STRICT_JSON_SYSTEM_PROMPT =
   "Output must be a valid JSON object only. Do not include Markdown, code fences, or explanatory text outside JSON.";
 
 export type ModelScopeMode = "plain_text" | "json_mode" | "prompt_json";
+export type InferenceRoute = "proxy" | "modelscope";
 
 export interface CallModelScopeOptions {
   responseFormat?: "json_object";
   systemPrompt?: string;
+  stream?: boolean;
 }
 
 export interface ModelScopeCallResult {
   content: string;
   mode: ModelScopeMode;
+}
+
+export interface InferenceCallResult extends ModelScopeCallResult {
+  rawContent: string;
+  route: InferenceRoute;
+  streamRequested: boolean;
 }
 
 type ModelScopeMessage = {
@@ -23,27 +41,64 @@ type ModelScopeMessage = {
 };
 
 type ModelScopeResponse = {
-  choices?: { message?: { content?: string } }[];
+  choices?: Array<{
+    message?: { content?: unknown };
+    delta?: { content?: unknown };
+  }>;
 };
 
-function ensureConfig(config: LlmConfig): void {
+function ensureModelScopeConfig(config: LlmConfig): void {
   if (!config.baseUrl) {
     throw new Error("LLM_CONFIG_MISSING:BASE_URL");
   }
   if (!config.apiKey) {
     throw new Error("LLM_CONFIG_MISSING:API_KEY");
   }
-  if (!config.modelId) {
+  if (!getEffectiveModelId(config)) {
     throw new Error("LLM_CONFIG_MISSING:MODEL_ID");
   }
 }
 
-function extractContent(data: ModelScopeResponse): string {
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) {
-    throw new Error("LLM_RESPONSE_EMPTY");
+function ensureProxyConfig(config: LlmConfig): void {
+  if (!config.proxyUrl?.trim()) {
+    throw new Error("LLM_CONFIG_MISSING:PROXY_URL");
   }
-  return content;
+  if (!getEffectiveModelId(config)) {
+    throw new Error("LLM_CONFIG_MISSING:MODEL_ID");
+  }
+}
+
+function toText(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "text" in item) {
+          const value = (item as { text?: unknown }).text;
+          return typeof value === "string" ? value : "";
+        }
+        return "";
+      })
+      .filter(Boolean);
+    return parts.join("");
+  }
+  return "";
+}
+
+function extractContent(data: ModelScopeResponse): string {
+  const choice = data.choices?.[0];
+  const direct = toText(choice?.message?.content);
+  if (direct.trim()) {
+    return direct.trim();
+  }
+  const delta = toText(choice?.delta?.content);
+  if (delta.trim()) {
+    return delta.trim();
+  }
+  throw new Error("LLM_RESPONSE_EMPTY");
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -54,24 +109,53 @@ async function parseError(response: Response): Promise<string> {
   }
 }
 
-async function requestModelScope(
+function buildPayload(
   config: LlmConfig,
   messages: ModelScopeMessage[],
-  responseFormat?: "json_object"
-): Promise<Response> {
-  const baseUrl = config.baseUrl.replace(/\/+$/, "");
-  const url = `${baseUrl}/chat/completions`;
+  responseFormat?: "json_object",
+  streamRequested = false
+): Record<string, unknown> {
+  const streamAllowed =
+    streamRequested &&
+    config.streamMode === "on" &&
+    config.reasoningPolicy !== "off";
+
+  if (streamRequested && !streamAllowed) {
+    logger.warn("llm", "Stream requested but downgraded to stable non-stream path", {
+      streamMode: config.streamMode,
+      reasoningPolicy: config.reasoningPolicy,
+    });
+  }
 
   const payload: Record<string, unknown> = {
-    model: config.modelId,
+    model: getEffectiveModelId(config),
+    enable_thinking: false,
     temperature: config.temperature,
     max_tokens: config.maxTokens,
     messages,
   };
 
+  // P1.5 hook: reserved for future stream/reasoning branch. Stable path keeps non-stream.
+  if (streamAllowed) {
+    payload.stream = false;
+  }
+
   if (responseFormat) {
     payload.response_format = { type: responseFormat };
   }
+
+  return payload;
+}
+
+async function requestModelScope(
+  config: LlmConfig,
+  messages: ModelScopeMessage[],
+  responseFormat?: "json_object",
+  streamRequested = false
+): Promise<Response> {
+  const baseUrl = config.baseUrl.replace(/\/+$/, "");
+  const url = `${baseUrl}/chat/completions`;
+  const payload = buildPayload(config, messages, responseFormat, streamRequested);
 
   return fetch(url, {
     method: "POST",
@@ -81,6 +165,183 @@ async function requestModelScope(
     },
     body: JSON.stringify(payload),
   });
+}
+
+async function requestProxyService(
+  config: LlmConfig,
+  messages: ModelScopeMessage[],
+  responseFormat?: "json_object",
+  streamRequested = false
+): Promise<Response> {
+  const url = (config.proxyUrl || DEFAULT_PROXY_URL).trim();
+  const payload = buildPayload(config, messages, responseFormat, streamRequested);
+
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function callProvider(
+  config: LlmConfig,
+  prompt: string,
+  options: CallModelScopeOptions,
+  route: InferenceRoute
+): Promise<ModelScopeCallResult> {
+  const baseSystemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
+  const streamRequested = options.stream === true;
+  const requester =
+    route === "proxy" ? requestProxyService : requestModelScope;
+
+  const request = (
+    messages: ModelScopeMessage[],
+    responseFormat?: "json_object"
+  ) => requester(config, messages, responseFormat, streamRequested);
+
+  const baseMessages: ModelScopeMessage[] = [
+    { role: "system", content: baseSystemPrompt },
+    { role: "user", content: prompt },
+  ];
+
+  if (options.responseFormat === "json_object") {
+    const jsonResponse = await request(baseMessages, "json_object");
+    if (jsonResponse.ok) {
+      const data = (await jsonResponse.json()) as ModelScopeResponse;
+      return {
+        content: extractContent(data),
+        mode: "json_mode",
+      };
+    }
+
+    const jsonErrorText = await parseError(jsonResponse);
+    const shouldFallback =
+      [400, 404, 415, 422].includes(jsonResponse.status) ||
+      /response_format|json_object|unsupported/i.test(jsonErrorText);
+
+    if (!shouldFallback) {
+      logger.error(
+        "llm",
+        `${route} JSON request failed: ${jsonResponse.status}`,
+        new Error(jsonErrorText)
+      );
+      throw new Error(`LLM_REQUEST_FAILED:${jsonResponse.status}`);
+    }
+
+    logger.warn("llm", `${route} JSON mode unsupported, fallback to prompt_json`, {
+      status: jsonResponse.status,
+    });
+
+    const promptJsonMessages: ModelScopeMessage[] = [
+      { role: "system", content: `${baseSystemPrompt}\n${STRICT_JSON_SYSTEM_PROMPT}` },
+      { role: "user", content: prompt },
+    ];
+    const promptJsonResponse = await request(promptJsonMessages);
+    if (!promptJsonResponse.ok) {
+      const promptJsonErrorText = await parseError(promptJsonResponse);
+      logger.error(
+        "llm",
+        `${route} prompt_json request failed: ${promptJsonResponse.status}`,
+        new Error(promptJsonErrorText)
+      );
+      throw new Error(`LLM_REQUEST_FAILED:${promptJsonResponse.status}`);
+    }
+
+    const promptJsonData = (await promptJsonResponse.json()) as ModelScopeResponse;
+    return {
+      content: extractContent(promptJsonData),
+      mode: "prompt_json",
+    };
+  }
+
+  const response = await request(baseMessages);
+  if (!response.ok) {
+    const errorText = await parseError(response);
+    logger.error("llm", `${route} request failed: ${response.status}`, new Error(errorText));
+    throw new Error(`LLM_REQUEST_FAILED:${response.status}`);
+  }
+
+  const data = (await response.json()) as ModelScopeResponse;
+  return {
+    content: extractContent(data),
+    mode: "plain_text",
+  };
+}
+
+function normalizeThinkHandlingPolicy(
+  policy: ThinkHandlingPolicy | undefined
+): ThinkHandlingPolicy {
+  if (policy === "keep_debug" || policy === "keep_raw") {
+    return policy;
+  }
+  return "strip";
+}
+
+export function stripThinkBlocks(text: string): string {
+  if (!text) return "";
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
+function applyThinkPolicy(text: string, policy: ThinkHandlingPolicy): string {
+  if (policy === "keep_raw") {
+    return text.trim();
+  }
+  return stripThinkBlocks(text);
+}
+
+export function resolveLlmRoute(config: LlmConfig): InferenceRoute {
+  return getLlmAccessMode(config) === "demo_proxy" ? "proxy" : "modelscope";
+}
+
+export async function callProxyService(
+  config: LlmConfig,
+  prompt: string,
+  options: CallModelScopeOptions = {}
+): Promise<ModelScopeCallResult> {
+  ensureProxyConfig(config);
+  return callProvider(config, prompt, options, "proxy");
+}
+
+export async function callModelScope(
+  config: LlmConfig,
+  prompt: string,
+  options: CallModelScopeOptions = {}
+): Promise<ModelScopeCallResult> {
+  ensureModelScopeConfig(config);
+  return callProvider(config, prompt, options, "modelscope");
+}
+
+export async function callInference(
+  config: LlmConfig,
+  prompt: string,
+  options: CallModelScopeOptions = {}
+): Promise<InferenceCallResult> {
+  const route = resolveLlmRoute(config);
+  const result =
+    route === "proxy"
+      ? await callProxyService(config, prompt, options)
+      : await callModelScope(config, prompt, options);
+
+  const policy = normalizeThinkHandlingPolicy(config.thinkHandlingPolicy);
+  const rawContent = result.content;
+  const content = applyThinkPolicy(rawContent, policy);
+
+  if (policy === "keep_debug" && content !== rawContent) {
+    logger.info("llm", "Think blocks stripped for user-visible output", {
+      route,
+      modelId: getEffectiveModelId(config),
+    });
+  }
+
+  return {
+    ...result,
+    content: content || rawContent,
+    rawContent,
+    route,
+    streamRequested: options.stream === true,
+  };
 }
 
 function buildConversationLines(messages: Message[]): string {
@@ -106,8 +367,11 @@ export function truncateForContext(text: string, maxChars: number): string {
 }
 
 export function sanitizeSummaryText(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```[\w-]*\n?/g, "").replace(/```/g, ""))
+  const noThink = stripThinkBlocks(text);
+  return noThink
+    .replace(/```[\s\S]*?```/g, (block) =>
+      block.replace(/```[\w-]*\n?/g, "").replace(/```/g, "")
+    )
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/__(.*?)__/g, "$1")
@@ -153,82 +417,3 @@ export function buildWeeklySourceHash(
   return `${rangeStart}-${rangeEnd}-${payload}`;
 }
 
-export async function callModelScope(
-  config: LlmConfig,
-  prompt: string,
-  options: CallModelScopeOptions = {}
-): Promise<ModelScopeCallResult> {
-  ensureConfig(config);
-
-  const baseSystemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
-  const baseMessages: ModelScopeMessage[] = [
-    { role: "system", content: baseSystemPrompt },
-    { role: "user", content: prompt },
-  ];
-
-  if (options.responseFormat === "json_object") {
-    const jsonResponse = await requestModelScope(config, baseMessages, "json_object");
-
-    if (jsonResponse.ok) {
-      const data = (await jsonResponse.json()) as ModelScopeResponse;
-      return {
-        content: extractContent(data),
-        mode: "json_mode",
-      };
-    }
-
-    const jsonErrorText = await parseError(jsonResponse);
-    const shouldFallback =
-      [400, 404, 415, 422].includes(jsonResponse.status) ||
-      /response_format|json_object|unsupported/i.test(jsonErrorText);
-
-    if (!shouldFallback) {
-      logger.error(
-        "llm",
-        `ModelScope JSON request failed: ${jsonResponse.status}`,
-        new Error(jsonErrorText)
-      );
-      throw new Error(`LLM_REQUEST_FAILED:${jsonResponse.status}`);
-    }
-
-    logger.warn("llm", "JSON mode unsupported, fallback to prompt_json", {
-      status: jsonResponse.status,
-    });
-
-    const promptJsonMessages: ModelScopeMessage[] = [
-      { role: "system", content: `${baseSystemPrompt}\n${STRICT_JSON_SYSTEM_PROMPT}` },
-      { role: "user", content: prompt },
-    ];
-
-    const promptJsonResponse = await requestModelScope(config, promptJsonMessages);
-    if (!promptJsonResponse.ok) {
-      const promptJsonErrorText = await parseError(promptJsonResponse);
-      logger.error(
-        "llm",
-        `ModelScope prompt_json request failed: ${promptJsonResponse.status}`,
-        new Error(promptJsonErrorText)
-      );
-      throw new Error(`LLM_REQUEST_FAILED:${promptJsonResponse.status}`);
-    }
-
-    const promptJsonData = (await promptJsonResponse.json()) as ModelScopeResponse;
-    return {
-      content: extractContent(promptJsonData),
-      mode: "prompt_json",
-    };
-  }
-
-  const response = await requestModelScope(config, baseMessages);
-
-  if (!response.ok) {
-    const errorText = await parseError(response);
-    logger.error("llm", `ModelScope request failed: ${response.status}`, new Error(errorText));
-    throw new Error(`LLM_REQUEST_FAILED:${response.status}`);
-  }
-
-  const data = (await response.json()) as ModelScopeResponse;
-  return {
-    content: extractContent(data),
-    mode: "plain_text",
-  };
-}

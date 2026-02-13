@@ -18,11 +18,10 @@ import {
   saveSummary,
   saveWeeklyReport,
 } from "../db/repository";
+import { getPrompt } from "../prompts";
 import {
-  buildSummaryPrompt,
-  buildWeeklyPrompt,
   buildWeeklySourceHash,
-  callModelScope,
+  callInference,
   sanitizeSummaryText,
   truncateForContext,
 } from "./llmService";
@@ -33,10 +32,12 @@ import {
   parseWeeklyReportObject,
 } from "./insightSchemas";
 import { logger } from "../utils/logger";
+import { getEffectiveModelId } from "./llmConfig";
 
 const SUMMARY_MAX_CHARS = 12000;
 const WEEKLY_MAX_CHARS = 12000;
 
+type PromptType = "conversationSummary" | "weeklyDigest";
 type GenerationMode = "plain_text" | "json_mode" | "prompt_json" | "fallback_text";
 
 interface ParseResult<T> {
@@ -45,6 +46,8 @@ interface ParseResult<T> {
 }
 
 interface StructuredGenerationResult<T, TVersion extends string> {
+  promptType: PromptType;
+  promptVersion: string;
   structured: T | null;
   content: string;
   format: InsightFormat;
@@ -53,6 +56,34 @@ interface StructuredGenerationResult<T, TVersion extends string> {
   mode: GenerationMode;
   attempt: number;
   validationErrors: string[];
+  fallbackStage?: "none" | "repair_json" | "fallback_text";
+}
+
+interface PromptUsageLog {
+  promptType: PromptType;
+  promptVersion: string;
+  mode: GenerationMode;
+  attempt: number;
+  validationErrors: string[];
+  format?: InsightFormat;
+  status?: InsightStatus;
+  route?: "proxy" | "modelscope";
+  fallbackStage?: "none" | "repair_json" | "fallback_text";
+  latencyMs: number;
+  success: boolean;
+}
+
+function logPromptUsage(entry: PromptUsageLog): void {
+  const message = entry.success
+    ? "Prompt usage"
+    : "Prompt usage (fallback or validation issue)";
+
+  if (entry.success) {
+    logger.info("service", message, entry);
+    return;
+  }
+
+  logger.warn("service", message, entry);
 }
 
 function renderSummaryText(summary: ConversationSummaryV1): string {
@@ -83,56 +114,6 @@ function formatRangeLabel(rangeStart: number, rangeEnd: number): string {
   return `${start} - ${end}`;
 }
 
-function buildConversationLines(messages: Message[]): string {
-  return messages
-    .map((message) => {
-      const role = message.role === "user" ? "User" : "AI";
-      return `[${role}] ${message.content_text}`;
-    })
-    .join("\n");
-}
-
-function buildWeeklyLines(conversations: Conversation[]): string {
-  return conversations
-    .map((conversation, index) => {
-      return `${index + 1}. [${conversation.platform}] ${conversation.title} - ${conversation.snippet}`;
-    })
-    .join("\n");
-}
-
-function buildSummaryJsonPrompt(messages: Message[]): string {
-  return `You are a Technical Documentation Specialist.
-Analyze the chat history and output valid JSON only.
-
-CONSTRAINTS:
-1) Output MUST be valid JSON following this schema exactly: ${JSON.stringify(insightSchemaHints.summary)}
-2) Filter conversational filler and keep technical decisions/debugging outcomes.
-3) topic_title should be concise (max 5 words).
-4) action_items can be omitted when not present.
-
-CHAT HISTORY:
-${buildConversationLines(messages)}`;
-}
-
-function buildWeeklyJsonPrompt(
-  conversations: Conversation[],
-  rangeStart: number,
-  rangeEnd: number
-): string {
-  return `You are a Technical Documentation Specialist.
-Analyze the weekly conversations and output valid JSON only.
-
-CONSTRAINTS:
-1) Output MUST be valid JSON following this schema exactly: ${JSON.stringify(insightSchemaHints.weekly)}
-2) Focus on themes, outcomes, and actionable items.
-3) period_title should include the weekly period and stay concise.
-4) action_items can be omitted when not present.
-
-PERIOD: ${formatRangeLabel(rangeStart, rangeEnd)}
-WEEKLY CONVERSATIONS:
-${buildWeeklyLines(conversations)}`;
-}
-
 function buildRepairPrompt(
   kind: "summary" | "weekly",
   rawOutput: string,
@@ -151,9 +132,13 @@ Raw output:
 ${rawOutput}`;
 }
 
+function toParsableJsonText(raw: string): string {
+  return raw.replace(/<think>[\s\S]*?<\/think>/gi, " ").trim();
+}
+
 function parseSummaryFromRaw(raw: string): ParseResult<ConversationSummaryV1> {
   try {
-    const parsedJson = parseJsonObjectFromText(raw);
+    const parsedJson = parseJsonObjectFromText(toParsableJsonText(raw));
     const parsed = parseConversationSummaryObject(parsedJson);
     if (parsed.success) {
       return { data: parsed.data, errors: [] };
@@ -172,7 +157,7 @@ function parseSummaryFromRaw(raw: string): ParseResult<ConversationSummaryV1> {
 
 function parseWeeklyFromRaw(raw: string): ParseResult<WeeklyReportV1> {
   try {
-    const parsedJson = parseJsonObjectFromText(raw);
+    const parsedJson = parseJsonObjectFromText(toParsableJsonText(raw));
     const parsed = parseWeeklyReportObject(parsedJson);
     if (parsed.success) {
       return { data: parsed.data, errors: [] };
@@ -191,27 +176,45 @@ function parseWeeklyFromRaw(raw: string): ParseResult<WeeklyReportV1> {
 
 async function generateStructuredSummary(
   settings: LlmConfig,
+  conversationTitle: string,
   messages: Message[]
 ): Promise<
   StructuredGenerationResult<ConversationSummaryV1, "conversation_summary.v1">
 > {
+  const prompt = getPrompt("conversationSummary", { variant: "current" });
+  const payload = {
+    conversationTitle,
+    messages,
+    locale: "zh" as const,
+  };
+
+  const firstAttemptStartedAt = Date.now();
   const primaryPrompt = truncateForContext(
-    buildSummaryJsonPrompt(messages),
+    prompt.userTemplate(payload),
     SUMMARY_MAX_CHARS
   );
-  const first = await callModelScope(settings, primaryPrompt, {
+  const first = await callInference(settings, primaryPrompt, {
     responseFormat: "json_object",
+    systemPrompt: prompt.system,
   });
   const firstParsed = parseSummaryFromRaw(first.content);
 
-  logger.info("service", "Summary generation attempt", {
+  logPromptUsage({
+    promptType: "conversationSummary",
+    promptVersion: prompt.version,
     mode: first.mode,
     attempt: 1,
     validationErrors: firstParsed.errors,
+    route: first.route,
+    fallbackStage: firstParsed.data ? "none" : "repair_json",
+    latencyMs: Date.now() - firstAttemptStartedAt,
+    success: !!firstParsed.data,
   });
 
   if (firstParsed.data) {
     return {
+      promptType: "conversationSummary",
+      promptVersion: prompt.version,
       structured: firstParsed.data,
       content: renderSummaryText(firstParsed.data),
       format: "structured_v1",
@@ -220,26 +223,37 @@ async function generateStructuredSummary(
       mode: first.mode,
       attempt: 1,
       validationErrors: [],
+      fallbackStage: "none",
     };
   }
 
+  const secondAttemptStartedAt = Date.now();
   const repairPrompt = truncateForContext(
     buildRepairPrompt("summary", first.content, firstParsed.errors),
     SUMMARY_MAX_CHARS
   );
-  const second = await callModelScope(settings, repairPrompt, {
+  const second = await callInference(settings, repairPrompt, {
     responseFormat: "json_object",
+    systemPrompt: prompt.system,
   });
   const secondParsed = parseSummaryFromRaw(second.content);
 
-  logger.info("service", "Summary generation attempt", {
+  logPromptUsage({
+    promptType: "conversationSummary",
+    promptVersion: prompt.version,
     mode: second.mode,
     attempt: 2,
     validationErrors: secondParsed.errors,
+    route: second.route,
+    fallbackStage: secondParsed.data ? "none" : "fallback_text",
+    latencyMs: Date.now() - secondAttemptStartedAt,
+    success: !!secondParsed.data,
   });
 
   if (secondParsed.data) {
     return {
+      promptType: "conversationSummary",
+      promptVersion: prompt.version,
       structured: secondParsed.data,
       content: renderSummaryText(secondParsed.data),
       format: "structured_v1",
@@ -248,25 +262,46 @@ async function generateStructuredSummary(
       mode: second.mode,
       attempt: 2,
       validationErrors: firstParsed.errors,
+      fallbackStage: "repair_json",
     };
   }
 
+  const fallbackStartedAt = Date.now();
   const fallbackPrompt = truncateForContext(
-    buildSummaryPrompt(messages, "zh"),
+    prompt.fallbackTemplate(payload),
     SUMMARY_MAX_CHARS
   );
-  const fallbackResponse = await callModelScope(settings, fallbackPrompt);
+  const fallbackResponse = await callInference(settings, fallbackPrompt, {
+    systemPrompt: prompt.fallbackSystem ?? prompt.system,
+  });
   const fallbackContent =
     sanitizeSummaryText(fallbackResponse.content) || "摘要生成失败，请重试。";
 
+  logPromptUsage({
+    promptType: "conversationSummary",
+    promptVersion: prompt.version,
+    mode: "fallback_text",
+    attempt: 3,
+    validationErrors: [...firstParsed.errors, ...secondParsed.errors],
+    route: fallbackResponse.route,
+    fallbackStage: "fallback_text",
+    latencyMs: Date.now() - fallbackStartedAt,
+    format: "fallback_plain_text",
+    status: "fallback",
+    success: false,
+  });
+
   return {
+    promptType: "conversationSummary",
+    promptVersion: prompt.version,
     structured: null,
     content: fallbackContent,
     format: "fallback_plain_text",
     status: "fallback",
     mode: "fallback_text",
-    attempt: 2,
+    attempt: 3,
     validationErrors: [...firstParsed.errors, ...secondParsed.errors],
+    fallbackStage: "fallback_text",
   };
 }
 
@@ -276,6 +311,14 @@ async function generateStructuredWeekly(
   rangeStart: number,
   rangeEnd: number
 ): Promise<StructuredGenerationResult<WeeklyReportV1, "weekly_report.v1">> {
+  const prompt = getPrompt("weeklyDigest", { variant: "current" });
+  const payload = {
+    conversations,
+    rangeStart,
+    rangeEnd,
+    locale: "zh" as const,
+  };
+
   if (conversations.length === 0) {
     const emptyReport: WeeklyReportV1 = {
       period_title: `Weekly Report ${formatRangeLabel(rangeStart, rangeEnd)}`,
@@ -285,6 +328,8 @@ async function generateStructuredWeekly(
     };
 
     return {
+      promptType: "weeklyDigest",
+      promptVersion: prompt.version,
       structured: emptyReport,
       content: renderWeeklyText(emptyReport),
       format: "structured_v1",
@@ -293,26 +338,37 @@ async function generateStructuredWeekly(
       mode: "prompt_json",
       attempt: 0,
       validationErrors: [],
+      fallbackStage: "none",
     };
   }
 
+  const firstAttemptStartedAt = Date.now();
   const primaryPrompt = truncateForContext(
-    buildWeeklyJsonPrompt(conversations, rangeStart, rangeEnd),
+    prompt.userTemplate(payload),
     WEEKLY_MAX_CHARS
   );
-  const first = await callModelScope(settings, primaryPrompt, {
+  const first = await callInference(settings, primaryPrompt, {
     responseFormat: "json_object",
+    systemPrompt: prompt.system,
   });
   const firstParsed = parseWeeklyFromRaw(first.content);
 
-  logger.info("service", "Weekly generation attempt", {
+  logPromptUsage({
+    promptType: "weeklyDigest",
+    promptVersion: prompt.version,
     mode: first.mode,
     attempt: 1,
     validationErrors: firstParsed.errors,
+    route: first.route,
+    fallbackStage: firstParsed.data ? "none" : "repair_json",
+    latencyMs: Date.now() - firstAttemptStartedAt,
+    success: !!firstParsed.data,
   });
 
   if (firstParsed.data) {
     return {
+      promptType: "weeklyDigest",
+      promptVersion: prompt.version,
       structured: firstParsed.data,
       content: renderWeeklyText(firstParsed.data),
       format: "structured_v1",
@@ -321,26 +377,37 @@ async function generateStructuredWeekly(
       mode: first.mode,
       attempt: 1,
       validationErrors: [],
+      fallbackStage: "none",
     };
   }
 
+  const secondAttemptStartedAt = Date.now();
   const repairPrompt = truncateForContext(
     buildRepairPrompt("weekly", first.content, firstParsed.errors),
     WEEKLY_MAX_CHARS
   );
-  const second = await callModelScope(settings, repairPrompt, {
+  const second = await callInference(settings, repairPrompt, {
     responseFormat: "json_object",
+    systemPrompt: prompt.system,
   });
   const secondParsed = parseWeeklyFromRaw(second.content);
 
-  logger.info("service", "Weekly generation attempt", {
+  logPromptUsage({
+    promptType: "weeklyDigest",
+    promptVersion: prompt.version,
     mode: second.mode,
     attempt: 2,
     validationErrors: secondParsed.errors,
+    route: second.route,
+    fallbackStage: secondParsed.data ? "none" : "fallback_text",
+    latencyMs: Date.now() - secondAttemptStartedAt,
+    success: !!secondParsed.data,
   });
 
   if (secondParsed.data) {
     return {
+      promptType: "weeklyDigest",
+      promptVersion: prompt.version,
       structured: secondParsed.data,
       content: renderWeeklyText(secondParsed.data),
       format: "structured_v1",
@@ -349,25 +416,46 @@ async function generateStructuredWeekly(
       mode: second.mode,
       attempt: 2,
       validationErrors: firstParsed.errors,
+      fallbackStage: "repair_json",
     };
   }
 
+  const fallbackStartedAt = Date.now();
   const fallbackPrompt = truncateForContext(
-    buildWeeklyPrompt(conversations, "zh"),
+    prompt.fallbackTemplate(payload),
     WEEKLY_MAX_CHARS
   );
-  const fallbackResponse = await callModelScope(settings, fallbackPrompt);
+  const fallbackResponse = await callInference(settings, fallbackPrompt, {
+    systemPrompt: prompt.fallbackSystem ?? prompt.system,
+  });
   const fallbackContent =
     sanitizeSummaryText(fallbackResponse.content) || "周报生成失败，请重试。";
 
+  logPromptUsage({
+    promptType: "weeklyDigest",
+    promptVersion: prompt.version,
+    mode: "fallback_text",
+    attempt: 3,
+    validationErrors: [...firstParsed.errors, ...secondParsed.errors],
+    route: fallbackResponse.route,
+    fallbackStage: "fallback_text",
+    latencyMs: Date.now() - fallbackStartedAt,
+    format: "fallback_plain_text",
+    status: "fallback",
+    success: false,
+  });
+
   return {
+    promptType: "weeklyDigest",
+    promptVersion: prompt.version,
     structured: null,
     content: fallbackContent,
     format: "fallback_plain_text",
     status: "fallback",
     mode: "fallback_text",
-    attempt: 2,
+    attempt: 3,
     validationErrors: [...firstParsed.errors, ...secondParsed.errors],
+    fallbackStage: "fallback_text",
   };
 }
 
@@ -386,19 +474,27 @@ export async function generateConversationSummary(
   }
 
   const previous = await getSummary(conversationId);
-  const generated = await generateStructuredSummary(settings, messages);
+  const generated = await generateStructuredSummary(
+    settings,
+    conversation.title,
+    messages
+  );
 
   logger.info("service", "Summary generation result", {
+    promptType: generated.promptType,
+    promptVersion: generated.promptVersion,
     mode: generated.mode,
     attempt: generated.attempt,
     validationErrors: generated.validationErrors,
     format: generated.format,
     status: generated.status,
+    fallbackStage: generated.fallbackStage ?? "none",
   });
 
   if (previous?.status === "fallback" && generated.status === "fallback") {
     logger.warn("service", "Summary hit consecutive fallback", {
       conversationId,
+      promptVersion: generated.promptVersion,
       validationErrors: generated.validationErrors,
     });
   }
@@ -410,7 +506,7 @@ export async function generateConversationSummary(
     format: generated.format,
     status: generated.status,
     schemaVersion: generated.schemaVersion,
-    modelId: settings.modelId,
+    modelId: getEffectiveModelId(settings),
     createdAt: Date.now(),
     sourceUpdatedAt: conversation.updated_at,
   });
@@ -433,17 +529,21 @@ export async function generateWeeklyReport(
   );
 
   logger.info("service", "Weekly generation result", {
+    promptType: generated.promptType,
+    promptVersion: generated.promptVersion,
     mode: generated.mode,
     attempt: generated.attempt,
     validationErrors: generated.validationErrors,
     format: generated.format,
     status: generated.status,
+    fallbackStage: generated.fallbackStage ?? "none",
   });
 
   if (previous?.status === "fallback" && generated.status === "fallback") {
     logger.warn("service", "Weekly report hit consecutive fallback", {
       rangeStart,
       rangeEnd,
+      promptVersion: generated.promptVersion,
       validationErrors: generated.validationErrors,
     });
   }
@@ -456,7 +556,7 @@ export async function generateWeeklyReport(
     format: generated.format,
     status: generated.status,
     schemaVersion: generated.schemaVersion,
-    modelId: settings.modelId,
+    modelId: getEffectiveModelId(settings),
     createdAt: Date.now(),
     sourceHash,
   });
