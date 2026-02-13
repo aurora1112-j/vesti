@@ -1,0 +1,57 @@
+{
+  "id": "conv-004-structured-summary-contract",
+  "type": "conversation",
+  "locale": "zh",
+  "title": "Summary ??? Contract ??",
+  "messages": [
+    {
+      "role": "user",
+      "content": "?? summary ??????? pre ???? markdown ???",
+      "timestamp": 1771021200000
+    },
+    {
+      "role": "ai",
+      "content": "?? sanitizer ??????? JSON schema?",
+      "timestamp": 1771021260000
+    },
+    {
+      "role": "user",
+      "content": "????????? content??? structured ???",
+      "timestamp": 1771021320000
+    },
+    {
+      "role": "ai",
+      "content": "?????? JSON ??? fallback_text???? status?",
+      "timestamp": 1771021380000
+    }
+  ],
+  "gold": {
+    "required_facts": [
+      "JSON",
+      "schema",
+      "structured",
+      "fallback"
+    ],
+    "forbidden_facts": [
+      "GraphQL",
+      "RabbitMQ"
+    ],
+    "reference": {
+      "topic_title": "?????????",
+      "key_takeaways": [
+        "?????????????????? JSON schema?",
+        "?? content + structured ?????????",
+        "???????? fallback_text ????????"
+      ],
+      "sentiment": "neutral",
+      "action_items": [
+        "?? Zod ??? normalize?",
+        "? UI ?? fallback badge?"
+      ],
+      "tech_stack_detected": [
+        "Zod",
+        "TypeScript"
+      ]
+    }
+  }
+}

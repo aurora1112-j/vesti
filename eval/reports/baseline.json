@@ -1,0 +1,231 @@
+{
+  "generatedAt": "2026-02-12T04:36:50.897Z",
+  "mode": "mock",
+  "variant": "current",
+  "datasetSize": {
+    "total": 10,
+    "conversation": 7,
+    "weekly": 3
+  },
+  "metrics": {
+    "formatComplianceRate": 100,
+    "informationCoverageRate": 100,
+    "hallucinationRate": 0,
+    "userSatisfaction": 5
+  },
+  "thresholds": {
+    "formatComplianceRate": 98,
+    "informationCoverageRate": 85,
+    "hallucinationRate": 8,
+    "userSatisfaction": 4
+  },
+  "gate": {
+    "formatComplianceRate": true,
+    "informationCoverageRate": true,
+    "hallucinationRate": true,
+    "userSatisfaction": true,
+    "allPassed": true
+  },
+  "cases": [
+    {
+      "id": "conv-001-parser-anchor",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 1,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "anchor",
+        "selector",
+        "??",
+        "fallback"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "conv-002-timeout-generate",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "timeout",
+        "generate",
+        "??",
+        "??"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "conv-003-version-governance",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "feature",
+        "annotated tag",
+        "SemVer",
+        "CHANGELOG"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "conv-004-structured-summary-contract",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "JSON",
+        "schema",
+        "structured",
+        "fallback"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "conv-005-summary-ui-prd",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "Header",
+        "Core",
+        "Process",
+        "action_items"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "conv-006-prompt-guidelines",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "???",
+        "JSON",
+        "??",
+        "??"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "conv-007-eval-sidecar",
+      "type": "conversation",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 1,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "gold",
+        "coverage",
+        "hallucination",
+        "satisfaction"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "weekly-001-structured-insights-focus",
+      "type": "weekly",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "summary",
+        "weekly",
+        "adapter",
+        "fallback"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "weekly-002-hotfix-stability",
+      "type": "weekly",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "timeout",
+        "v1.0.1",
+        "sanitize",
+        "hotfix"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    },
+    {
+      "id": "weekly-003-prompt-ui-eval",
+      "type": "weekly",
+      "promptVersion": "v1.1.0#mock",
+      "mode": "mock_gold",
+      "attempt": 1,
+      "latencyMs": 0,
+      "formatCompliant": true,
+      "coverageRate": 1,
+      "hallucinationRate": 0,
+      "subjectiveScore": 5,
+      "matchedRequiredFacts": [
+        "prompt",
+        "ui",
+        "gold",
+        "gate"
+      ],
+      "missedRequiredFacts": [],
+      "triggeredForbiddenFacts": []
+    }
+  ]
+}

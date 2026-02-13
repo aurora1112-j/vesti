@@ -1,0 +1,67 @@
+{
+  "id": "weekly-002-hotfix-stability",
+  "type": "weekly",
+  "locale": "zh",
+  "range_start": 1770848400000,
+  "range_end": 1771366800000,
+  "conversations": [
+    {
+      "id": 201,
+      "title": "Timeout after 4000ms ??",
+      "platform": "Claude",
+      "created_at": 1770848400000,
+      "snippet": "test ??? generate ???????????????",
+      "message_count": 11
+    },
+    {
+      "id": 202,
+      "title": "Markdown ?????",
+      "platform": "ChatGPT",
+      "created_at": 1770934800000,
+      "snippet": "sanitizeSummaryText ?? ** ## ????",
+      "message_count": 8
+    },
+    {
+      "id": 203,
+      "title": "v1.0.1 ????",
+      "platform": "Claude",
+      "created_at": 1771021200000,
+      "snippet": "fix ?????? patch tag??? release ????",
+      "message_count": 7
+    }
+  ],
+  "gold": {
+    "required_facts": [
+      "timeout",
+      "v1.0.1",
+      "sanitize",
+      "hotfix"
+    ],
+    "forbidden_facts": [
+      "microservice",
+      "terraform"
+    ],
+    "reference": {
+      "period_title": "??? Hotfix ??",
+      "main_themes": [
+        "Generate ?????????",
+        "Markdown ???????",
+        "v1.0.1 patch ????"
+      ],
+      "key_takeaways": [
+        "?????????????????",
+        "sanitize ???????????",
+        "hotfix ??? fix ??? patch tag ???"
+      ],
+      "action_items": [
+        "??? fallback ???",
+        "?? RC ?? checklist?"
+      ],
+      "tech_stack_detected": [
+        "ModelScope",
+        "Git",
+        "SemVer"
+      ]
+    }
+  }
+}
