@@ -265,7 +265,7 @@
 
 ## 🗺️ 短期路线图 (Roadmap)
 
-在接下来的 **1 到 2 个月**内，我们将专注于从“连接”、“可视化”到“深度智能”的全面进化，计划实现以下核心功能：
+在接下来的 **3 到 6 个月**内，我们将专注于从“连接”、“可视化”到“深度智能”的全面进化，计划实现以下核心功能：
 
 ### 1. 🔌 全面完善平台支持
 致力于打破生态壁垒，我们将扩展后端捕获能力，从当前的架构延伸至更多前沿 AI 工具：
@@ -278,7 +278,7 @@
 - **Platform Distribution (平台分布)**：审视您对不同 AI 工具的依赖与偏好。
 
 <p align="center">
-  <img src="assets/dashboard-effect.png" alt="Dashboard Effect" width="100%">
+  <img src=".github/assets/dashboard-effect.png" alt="Dashboard Effect" width="100%">
   <br>
   <em>预览：每一次对话，都将成为数字大脑成长的可视化足迹</em>
 </p>
