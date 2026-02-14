@@ -1,37 +1,40 @@
-﻿export interface SummaryMetaData {
+export interface ArtifactMetaData {
   title: string;
   generated_at: string;
   tags: string[];
   fallback: boolean;
-}
-
-export interface SummaryProcessStep {
-  step: string;
-  detail: string;
+  range_label?: string;
 }
 
 export interface ChatSummaryData {
-  meta: SummaryMetaData;
-  core: {
-    problem: string;
-    solution: string;
+  meta: ArtifactMetaData;
+  core_question: string;
+  thinking_journey: {
+    initial_state: string;
+    key_turns: string[];
+    final_understanding: string;
   };
-  process: SummaryProcessStep[];
   key_insights: string[];
-  action_items?: string[];
+  unresolved_threads: string[];
+  meta_observations: {
+    thinking_style: string;
+    emotional_tone: string;
+    depth_level: "superficial" | "moderate" | "deep";
+  };
+  actionable_next_steps: string[];
   plain_text?: string;
 }
 
 export interface WeeklySummaryData {
-  meta: SummaryMetaData & {
-    range_label: string;
-  };
-  core: {
-    problem: string;
-    solution: string;
-  };
-  process: SummaryProcessStep[];
-  key_insights: string[];
-  action_items?: string[];
+  meta: ArtifactMetaData;
+  highlights: string[];
+  recurring_questions: string[];
+  unresolved_threads: string[];
+  suggested_focus: string[];
+  evidence: Array<{
+    conversation_id: number;
+    note: string;
+  }>;
+  insufficient_data: boolean;
   plain_text?: string;
 }

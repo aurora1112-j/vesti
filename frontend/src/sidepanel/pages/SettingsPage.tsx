@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles, Eye, EyeOff, Loader2 } from "lucide-react";
 import type { AsyncStatus, LlmConfig } from "~lib/types";
 import {
+  DEFAULT_BACKUP_MODEL,
   buildDefaultLlmSettings,
   DEFAULT_PROXY_URL,
   DEFAULT_STABLE_MODEL,
@@ -17,9 +18,7 @@ import {
 
 const MODEL_OPTIONS = [
   DEFAULT_STABLE_MODEL,
-  "Qwen/Qwen3-32B",
-  "Qwen/Qwen3-14B",
-  "deepseek-ai/DeepSeek-R1",
+  DEFAULT_BACKUP_MODEL,
 ];
 
 function getErrorMessage(error: unknown): string {
@@ -135,7 +134,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-tertiary">
+    <div className="vesti-shell flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-app">
       <header className="flex h-8 shrink-0 items-center px-4">
         <h1 className="text-vesti-xl font-semibold text-text-primary">Settings</h1>
       </header>
@@ -147,17 +146,17 @@ export function SettingsPage() {
             Model Access
           </h2>
 
-          <div className="rounded-md bg-surface-card p-3">
+          <div className="card-shadow-warm rounded-card border border-border-subtle bg-bg-surface p-4">
             <div className="grid gap-3">
-              <div className="flex items-center justify-between rounded-sm border border-border-subtle bg-bg-primary px-3 py-2">
-                <div className="grid gap-0.5">
-                  <span className="text-vesti-xs font-medium text-text-primary">
-                    Use Custom Configuration (Expert Mode)
+              <div className="flex items-center justify-between gap-4 rounded-md border border-border-subtle bg-bg-surface-hover px-3 py-2">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[15px] font-medium text-text-primary">
+                    Use Custom Configuration
                   </span>
-                  <span className="text-[10px] text-text-tertiary">
+                  <span className="mt-0.5 text-[13px] leading-[1.45] text-text-secondary">
                     {isCustomMode
-                      ? "Custom BYOK mode: direct request to ModelScope"
-                      : "Demo mode: proxy route with developer-managed credentials"}
+                      ? "Custom BYOK mode: direct request to ModelScope."
+                      : "Demo mode: proxy route with developer credentials."}
                   </span>
                 </div>
                 <button
@@ -165,47 +164,45 @@ export function SettingsPage() {
                   role="switch"
                   aria-checked={isCustomMode}
                   onClick={() => setMode(!isCustomMode)}
-                  className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${
-                    isCustomMode ? "bg-info" : "bg-border-subtle"
-                  }`}
+                  data-state={isCustomMode ? "checked" : "unchecked"}
+                  className="settings-switch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
-                  <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${
-                      isCustomMode ? "translate-x-5" : "translate-x-0.5"
-                    }`}
-                  />
+                  <span className="settings-switch-thumb" />
                 </button>
               </div>
 
               {!isCustomMode ? (
-                <div className="grid gap-2 rounded-sm border border-border-subtle bg-bg-primary p-3">
-                  <div className="inline-flex w-fit items-center rounded-md border border-border-default bg-bg-secondary px-2 py-0.5 text-[10px] font-semibold text-text-primary">
+                <div className="grid gap-3 rounded-md border border-border-subtle bg-bg-surface-hover p-3">
+                  <div className="inline-flex w-fit items-center rounded-md border border-border-subtle bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-text-primary">
                     Demo Channel Active
                   </div>
-                  <p className="text-vesti-xs text-text-secondary">
-                    Running on {DEFAULT_STABLE_MODEL}
+                  <p className="text-[13px] leading-[1.45] text-text-secondary">
+                    Primary model: {DEFAULT_STABLE_MODEL}
                   </p>
-                  <p className="text-[10px] text-text-tertiary">
-                    Gateway locked to modelscope.cn · Route: Proxy ({DEFAULT_PROXY_URL})
+                  <p className="text-[13px] leading-[1.45] text-text-secondary">
+                    Backup model: {DEFAULT_BACKUP_MODEL} (auto failover on timeout/429/5xx)
+                  </p>
+                  <p className="text-[11px] text-text-tertiary">
+                    Gateway locked to modelscope.cn | Route: Proxy ({DEFAULT_PROXY_URL})
                   </p>
 
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={handleTest}
-                      className="rounded-sm border border-border-default bg-bg-primary px-3 py-1.5 text-vesti-xs font-medium text-text-primary transition-colors duration-200 hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                      className="rounded-md border border-border-default bg-transparent px-4 py-2 text-[13px] font-medium text-text-primary transition-colors duration-200 hover:bg-bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                     >
                       Test Connection
                     </button>
                     {status === "loading" && (
-                      <div className="flex items-center gap-1 text-vesti-xs text-text-tertiary">
+                      <div className="flex items-center gap-1 text-[12px] text-text-tertiary">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         Working...
                       </div>
                     )}
                     {message && status !== "loading" && (
                       <span
-                        className={`text-vesti-xs ${
+                        className={`text-[12px] ${
                           status === "error" ? "text-danger" : "text-text-secondary"
                         }`}
                       >
@@ -215,9 +212,9 @@ export function SettingsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-3 rounded-sm border border-border-subtle bg-bg-primary p-3 transition-all duration-200">
+                <div className="grid gap-3 rounded-md border border-border-subtle bg-bg-surface-hover p-3 transition-all duration-200">
                   <div className="grid gap-1">
-                    <label className="text-[10px] text-text-tertiary">Model</label>
+                    <label className="text-[11px] text-text-tertiary">Model</label>
                     <select
                       value={llmSettings.customModelId ?? llmSettings.modelId}
                       onChange={(e) =>
@@ -229,7 +226,7 @@ export function SettingsPage() {
                           })
                         )
                       }
-                      className="h-8 rounded-sm border border-border-default bg-bg-primary px-2 text-vesti-xs text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                      className="settings-input"
                     >
                       {MODEL_OPTIONS.map((model) => (
                         <option key={model} value={model}>
@@ -240,7 +237,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="grid gap-1">
-                    <label className="text-[10px] text-text-tertiary">API Key</label>
+                    <label className="text-[11px] text-text-tertiary">API Key</label>
                     <div className="relative">
                       <input
                         type={showApiKey ? "text" : "password"}
@@ -248,13 +245,13 @@ export function SettingsPage() {
                         onChange={(e) =>
                           setLlmSettingsState((prev) => ({ ...prev, apiKey: e.target.value }))
                         }
-                        className="h-8 w-full rounded-sm border border-border-default bg-bg-primary px-2 pr-8 text-vesti-xs text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                        className="settings-input pr-9"
                         placeholder="ms-..."
                       />
                       <button
                         type="button"
                         onClick={() => setShowApiKey((prev) => !prev)}
-                        className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-text-tertiary transition-colors duration-200 hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                        className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-text-tertiary transition-colors duration-200 hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                         aria-label="Toggle visibility"
                       >
                         {showApiKey ? (
@@ -266,34 +263,34 @@ export function SettingsPage() {
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-text-tertiary">
-                    Gateway locked to modelscope.cn · Route: Direct ({MODELSCOPE_BASE_URL})
+                  <p className="text-[11px] text-text-tertiary">
+                    Gateway locked to modelscope.cn | Route: Direct ({MODELSCOPE_BASE_URL})
                   </p>
 
-                  <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="mt-1 flex flex-wrap items-center justify-end gap-3">
                     <button
                       type="button"
                       onClick={handleTest}
-                      className="rounded-sm border border-border-default bg-transparent px-3 py-1.5 text-vesti-xs font-medium text-text-primary transition-colors duration-200 hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                      className="rounded-md border border-border-default bg-transparent px-4 py-2 text-[13px] font-medium text-text-primary transition-colors duration-200 hover:bg-bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                     >
                       Test
                     </button>
                     <button
                       type="button"
                       onClick={handleSave}
-                      className="rounded-sm border border-border-default bg-text-primary px-3 py-1.5 text-vesti-xs font-medium text-bg-primary transition-colors duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                      className="rounded-md border border-text-primary bg-text-primary px-4 py-2 text-[13px] font-medium text-white transition-colors duration-200 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                     >
                       Save
                     </button>
                     {status === "loading" && (
-                      <div className="flex items-center gap-1 text-vesti-xs text-text-tertiary">
+                      <div className="flex items-center gap-1 text-[12px] text-text-tertiary">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         Working...
                       </div>
                     )}
                     {message && status !== "loading" && (
                       <span
-                        className={`text-vesti-xs ${
+                        className={`text-[12px] ${
                           status === "error" ? "text-danger" : "text-text-secondary"
                         }`}
                       >

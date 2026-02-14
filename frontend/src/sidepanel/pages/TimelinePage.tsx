@@ -32,11 +32,11 @@ export function TimelinePage({ onSelectConversation, refreshToken }: TimelinePag
   const todayCount = stats?.todayCount ?? 0;
 
   return (
-    <div className="flex h-full flex-col bg-bg-tertiary">
+    <div className="flex h-full flex-col bg-bg-app">
       <header className="flex h-8 shrink-0 items-center justify-between px-4">
         <div className="flex items-center gap-1.5">
           <img src={LOGO_BASE64} alt="Vesti" width={20} height={20} />
-          <span className="text-vesti-base font-semibold text-text-primary tracking-tight">
+          <span className="text-vesti-base font-semibold text-text-primary tracking-tight font-serif">
             Vesti
           </span>
         </div>

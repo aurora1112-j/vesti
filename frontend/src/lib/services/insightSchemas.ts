@@ -1,10 +1,16 @@
 ﻿import { z } from "zod";
-import type { ConversationSummaryV1, WeeklyReportV1 } from "../types";
+import type {
+  ConversationSummaryV1,
+  ConversationSummaryV2,
+  WeeklyLiteReportV1,
+  WeeklyReportV1,
+} from "../types";
 
 const MAX_TITLE_LENGTH = 80;
 const MAX_PERIOD_LENGTH = 120;
 const MAX_LIST_ITEM_LENGTH = 280;
 const MAX_LIST_ITEMS = 8;
+const MAX_META_LENGTH = 180;
 
 const summarySchema = z.object({
   topic_title: z.string().min(1).max(MAX_TITLE_LENGTH),
@@ -22,6 +28,42 @@ const weeklySchema = z.object({
   tech_stack_detected: z.array(z.string().min(1)),
 });
 
+const summaryV2Schema = z.object({
+  core_question: z.string().min(1).max(MAX_META_LENGTH),
+  thinking_journey: z.object({
+    initial_state: z.string().min(1).max(MAX_LIST_ITEM_LENGTH),
+    key_turns: z.array(z.string().min(1)).min(1).max(8),
+    final_understanding: z.string().min(1).max(MAX_LIST_ITEM_LENGTH),
+  }),
+  key_insights: z.array(z.string().min(1)).min(1).max(8),
+  unresolved_threads: z.array(z.string().min(1)).max(8),
+  meta_observations: z.object({
+    thinking_style: z.string().min(1).max(MAX_META_LENGTH),
+    emotional_tone: z.string().min(1).max(MAX_META_LENGTH),
+    depth_level: z.enum(["superficial", "moderate", "deep"]),
+  }),
+  actionable_next_steps: z.array(z.string().min(1)).max(8),
+});
+
+const weeklyLiteSchema = z.object({
+  time_range: z.object({
+    start: z.string().min(1),
+    end: z.string().min(1),
+    total_conversations: z.number().int().min(0),
+  }),
+  highlights: z.array(z.string().min(1)).min(1).max(8),
+  recurring_questions: z.array(z.string().min(1)).max(8),
+  unresolved_threads: z.array(z.string().min(1)).max(8),
+  suggested_focus: z.array(z.string().min(1)).min(1).max(8),
+  evidence: z.array(
+    z.object({
+      conversation_id: z.number().int().min(0),
+      note: z.string().min(1),
+    })
+  ).max(10),
+  insufficient_data: z.boolean(),
+});
+
 function cleanItem(value: string): string {
   return value
     .replace(/^\s*[-*+•]+\s*/g, "")
@@ -31,6 +73,10 @@ function cleanItem(value: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, MAX_LIST_ITEM_LENGTH);
+}
+
+function cleanMeta(value: string): string {
+  return cleanItem(value).slice(0, MAX_META_LENGTH);
 }
 
 function dedupePreserveOrder(items: string[]): string[] {
@@ -107,6 +153,98 @@ export function normalizeWeeklyReport(input: {
   return weekly;
 }
 
+export function normalizeConversationSummaryV2(input: {
+  core_question: string;
+  thinking_journey: {
+    initial_state: string;
+    key_turns: string[];
+    final_understanding: string;
+  };
+  key_insights: string[];
+  unresolved_threads: string[];
+  meta_observations: {
+    thinking_style: string;
+    emotional_tone: string;
+    depth_level: "superficial" | "moderate" | "deep";
+  };
+  actionable_next_steps: string[];
+}): ConversationSummaryV2 {
+  const keyTurns = normalizeList(input.thinking_journey.key_turns, 5);
+  const keyInsights = normalizeList(input.key_insights, 6);
+  const unresolvedThreads = normalizeList(input.unresolved_threads, 6);
+  const nextSteps = normalizeList(input.actionable_next_steps, 6);
+
+  return {
+    core_question: cleanMeta(input.core_question) || "你这次对话想解决的核心问题是什么？",
+    thinking_journey: {
+      initial_state:
+        cleanItem(input.thinking_journey.initial_state) || "你在问题起点存在一些不确定性。",
+      key_turns: keyTurns.length > 0 ? keyTurns : ["你通过追问不断澄清关键假设。"],
+      final_understanding:
+        cleanItem(input.thinking_journey.final_understanding) || "你对问题形成了阶段性理解。",
+    },
+    key_insights: keyInsights.length > 0 ? keyInsights : ["你获得了可执行的阶段性洞察。"],
+    unresolved_threads: unresolvedThreads,
+    meta_observations: {
+      thinking_style:
+        cleanMeta(input.meta_observations.thinking_style) || "你倾向先拆解问题再收敛结论。",
+      emotional_tone:
+        cleanMeta(input.meta_observations.emotional_tone) || "整体语气以探索和澄清为主。",
+      depth_level: input.meta_observations.depth_level,
+    },
+    actionable_next_steps: nextSteps,
+  };
+}
+
+export function normalizeWeeklyLiteReport(input: {
+  time_range: {
+    start: string;
+    end: string;
+    total_conversations: number;
+  };
+  highlights: string[];
+  recurring_questions: string[];
+  unresolved_threads: string[];
+  suggested_focus: string[];
+  evidence: Array<{
+    conversation_id: number;
+    note: string;
+  }>;
+  insufficient_data: boolean;
+}): WeeklyLiteReportV1 {
+  const highlights = normalizeList(input.highlights, 6);
+  const recurringQuestions = normalizeList(input.recurring_questions, 4);
+  const unresolvedThreads = normalizeList(input.unresolved_threads, 6);
+  const suggestedFocus = normalizeList(input.suggested_focus, 6);
+  const evidence = (input.evidence || [])
+    .slice(0, 8)
+    .map((item) => ({
+      conversation_id: item.conversation_id,
+      note: cleanItem(item.note),
+    }))
+    .filter((item) => item.note.length > 0);
+
+  const totalConversations = Math.max(0, Math.floor(input.time_range.total_conversations));
+  const insufficientData = input.insufficient_data || totalConversations < 3;
+
+  return {
+    time_range: {
+      start: input.time_range.start.trim(),
+      end: input.time_range.end.trim(),
+      total_conversations: totalConversations,
+    },
+    highlights: highlights.length > 0 ? highlights : ["本周形成了可复用的阶段性结论。"],
+    recurring_questions: recurringQuestions,
+    unresolved_threads: unresolvedThreads,
+    suggested_focus:
+      suggestedFocus.length > 0
+        ? suggestedFocus
+        : ["下周优先推进一个高价值问题并记录验证结果。"],
+    evidence,
+    insufficient_data: insufficientData,
+  };
+}
+
 export function parseConversationSummaryObject(value: unknown): {
   success: true;
   data: ConversationSummaryV1;
@@ -128,6 +266,29 @@ export function parseConversationSummaryObject(value: unknown): {
   };
 }
 
+export function parseConversationSummaryV2Object(value: unknown): {
+  success: true;
+  data: ConversationSummaryV2;
+} | {
+  success: false;
+  errors: string[];
+} {
+  const parsed = summaryV2Schema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      success: false,
+      errors: parsed.error.issues.map(
+        (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`
+      ),
+    };
+  }
+
+  return {
+    success: true,
+    data: normalizeConversationSummaryV2(parsed.data),
+  };
+}
+
 export function parseWeeklyReportObject(value: unknown): {
   success: true;
   data: WeeklyReportV1;
@@ -146,6 +307,29 @@ export function parseWeeklyReportObject(value: unknown): {
   return {
     success: true,
     data: normalizeWeeklyReport(parsed.data),
+  };
+}
+
+export function parseWeeklyLiteReportObject(value: unknown): {
+  success: true;
+  data: WeeklyLiteReportV1;
+} | {
+  success: false;
+  errors: string[];
+} {
+  const parsed = weeklyLiteSchema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      success: false,
+      errors: parsed.error.issues.map(
+        (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`
+      ),
+    };
+  }
+
+  return {
+    success: true,
+    data: normalizeWeeklyLiteReport(parsed.data),
   };
 }
 
@@ -337,5 +521,34 @@ export const insightSchemaHints = {
     key_takeaways: ["string"],
     action_items: ["string (optional)"],
     tech_stack_detected: ["string"],
+  },
+  summary_v2: {
+    core_question: "string",
+    thinking_journey: {
+      initial_state: "string",
+      key_turns: ["string"],
+      final_understanding: "string",
+    },
+    key_insights: ["string"],
+    unresolved_threads: ["string"],
+    meta_observations: {
+      thinking_style: "string",
+      emotional_tone: "string",
+      depth_level: "superficial | moderate | deep",
+    },
+    actionable_next_steps: ["string"],
+  },
+  weekly_lite: {
+    time_range: {
+      start: "YYYY-MM-DD",
+      end: "YYYY-MM-DD",
+      total_conversations: "number",
+    },
+    highlights: ["string"],
+    recurring_questions: ["string"],
+    unresolved_threads: ["string"],
+    suggested_focus: ["string"],
+    evidence: [{ conversation_id: "number", note: "string" }],
+    insufficient_data: "boolean",
   },
 };

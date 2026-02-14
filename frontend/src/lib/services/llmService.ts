@@ -53,8 +53,8 @@ type ModelScopeMessage = {
 
 type ModelScopeResponse = {
   choices?: Array<{
-    message?: { content?: unknown };
-    delta?: { content?: unknown };
+    message?: { content?: unknown; reasoning_content?: unknown };
+    delta?: { content?: unknown; reasoning_content?: unknown };
   }>;
 };
 
@@ -109,7 +109,17 @@ function extractContent(data: ModelScopeResponse): string {
   if (delta.trim()) {
     return delta.trim();
   }
-  throw new Error("LLM_RESPONSE_EMPTY");
+  return "";
+}
+
+function hasReasoningContent(data: ModelScopeResponse): boolean {
+  const choice = data.choices?.[0];
+  const messageReasoning = toText(choice?.message?.reasoning_content);
+  if (messageReasoning.trim()) {
+    return true;
+  }
+  const deltaReasoning = toText(choice?.delta?.reasoning_content);
+  return deltaReasoning.trim().length > 0;
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -227,57 +237,69 @@ async function callProvider(
   ];
 
   if (options.responseFormat === "json_object") {
+    let shouldPromptJsonFallback = false;
     const jsonResponse = await request(baseMessages, "json_object");
     if (jsonResponse.ok) {
       const data = (await jsonResponse.json()) as ModelScopeResponse;
+      const jsonModeContent = extractContent(data);
+      if (jsonModeContent.trim()) {
+        return {
+          content: jsonModeContent,
+          mode: "json_mode",
+          streamStage: streamDecision.stage,
+          streamReason: streamDecision.reason,
+        };
+      }
+
+      shouldPromptJsonFallback = true;
+      logger.warn("llm", `${route} JSON mode returned empty content, fallback to prompt_json`, {
+        hasReasoningContent: hasReasoningContent(data),
+      });
+    } else {
+      const jsonErrorText = await parseError(jsonResponse);
+      const shouldFallback =
+        [400, 404, 415, 422].includes(jsonResponse.status) ||
+        /response_format|json_object|unsupported/i.test(jsonErrorText);
+
+      if (!shouldFallback) {
+        logger.error(
+          "llm",
+          `${route} JSON request failed: ${jsonResponse.status}`,
+          new Error(jsonErrorText)
+        );
+        throw new Error(`LLM_REQUEST_FAILED:${jsonResponse.status}`);
+      }
+
+      shouldPromptJsonFallback = true;
+      logger.warn("llm", `${route} JSON mode unsupported, fallback to prompt_json`, {
+        status: jsonResponse.status,
+      });
+    }
+
+    if (shouldPromptJsonFallback) {
+      const promptJsonMessages: ModelScopeMessage[] = [
+        { role: "system", content: `${baseSystemPrompt}\n${STRICT_JSON_SYSTEM_PROMPT}` },
+        { role: "user", content: prompt },
+      ];
+      const promptJsonResponse = await request(promptJsonMessages);
+      if (!promptJsonResponse.ok) {
+        const promptJsonErrorText = await parseError(promptJsonResponse);
+        logger.error(
+          "llm",
+          `${route} prompt_json request failed: ${promptJsonResponse.status}`,
+          new Error(promptJsonErrorText)
+        );
+        throw new Error(`LLM_REQUEST_FAILED:${promptJsonResponse.status}`);
+      }
+
+      const promptJsonData = (await promptJsonResponse.json()) as ModelScopeResponse;
       return {
-        content: extractContent(data),
-        mode: "json_mode",
+        content: extractContent(promptJsonData),
+        mode: "prompt_json",
         streamStage: streamDecision.stage,
         streamReason: streamDecision.reason,
       };
     }
-
-    const jsonErrorText = await parseError(jsonResponse);
-    const shouldFallback =
-      [400, 404, 415, 422].includes(jsonResponse.status) ||
-      /response_format|json_object|unsupported/i.test(jsonErrorText);
-
-    if (!shouldFallback) {
-      logger.error(
-        "llm",
-        `${route} JSON request failed: ${jsonResponse.status}`,
-        new Error(jsonErrorText)
-      );
-      throw new Error(`LLM_REQUEST_FAILED:${jsonResponse.status}`);
-    }
-
-    logger.warn("llm", `${route} JSON mode unsupported, fallback to prompt_json`, {
-      status: jsonResponse.status,
-    });
-
-    const promptJsonMessages: ModelScopeMessage[] = [
-      { role: "system", content: `${baseSystemPrompt}\n${STRICT_JSON_SYSTEM_PROMPT}` },
-      { role: "user", content: prompt },
-    ];
-    const promptJsonResponse = await request(promptJsonMessages);
-    if (!promptJsonResponse.ok) {
-      const promptJsonErrorText = await parseError(promptJsonResponse);
-      logger.error(
-        "llm",
-        `${route} prompt_json request failed: ${promptJsonResponse.status}`,
-        new Error(promptJsonErrorText)
-      );
-      throw new Error(`LLM_REQUEST_FAILED:${promptJsonResponse.status}`);
-    }
-
-    const promptJsonData = (await promptJsonResponse.json()) as ModelScopeResponse;
-    return {
-      content: extractContent(promptJsonData),
-      mode: "prompt_json",
-      streamStage: streamDecision.stage,
-      streamReason: streamDecision.reason,
-    };
   }
 
   const response = await request(baseMessages);

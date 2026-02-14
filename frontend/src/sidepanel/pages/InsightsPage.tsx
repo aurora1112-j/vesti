@@ -137,30 +137,32 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
   const weeklyData = weeklyReport ? toWeeklySummaryData(weeklyReport) : null;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-tertiary">
-      <header className="flex h-8 shrink-0 items-center px-4">
-        <h1 className="text-vesti-xl font-semibold text-text-primary">Insights</h1>
+    <div className="vesti-shell flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-app">
+      <header className="flex h-9 shrink-0 items-center px-4">
+        <h1 className="text-[18px] font-semibold tracking-tight text-text-primary">Insights</h1>
       </header>
 
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-5 p-4">
         <section>
-          <h2 className="mb-2 text-vesti-sm font-medium text-text-secondary">Conversation Summary</h2>
+          <h2 className="mb-2 text-[13px] font-medium uppercase tracking-[0.04em] text-text-secondary">
+            Conversation Summary
+          </h2>
 
-          <div className="rounded-md bg-surface-card p-3">
+          <div className="rounded-[12px] border border-border-subtle bg-surface-card p-4">
             {!conversation && (
-              <p className="text-vesti-sm text-text-tertiary">
+              <p className="text-[13px] text-text-tertiary">
                 Select a conversation from Timeline to generate a summary.
               </p>
             )}
 
             {conversation && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-vesti-sm font-medium text-text-primary">
+                    <p className="text-[15px] font-medium text-text-primary">
                       {conversation.title}
                     </p>
-                    <p className="text-vesti-xs text-text-tertiary">
+                    <p className="text-[13px] text-text-tertiary">
                       {conversation.message_count} turns
                     </p>
                   </div>
@@ -171,7 +173,7 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                   type="button"
                   onClick={handleGenerateSummary}
                   disabled={summaryStatus === "loading"}
-                  className="flex w-fit items-center gap-1 rounded-sm border border-border-default bg-bg-primary px-3 py-1.5 text-vesti-xs font-medium text-text-primary transition-colors duration-[120ms] hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-fit items-center gap-1 rounded-md border border-border-default bg-bg-primary px-3 py-1.5 text-[13px] font-medium text-text-primary transition-colors duration-200 hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {summaryStatus === "loading" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -181,21 +183,21 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                   {summary ? "Regenerate" : "Generate"}
                 </button>
 
-                <div className="min-h-[160px] rounded-md bg-bg-primary p-3 text-vesti-sm text-text-primary">
+                <div className="min-h-[160px] rounded-md bg-bg-surface p-3">
                   {summaryStatus === "loading" && !summaryData && (
-                    <div className="flex items-center gap-2 text-text-tertiary">
+                    <div className="flex items-center gap-2 text-[13px] text-text-tertiary">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Analyzing conversation context...
                     </div>
                   )}
 
                   {summaryStatus === "error" && (
-                    <div className="flex items-center gap-2 text-vesti-xs text-danger">
+                    <div className="flex items-center gap-2 text-[13px] text-danger">
                       <span>Failed to summarize. {summaryError}</span>
                       <button
                         type="button"
                         onClick={handleGenerateSummary}
-                        className="text-vesti-xs text-text-secondary underline underline-offset-2"
+                        className="text-[13px] text-text-secondary underline underline-offset-2"
                       >
                         Retry
                       </button>
@@ -203,14 +205,14 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                   )}
 
                   {!summaryData && summaryStatus !== "loading" && summaryStatus !== "error" && (
-                    <p className="text-vesti-xs text-text-tertiary">No summary yet.</p>
+                    <p className="text-[13px] text-text-tertiary">No summary yet.</p>
                   )}
 
                   {summaryData && <StructuredSummaryCard data={summaryData} />}
                 </div>
 
                 {summary && (
-                  <div className="text-vesti-xs text-text-tertiary">
+                  <div className="text-[12px] text-text-tertiary">
                     Model: {summary.modelId} · Generated: {formatDateTime(summary.createdAt)}
                   </div>
                 )}
@@ -220,18 +222,18 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
         </section>
 
         <section>
-          <h2 className="mb-2 flex items-center gap-1.5 text-vesti-sm font-medium text-text-secondary">
+          <h2 className="mb-2 flex items-center gap-1.5 text-[13px] font-medium uppercase tracking-[0.04em] text-text-secondary">
             <CalendarDays className="h-4 w-4" strokeWidth={1.75} />
             Weekly Summary
           </h2>
 
-          <div className="rounded-md bg-surface-card p-3">
-            <div className="flex flex-col gap-3">
+          <div className="rounded-[12px] border border-border-subtle bg-surface-card p-4">
+            <div className="flex flex-col gap-4">
               <button
                 type="button"
                 onClick={handleGenerateWeekly}
                 disabled={weeklyStatus === "loading"}
-                className="flex w-fit items-center gap-1 rounded-sm border border-border-default bg-bg-primary px-3 py-1.5 text-vesti-xs font-medium text-text-primary transition-colors duration-[120ms] hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-fit items-center gap-1 rounded-md border border-border-default bg-bg-primary px-3 py-1.5 text-[13px] font-medium text-text-primary transition-colors duration-200 hover:bg-surface-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {weeklyStatus === "loading" ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -241,21 +243,21 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                 {weeklyReport ? "Regenerate" : "Generate"}
               </button>
 
-              <div className="min-h-[160px] rounded-md bg-bg-primary p-3 text-vesti-sm text-text-primary">
+              <div className="min-h-[160px] rounded-md bg-bg-surface p-3">
                 {weeklyStatus === "loading" && !weeklyData && (
-                  <div className="flex items-center gap-2 text-text-tertiary">
+                  <div className="flex items-center gap-2 text-[13px] text-text-tertiary">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Analyzing weekly conversation context...
                   </div>
                 )}
 
                 {weeklyStatus === "error" && (
-                  <div className="flex items-center gap-2 text-vesti-xs text-danger">
+                  <div className="flex items-center gap-2 text-[13px] text-danger">
                     <span>Failed to summarize. {weeklyError}</span>
                     <button
                       type="button"
                       onClick={handleGenerateWeekly}
-                      className="text-vesti-xs text-text-secondary underline underline-offset-2"
+                      className="text-[13px] text-text-secondary underline underline-offset-2"
                     >
                       Retry
                     </button>
@@ -263,14 +265,14 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                 )}
 
                 {!weeklyData && weeklyStatus !== "loading" && weeklyStatus !== "error" && (
-                  <p className="text-vesti-xs text-text-tertiary">No weekly summary yet.</p>
+                  <p className="text-[13px] text-text-tertiary">No weekly summary yet.</p>
                 )}
 
                 {weeklyData && <StructuredWeeklyCard data={weeklyData} />}
               </div>
 
               {weeklyReport && (
-                <div className="text-vesti-xs text-text-tertiary">
+                <div className="text-[12px] text-text-tertiary">
                   Model: {weeklyReport.modelId} · Generated: {formatDateTime(weeklyReport.createdAt)}
                 </div>
               )}

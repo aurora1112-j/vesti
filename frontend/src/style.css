@@ -1,32 +1,40 @@
-﻿@tailwind base;
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;500;600&family=Noto+Serif+SC:wght@400;500;700&display=swap");
+
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --bg-primary: 0 0% 100%;
-    --bg-secondary: 40 14% 96%;
-    --bg-tertiary: 43 20% 97%;
+    --bg-primary: 48 25% 92%;
+    --bg-secondary: 49 21% 90%;
+    --bg-tertiary: 48 33% 97%;
+    --bg-sidebar: 48 24% 96%;
 
-    --surface-card: 40 16% 92%;
-    --surface-card-hover: 40 14% 89%;
-    --surface-card-active: 40 13% 87%;
-    --surface-ai-message: 40 10% 95%;
+    --surface-card: 48 25% 92%;
+    --surface-card-hover: 49 21% 90%;
+    --surface-card-active: 48 19% 86%;
+    --surface-ai-message: 48 22% 93%;
 
-    --text-primary: 0 0% 10%;
-    --text-secondary: 0 0% 42%;
-    --text-tertiary: 0 0% 61%;
+    /* UI v2 semantic token mapping (PRD -> current token set) */
+    --bg-app: var(--bg-tertiary);
+    --bg-surface: var(--surface-card);
+    --bg-surface-hover: var(--surface-card-hover);
+
+    --text-primary: 30 4% 10%;
+    --text-secondary: 26 4% 35%;
+    --text-tertiary: 28 5% 53%;
     --text-inverse: 0 0% 100%;
 
-    --accent-primary: 214 55% 44%;
-    --accent-primary-hover: 214 57% 38%;
-    --accent-primary-active: 214 58% 33%;
-    --accent-primary-light: 214 55% 44% / 0.08;
-    --accent-primary-muted: 214 55% 44% / 0.15;
+    --accent-primary: 30 4% 10%;
+    --accent-primary-hover: 30 8% 8%;
+    --accent-primary-active: 30 11% 7%;
+    --accent-primary-light: 30 15% 22% / 0.08;
+    --accent-primary-muted: 30 15% 22% / 0.15;
 
-    --border-default: 40 12% 89%;
-    --border-subtle: 40 14% 92%;
-    --border-focus: 214 55% 44%;
+    --border-default: 45 22% 84%;
+    --border-subtle: 45 24% 87%;
+    --border-focus: 30 4% 10%;
 
     --success: 145 51% 36%;
     --warning: 36 90% 43%;
@@ -71,12 +79,14 @@
     --ring: var(--border-focus);
     --radius: 0.5rem;
 
-    --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
-    --shadow-popover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
-    --shadow-capsule: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+    --shadow-color: 28, 20, 15;
+    --shadow-paper: 0 2px 6px rgba(var(--shadow-color), 0.04), 0 6px 16px rgba(var(--shadow-color), 0.03);
+    --shadow-card-hover: 0 2px 6px rgba(var(--shadow-color), 0.04), 0 6px 16px rgba(var(--shadow-color), 0.03);
+    --shadow-popover: 0 8px 22px rgba(var(--shadow-color), 0.1), 0 2px 6px rgba(var(--shadow-color), 0.08);
+    --shadow-capsule: 0 3px 9px rgba(var(--shadow-color), 0.16), 0 1px 2px rgba(var(--shadow-color), 0.1);
 
-    --font-serif: Georgia, "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", "Times New Roman", serif;
-    --font-ui: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-serif: "Newsreader", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+    --font-ui: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --font-mono: "Cascadia Mono", "Consolas", "SF Mono", "Menlo", "Liberation Mono", monospace;
   }
 }
@@ -85,19 +95,112 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-serif);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
 
 @layer utilities {
+  .vesti-shell {
+    font-family: var(--font-ui);
+  }
+
+  .vesti-artifact {
+    font-family: var(--font-serif);
+    font-optical-sizing: auto;
+    font-variant-ligatures: common-ligatures;
+  }
+
   .text-balance {
     text-wrap: balance;
   }
+
   .text-vesti-xs,
-  .text-vesti-sm {
+  .text-vesti-sm,
+  .text-vesti-base,
+  .text-vesti-md {
     font-family: var(--font-ui);
+  }
+
+  .text-reading-md {
+    font-family: var(--font-serif);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .text-reading-lg {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    line-height: 1.65;
+  }
+
+  .card-shadow-warm {
+    box-shadow: var(--shadow-paper);
+  }
+
+  .tag-paper {
+    border: 1px solid hsl(var(--border-subtle));
+    background-color: rgba(255, 255, 255, 0.6);
+  }
+
+  .settings-input {
+    width: 100%;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid #e6e2d6;
+    background-color: #ffffff;
+    padding: 0 12px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: #1a1918;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .settings-input:focus-visible {
+    outline: none;
+    border-color: #1a1918;
+    box-shadow: 0 0 0 2px rgba(26, 25, 24, 0.1);
+  }
+
+  .settings-switch {
+    position: relative;
+    display: inline-flex;
+    height: 24px;
+    width: 44px;
+    flex-shrink: 0;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-color: #d1d1d1;
+    transition: background-color 0.2s ease-in-out;
+  }
+
+  .settings-switch[data-state="checked"] {
+    background-color: #1a1918;
+  }
+
+  .settings-switch-thumb {
+    pointer-events: none;
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    display: inline-block;
+    height: 20px;
+    width: 20px;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px rgba(26, 25, 24, 0.2);
+    transform: translateX(0);
+    transition: transform 0.2s ease-in-out;
+  }
+
+  .settings-switch[data-state="checked"] .settings-switch-thumb {
+    transform: translateX(20px);
   }
 }
 
@@ -107,6 +210,7 @@
     opacity: 0.4;
     transform: scale(0.85);
   }
+
   50% {
     opacity: 1;
     transform: scale(1);
@@ -127,13 +231,16 @@
 .vesti-scroll::-webkit-scrollbar {
   width: 4px;
 }
+
 .vesti-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .vesti-scroll::-webkit-scrollbar-thumb {
   background: hsl(var(--border-default));
   border-radius: 9999px;
 }
+
 .vesti-scroll::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--text-tertiary));
 }
@@ -141,12 +248,15 @@
 .heatmap-l1 {
   background-color: hsl(var(--heatmap-1, 80 62% 72%));
 }
+
 .heatmap-l2 {
   background-color: hsl(var(--heatmap-2, 112 45% 61%));
 }
+
 .heatmap-l3 {
   background-color: hsl(var(--heatmap-3, 120 40% 44%));
 }
+
 .heatmap-l4 {
   background-color: hsl(var(--heatmap-4, 120 40% 30%));
 }

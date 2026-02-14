@@ -5,6 +5,8 @@ export type PromptVariant = "current" | "experimental";
 
 export interface ConversationSummaryPromptPayload {
   conversationTitle?: string;
+  conversationPlatform?: string;
+  conversationCreatedAt?: number;
   messages: Message[];
   locale?: "zh" | "en";
 }
@@ -13,6 +15,11 @@ export interface WeeklyDigestPromptPayload {
   conversations: Conversation[];
   rangeStart: number;
   rangeEnd: number;
+  selectedSummaries?: Array<{
+    conversationId: number;
+    summary: string;
+  }>;
+  maxConversations?: number;
   locale?: "zh" | "en";
 }
 

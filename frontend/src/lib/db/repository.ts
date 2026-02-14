@@ -1,11 +1,13 @@
 import type {
   Conversation,
+  ConversationSummaryV2,
   Message,
   DashboardStats,
   Platform,
   InsightFormat,
   InsightStatus,
   SummaryRecord,
+  WeeklyLiteReportV1,
   WeeklyReportRecord,
 } from "../types";
 import type { ConversationFilters } from "../messaging/protocol";
@@ -42,13 +44,23 @@ function toSummary(record: SummaryRecordRecord): SummaryRecord {
   const status: InsightStatus =
     summary.status ?? (summary.structured ? "ok" : "fallback");
 
+  const isV2Structured = (value: unknown): value is ConversationSummaryV2 => {
+    if (!value || typeof value !== "object") return false;
+    return "core_question" in value && "thinking_journey" in value;
+  };
+
   return {
     ...summary,
     structured: summary.structured ?? null,
     format,
     status,
     schemaVersion:
-      summary.schemaVersion ?? (summary.structured ? "conversation_summary.v1" : undefined),
+      summary.schemaVersion ??
+      (isV2Structured(summary.structured)
+        ? "conversation_summary.v2"
+        : summary.structured
+          ? "conversation_summary.v1"
+          : undefined),
   };
 }
 
@@ -63,13 +75,23 @@ function toWeeklyReport(record: WeeklyReportRecordRecord): WeeklyReportRecord {
   const status: InsightStatus =
     weekly.status ?? (weekly.structured ? "ok" : "fallback");
 
+  const isWeeklyLiteStructured = (value: unknown): value is WeeklyLiteReportV1 => {
+    if (!value || typeof value !== "object") return false;
+    return "time_range" in value && "highlights" in value;
+  };
+
   return {
     ...weekly,
     structured: weekly.structured ?? null,
     format,
     status,
     schemaVersion:
-      weekly.schemaVersion ?? (weekly.structured ? "weekly_report.v1" : undefined),
+      weekly.schemaVersion ??
+      (isWeeklyLiteStructured(weekly.structured)
+        ? "weekly_lite.v1"
+        : weekly.structured
+          ? "weekly_report.v1"
+          : undefined),
   };
 }
 

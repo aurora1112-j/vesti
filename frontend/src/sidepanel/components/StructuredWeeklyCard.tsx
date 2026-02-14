@@ -6,25 +6,47 @@ interface StructuredWeeklyCardProps {
 
 function FallbackBadge() {
   return (
-    <span className="inline-flex items-center rounded-md border border-border-subtle bg-bg-secondary px-2 py-0.5 text-[10px] font-medium text-text-tertiary">
+    <span className="tag-paper inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium text-text-tertiary font-sans">
       Fallback plain text
     </span>
   );
 }
 
+function LiteBoundaryBadge({ insufficientData }: { insufficientData: boolean }) {
+  return (
+    <span className="tag-paper inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium text-text-secondary font-sans">
+      {insufficientData ? "Weekly Lite · Insufficient Data" : "Weekly Lite"}
+    </span>
+  );
+}
+
+function SectionEyebrow({ children }: { children: string }) {
+  return (
+    <h4 className="mb-3 text-[12px] font-medium uppercase tracking-[0.05em] text-text-secondary font-sans">
+      {children}
+    </h4>
+  );
+}
+
 export function StructuredWeeklyCard({ data }: StructuredWeeklyCardProps) {
   return (
-    <article className="rounded-lg border border-border-default bg-bg-primary p-4 text-vesti-sm leading-[1.7] text-text-primary">
-      <header className="mb-4 grid gap-2">
+    <article className="vesti-artifact card-shadow-warm rounded-card border border-border-subtle bg-bg-surface px-6 py-6 text-body-lg text-text-primary">
+      <header className="mb-6 grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-base font-semibold text-text-primary">{data.meta.title}</h3>
-          <span className="text-[11px] text-text-tertiary">{data.meta.range_label}</span>
+          <h3 className="text-[20px] leading-[1.4] text-text-primary font-medium">
+            {data.meta.title}
+          </h3>
+          {data.meta.range_label && (
+            <span className="text-[13px] text-text-secondary font-sans">{data.meta.range_label}</span>
+          )}
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
+          <LiteBoundaryBadge insufficientData={data.insufficient_data} />
           {data.meta.tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center rounded-md border border-border-subtle bg-bg-secondary px-2 py-0.5 text-[11px] font-medium text-text-secondary"
+              className="tag-paper inline-flex items-center rounded-[6px] px-2 py-0.5 text-[13px] font-medium text-text-secondary font-sans"
             >
               {tag}
             </span>
@@ -33,61 +55,78 @@ export function StructuredWeeklyCard({ data }: StructuredWeeklyCardProps) {
         </div>
       </header>
 
-      <section className="mb-4 rounded-r-md border-l-4 border-border-default bg-bg-secondary px-3 py-2.5">
-        <p className="mb-1 text-vesti-sm text-text-primary">
-          <span className="font-semibold">Q:</span> {data.core.problem}
-        </p>
-        <p className="text-vesti-sm text-text-primary">
-          <span className="font-semibold">A:</span> {data.core.solution}
-        </p>
-      </section>
+      {data.insufficient_data && (
+        <section className="mb-6 rounded-lg border border-border-subtle bg-bg-secondary/70 px-4 py-3 font-sans text-[13px] leading-[1.5] text-text-secondary">
+          Weekly Lite 边界提示：本周可用样本较少，本报告仅提供轻量复盘与下一步建议，不包含长期趋势判断。
+        </section>
+      )}
 
-      <section className="mb-4">
-        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-          Process
-        </h4>
-        <ol className="list-inside list-decimal space-y-2 text-text-secondary">
-          {data.process.map((item, index) => (
-            <li key={`${item.step}-${index}`}>
-              <span className="font-semibold text-text-primary">{item.step}:</span> {item.detail}
+      <section className="mb-6">
+        <SectionEyebrow>Highlights</SectionEyebrow>
+        <ul className="list-disc space-y-3 pl-6 text-text-primary">
+          {data.highlights.map((item, index) => (
+            <li key={`${item}-${index}`} className="pl-1">
+              {item}
             </li>
-          ))}
-        </ol>
-      </section>
-
-      <hr className="my-4 border-border-subtle" />
-
-      <section className="mb-4">
-        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-          Key Takeaways
-        </h4>
-        <ul className="list-inside list-disc space-y-1.5 text-text-secondary">
-          {data.key_insights.map((item, index) => (
-            <li key={`${item}-${index}`}>{item}</li>
           ))}
         </ul>
       </section>
 
-      {data.action_items?.length ? (
-        <section>
-          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-            Next Steps
-          </h4>
-          <ul className="space-y-2">
-            {data.action_items.map((item, index) => (
-              <li key={`${item}-${index}`} className="flex items-start gap-2 text-text-secondary">
-                <input
-                  aria-label={`weekly-action-item-${index + 1}`}
-                  type="checkbox"
-                  disabled
-                  className="mt-1 h-3.5 w-3.5 rounded border-border-default"
-                />
-                <span>{item}</span>
+      {data.recurring_questions.length > 0 && (
+        <section className="mb-6">
+          <SectionEyebrow>Recurring Questions</SectionEyebrow>
+          <ul className="list-disc space-y-3 pl-6 text-text-primary">
+            {data.recurring_questions.map((item, index) => (
+              <li key={`${item}-${index}`} className="pl-1">
+                {item}
               </li>
             ))}
           </ul>
         </section>
-      ) : null}
+      )}
+
+      {data.unresolved_threads.length > 0 && (
+        <section className="mb-6">
+          <SectionEyebrow>Unresolved Threads</SectionEyebrow>
+          <ul className="list-disc space-y-3 pl-6 text-text-primary">
+            {data.unresolved_threads.map((item, index) => (
+              <li key={`${item}-${index}`} className="pl-1">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="mb-6">
+        <SectionEyebrow>Suggested Focus</SectionEyebrow>
+        <ul className="space-y-3">
+          {data.suggested_focus.map((item, index) => (
+            <li key={`${item}-${index}`} className="flex items-start gap-2 text-text-primary">
+              <input
+                aria-label={`weekly-action-item-${index + 1}`}
+                type="checkbox"
+                disabled
+                className="mt-1 h-3.5 w-3.5 rounded border-border-default"
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {data.evidence.length > 0 && (
+        <section>
+          <SectionEyebrow>Evidence</SectionEyebrow>
+          <ul className="space-y-2 text-[13px] leading-[1.5] text-text-secondary font-sans">
+            {data.evidence.map((item, index) => (
+              <li key={`${item.conversation_id}-${index}`}>
+                #{item.conversation_id}: {item.note}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </article>
   );
 }
