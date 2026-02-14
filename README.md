@@ -232,6 +232,27 @@ pnpm build
 
 详情页顶部的标题栏包含返回按钮、对话标题、平台标签和消息轮数统计。点击平台标签旁边的跳转图标，可以在新标签页中打开对话的原始网页，方便你继续讨论或查看更多上下文。
 
+### 灵活的模型调用配置
+为了让不同需求的用户都能获得流畅的体验，心迹在摘要生成环节提供了两种灵活的 API 调用模式。你可以在侧边栏右下角的 **设置 (Settings) -> Model Access** 面板中自由切换：
+
+<table border="0" width="100%" cellspacing="0" cellpadding="10">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/vesti-settings-modelscope-1.png" alt="Demo Mode Settings" width="75%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>默认开箱即用：Demo 模式</b><br>无需配置密钥，通过代理路由直接体验核心功能。</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/vesti-settings-modelscope-2.png" alt="Custom BYOK Mode Settings" width="75%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>进阶自定义配置：BYOK 模式</b><br>填入你自己的 ModelScope API Key，直连官方接口。</sub>
+    </td>
+  </tr>
+</table>
+
+* **Demo 模式（开箱即用）**：默认开启。此模式下，请求将通过开发者提供的代理路由 (Proxy route) 发送，无需你配置任何额外的密钥。为了确保生成功能的稳定性，我们在后端实现了强大的**双模型容错策略**：主模型采用带有深度推理能力的 `DeepSeek-R1-Distill-Qwen-14B`；当遇到网络超时或接口限流（如 429/5xx 错误）时，系统会自动且无缝地切换至备用模型 `Qwen/Qwen3-14B` 进行单次重试，最大程度保障每次提取摘要的成功率。
+* **自定义 BYOK 模式 (Bring Your Own Key)**：打开 `Use Custom Configuration` 开关即可启用。如果你拥有自己的 ModelScope API Key，可以在此填入并从下拉菜单中指定你要使用的模型（如 DeepSeek-R1 系列）。此模式下，所有请求将绕过开发者代理，**直接发往 ModelScope 官方接口**，适合高频重度用户或对数据路由有严格要求的场景。配置完成后，点击 "Test" 按钮即可验证连接。
+
 ### 生成单会话摘要
 在配置好 ModelScope API 后，对话详情页会显示"生成摘要"按钮。点击该按钮，系统会将完整的对话历史发送给大语言模型，基于我们精心设计的提示词生成结构化分析。
 
