@@ -1,8 +1,45 @@
 <div align="center">
 
+<<<<<<< HEAD
   <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
+=======
+  <h3>📷 Vesti 界面概览与核心功能演示</h3>
+
+  <table border="0" width="100%" cellspacing="0" cellpadding="10">
+    <tr>
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/showcase.png" alt="Vesti Sidebar Right" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <br>
+        <sub><b>沉浸式侧边栏 (右侧)</b><br>在浏览网页时，随时呼出记录灵感与摘要。</sub>
+      </td>
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/showcase-2.png" alt="Vesti Chats List Left" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <br>
+        <sub><b>全局对话管理 (左侧)</b><br>集中管理所有平台的 AI 对话历史，一键回溯。</sub>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/summary-generation-1.png" alt="ChatGPT Summary Capture" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <br>
+        <sub>🤖 <b>ChatGPT：即时结构化笔记</b><br>无缝跟随对话流，自动提取要点生成清晰摘要。</sub>
+      </td>
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/summary-generation-2.png" alt="Claude Insights Generation" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <br>
+        <sub>🧠 <b>Claude：深度思维路径可视化</b><br>梳理长文脉络，呈现核心问题与思考演进过程。</sub>
+      </td>
+    </tr>
+  </table>
+>>>>>>> origin/main
 
   <br>
+  
+  https://github.com/user-attachments/assets/9f3f04a6-4abd-4d46-bcb5-b0d12e1b732f
+
+  <b>🎥 视频演示：捕获对话与其他试验功能</b>
+
+  <br><br>
 
   <b>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</b>
 
@@ -37,7 +74,6 @@
   ![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 </div>
-
 ## 👋 项目介绍
 
 **心迹 Vesti** —— 你的 **本地优先 AI 对话记忆中枢 (Local-First AI Conversation Memory Hub)**。
@@ -262,17 +298,40 @@
 
 **语言支持方面**，界面和文档目前只有中文版本。虽然核心功能对英文对话同样有效，但部分 UI 文案和设置说明还没有国际化。我们会在用户基数扩大后考虑添加多语言支持。
 
-### 短期路线图
 
-接下来的三到六个月，我们计划实现以下功能。
+## 🗺️ 短期路线图 (Roadmap)
 
-**首先是完善平台支持**，添加 Gemini 和 DeepSeek 的后端捕获能力，并探索支持更多 AI 工具，比如 Perplexity、Poe 等。
+在接下来的 **3 到 6 个月**内，我们将专注于从“连接”、“可视化”到“深度智能”的全面进化，计划实现以下核心功能：
 
-**其次是引入向量化技术**，将所有对话内容转换为语义向量存储在本地。这将支持真正的语义搜索——你搜索 "产品设计" 时，系统不仅匹配这个词本身，还能找到所有讨论用户体验、交互逻辑、功能规划的相关对话。
+### 1. 🔌 全面完善平台支持
+致力于打破生态壁垒，我们将扩展后端捕获能力，从当前的架构延伸至更多前沿 AI 工具：
+- **新增支持**：集成 **Gemini** 与 **DeepSeek**。
+- **探索集成**：计划适配 **Perplexity**、**Poe** 等更多生产力工具。
 
-**第三是实现跨对话的主题聚类**。通过向量相似度计算，系统可以自动识别你在不同时间、不同平台上反复讨论的核心议题，生成主题图谱。你可以看到自己的思维如何在不同话题间流动，哪些问题是持续关注的，哪些是新涌现的。
+### 2. 📊 上线思维可视化仪表盘
+数据不应只是沉睡在硬盘里的字节。我们将引入 **全局 Dashboard**，让您的智力活动“可见”。
+- **Activity Heatmap (活跃度热力图)**：记录您的思考节律与高产时刻。
+- **Platform Distribution (平台分布)**：审视您对不同 AI 工具的依赖与偏好。
 
-**第四是开发可选的云端同步功能**。我们会采用端到端加密的方案，确保即使数据存储在服务器上，我们也无法解密查看。用户可以选择是否启用这个功能，默认仍然是本地优先。
+<p align="center">
+  <img src=".github/assets/dashboard-effect.png" alt="Dashboard Effect" width="100%">
+  <br>
+  <em>预览：每一次对话，都将成为数字大脑成长的可视化足迹</em>
+</p>
+
+### 3. 🧠 引入本地向量化技术 (Vectorization)
+我们将把所有对话内容转换为语义向量并存储在本地，实现真正的 **语义搜索 (Semantic Search)**。
+> **场景举例**：当您搜索 `产品设计` 时，系统不再局限于关键词匹配，而是能智能关联并召回所有讨论 `用户体验`、`交互逻辑`、`功能规划` 的相关对话。
+
+### 4. 🕸️ 跨对话主题聚类
+基于向量相似度计算，系统将自动识别您在不同时间、不同平台上反复讨论的核心议题，生成 **主题图谱 (Topic Graph)**。
+- **洞察流向**：可视化您的思维如何在不同话题间流动。
+- **趋势识别**：自动标记哪些问题是您“持续关注”的，哪些是“新涌现”的灵感。
+
+### 5. 🛡️ 可选的端到端加密云同步
+我们坚持 **Local-First (本地优先)** 策略，但也将提供便捷的多端体验。
+- **安全承诺**：采用端到端加密 (E2EE) 方案，确保即便是存储在服务器上的数据，我们也无法解密查看。
+- **用户自主**：云端同步功能默认关闭，由您全权决定是否开启。
 
 ### 长期愿景
 
