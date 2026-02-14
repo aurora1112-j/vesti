@@ -178,7 +178,7 @@ pnpm build
 
 ### ⚙️ 配置 ModelScope API
 
-心迹的摘要功能需要调用 ModelScope 的大语言模型 API。
+你可以通过调用 ModelScope 的大语言模型 API来实现心迹的自定义（BYOK）模型配置功能。
 
 **获取 API 密钥：**
 1. 访问 ModelScope 官网并注册账号。
