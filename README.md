@@ -88,27 +88,19 @@
 * **智能摘要**：集成ModelScope API，为单个会话生成结构化摘要。这不是简单的内容压缩，而是基于精心设计的提示词工程，能够揭示对话的思维轨迹、关键转折和核心洞察。摘要包含核心问题、思考演进、关键洞见、悬而未决的话题和可行的下一步建议。生成的摘要会被缓存在本地，下次查看同一对话时无需重新生成。
 * **周度思维复盘（Weekly Lite）**：每周结束时，心迹可以生成一份轻量级的思维周报，帮助你回顾这一周与AI的对话主题分布。Weekly Lite版本专注于快速识别你的关注焦点——哪些话题占据了你的思考时间，哪些问题是你反复探讨的，以及这周新涌现的兴趣点。这个功能在对话样本较少时依然能提供有价值的复盘视角，让你不会因为忙碌而失去对自己思维方向的感知。系统会自动评估本周对话样本的充分性，如果对话数量较少或讨论深度不足，会明确标注"Insufficient Data"边界提示，保持分析的诚实性而非过度推测。
 * **本地优先**：所有数据存储在你的本地设备中，不上传到任何云端服务器。你拥有完整的数据主权，可以随时导出、备份或删除。即使开发者也无法访问你的对话记录。这不仅是技术选择，更是价值立场——我们相信数据应该服务于人，而非被用来分析和操纵人。
-```
-
-
 
 ## 🧩 技术架构
 
-心迹采用现代化的浏览器扩展技术栈构建，确保性能、稳定性和可扩展性。
+心迹的技术实现体现了我们对可持续性和可扩展性的重视。每一个架构决策都不是为了快速搭建原型，而是为了建造一个可以持续演进的系统。
 
-**前端框架：** 基于React 18和TypeScript开发，所有组件都有严格的类型定义，消除了运行时错误的可能。UI层采用shadcn/ui组件库，确保视觉一致性和交互流畅性。
-
-**样式系统：** 使用Tailwind CSS实现utility-first的样式架构，配合精心设计的色彩Token和间距系统，营造温暖克制的阅读体验。设计语言遵循Claude MCP Apps的美学标准。
-
-**扩展框架：** 采用Plasmo作为Chrome扩展的开发框架，它提供了热重载、TypeScript支持和更优雅的API抽象，大幅提升了开发效率。
-
-**本地存储：** 使用Dexie.js作为IndexedDB的抽象层，实现了类型安全的数据操作和高效的查询性能。所有对话数据以结构化的形式存储在浏览器本地。
-
-**捕获引擎：** 设计了Parser-Observer-Storage三层架构。Observer层监听DOM变化，Parser层根据平台特性提取对话内容，Storage层负责数据持久化。三层之间通过消息传递解耦，确保了系统的可维护性。
-
-**服务层隔离：** UI组件永远不直接操作数据，所有交互通过统一的服务接口进行。这意味着当我们未来引入向量数据库或云端同步时，只需要重写服务层的内部实现，UI层完全不需要改动。
-
-### 技术栈（Tech Stack）
+* **前端框架**：基于React 18和TypeScript开发，所有组件都有严格的类型定义。我们拒绝使用any类型，确保编译时就能发现绝大多数潜在错误。UI层采用shadcn/ui组件库，这不仅保证了视觉一致性，更重要的是它基于Radix UI的无障碍设计理念，确保产品对所有用户友好。
+* **样式系统**：使用Tailwind CSS实现utility-first的样式架构。我们设计了完整的设计令牌系统（design tokens），包括色彩、间距、圆角、阴影等。这个系统不仅服务于当前的UI，更是为未来的功能扩展提供了一致的视觉语言。我们遵循Warm Paper设计哲学——界面像一本排版精良的学术笔记，温暖而克制，让内容成为主角。
+* **扩展框架**：采用Plasmo作为Chrome扩展的开发框架。Plasmo提供了热重载、TypeScript支持和更优雅的API抽象，大幅提升了开发效率。更重要的是，它的声明式配置让我们可以专注于业务逻辑，而不是与浏览器扩展的底层API搏斗。
+* **本地存储**：使用Dexie.js作为IndexedDB的抽象层，实现了类型安全的数据操作和高效的查询性能。我们设计了明确的数据模型——Conversation表存储对话元数据，Message表存储具体消息内容，Summary表缓存生成的摘要。所有表之间通过外键关联，保证数据一致性。
+* **捕获引擎**：设计了Parser-Observer-Storage三层架构。Observer层使用MutationObserver监听DOM变化，当检测到新消息时触发解析流程。Parser层根据平台特性提取对话内容——不同AI平台的DOM结构差异巨大，我们采用了主备选择器策略，每个平台定义多个可能的选择器模式，运行时动态检测哪个有效。这种设计让系统对平台UI更新具有弹性。Storage层负责数据持久化，使用debounce机制和增量更新策略，将数据库操作减少了80%以上。
+* **服务层隔离**：这是架构设计中最关键的决策之一。UI组件永远不直接操作数据，所有交互通过统一的服务接口进行。这意味着当我们未来引入向量数据库或云端同步时，只需要重写服务层的内部实现，UI层完全不需要改动。我们甚至在MVP阶段就设计了mockService作为开发和测试的替身，验证了这个隔离策略的有效性。
+* **提示词工程**：我们为每个AI功能设计了专门的提示词模板，并建立了完整的版本管理系统。每个提示词都有明确的版本号、创建日期和变更描述。当前生产环境使用的是v1.0版本，我们同时维护了experimental分支用于测试新的提示策略。每次调用API时都会记录提示词版本、token消耗、延迟和用户满意度，这些数据为持续优化提供了基础。提示词的设计遵循一个核心原则：AI不是冷冰冰的摘要生成器，而是善于洞察思维轨迹的观察者。我们要求AI关注对话的过程而非仅仅是结论，识别隐含的意图和情绪，把对话放在更大的语境中理解。
+* **双模型容错策略**：为了确保生成功能的稳定性，我们实现了双模型fallback机制。主模型是DeepSeek-R1-Distill-Qwen-14B，备用模型是Qwen3-14B。当主模型调用失败时（网络超时、速率限制、服务器错误），系统会自动切换到备用模型重试。我们还实现了多级fallback链——首先尝试json_mode结构化输出，如果返回空内容则降级到prompt_json模式，最后兜底为fallback_text纯文本输出。这确保了即使在最差情况下，用户也能得到可读的分析结果。
 
 <table>
   <tr>
@@ -121,26 +113,23 @@
   </tr>
   <tr>
     <td width="120px"><strong>AI</strong></td>
-    <td>ModelScope API (Qwen-2.5)</td>
+    <td>ModelScope API (DeepSeek-R1 / Qwen3 双模型容错)</td>
+  </tr>
+  <tr>
+    <td width="120px"><strong>Design</strong></td>
+    <td>Warm Paper Theme, Serif Reading Typography</td>
   </tr>
 </table>
 
-## 🗂️ 目录结构
+---
 
-```text
-.
-├── frontend/          # Plasmo 扩展主体
-├── documents/         # MVP 文档与说明
-├── Frontend_Polish/   # UI 原型与设计资产
-├── Backend_Trial/     # 后端试验/草案
-├── architecture/      # 架构与研究资料
-├── release/           # 交付物/构建输出
-└── .github/assets/    # README 图像资源
-```
+## 🚀 快速开始
 
-## 🚀 快速开始 (离线安装版)
+我们提供两种安装方式：离线安装包（适合快速体验）和开发者构建（适合贡献代码）。
 
-无需配置编程环境，三步即可体验心迹 Vesti！请先访问以下任一项目主页下载最新版本的安装包 (`.zip` 文件)：
+### 方式一：离线安装包（推荐）
+
+无需配置编程环境，三步即可体验心迹。请先访问以下任一项目主页下载最新版本的安装包：
 
 <div align="center">
   <a href="https://vesti-landing-page0211.vercel.app/">
@@ -149,88 +138,66 @@
   <a href="https://modelscope.cn/studios/aurorasein/Vesti/summary">
     <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载">
   </a>
-
-  <br><br>
-
-  <a href="https://vesti-landing-page0211.vercel.app/">
-    <img src=".github/assets/landing-page-preview.png" alt="Vesti 官网预览" width="80%" style="border-radius: 10px; border: 1px solid #30363d;">
-  </a>
-  <br><sub>👆 点击预览图访问官网，体验更精美的介绍页面</sub>
 </div>
 
-### 🛠️ 安装步骤
+<br>
 
-#### 1. 解压安装包
-下载完成后，将 `Vesti_v1.0.zip` 解压到本地任意位置（例如 `D:\Vesti` 或 `~/Documents/Vesti`）。
-> ⚠️ **注意**：请确保解压后的文件夹内能直接看到 `manifest.json` 文件。安装完成后，**请勿删除或移动该文件夹**，否则插件将失效。
+**安装步骤：**
+1. 解压安装包到本地任意位置，确保能直接看到 `manifest.json` 文件。注意安装完成后请勿删除或移动该文件夹。
+2. 在 Chrome 浏览器地址栏输入 `chrome://extensions/` 进入扩展管理页，开启右上角的"开发者模式"开关。
+3. 点击左上角的"加载已解压的扩展程序"按钮，选择解压后的文件夹。
 
-#### 2. 开启开发者模式
-在 Chrome 浏览器地址栏输入 `chrome://extensions/` 并回车进入扩展管理页。务必开启页面右上角的 **“开发者模式 (Developer mode)”** 开关。
+> 安装成功后，Vesti 图标将出现在浏览器工具栏中。现在打开 ChatGPT 或 Claude 网页开始对话，心迹会自动捕获并生成记忆胶囊。
 
-#### 3. 加载插件
-点击左上角的 **“加载已解压的扩展程序 (Load unpacked)”** 按钮，选择第 1 步中解压得到的 **文件夹**。
+### 方式二：开发者构建
 
----
+如果你想贡献代码或深度定制，可以从源码构建。
+**环境要求**：Node.js 18 或更高版本，pnpm 包管理器。
 
-### 🎉 安装成功！
-此时 Vesti 图标将出现在浏览器右上角的工具栏中（如果没有显示，请点击 🧩 拼图图标将其固定）。
+**构建步骤：**
 
-**现在，你可以：**
-1. 打开 **DeepSeek**、**ChatGPT** 或 **Claude** 网页版开始对话。
-2. 留意侧边栏或点击 Vesti 图标，你会发现你的思维轨迹已被自动捕获并生成了精美的“记忆胶囊”。
+```bash
+# 克隆仓库
+git clone [https://github.com/yourusername/vesti.git](https://github.com/yourusername/vesti.git)
+cd vesti
 
-## 🚀 快速开始
+# 安装依赖
+cd frontend
+pnpm install
 
-### 环境要求
+# 开发模式（热重载）
+pnpm dev
 
-在开始之前，请确保你的系统满足以下要求。你需要安装Node.js版本18或更高，以及pnpm包管理器。如果你还没有安装pnpm，可以通过npm全局安装它。你还需要使用Chrome浏览器或其他基于Chromium的浏览器，比如Edge或Brave。
+# 或生产构建
+pnpm build
+```
+开发模式下，扩展文件在 frontend/build/chrome-mv3-dev 目录。生产构建在 frontend/build/chrome-mv3-prod 目录。按照方式一的步骤 2-3 加载对应目录即可。
 
-### 安装步骤
+###⚙️ 配置 ModelScope API
+心迹的摘要功能需要调用 ModelScope 的大语言模型 API。
 
-首先，从GitHub仓库克隆项目代码到本地。打开终端，执行克隆命令，然后进入项目目录。接下来安装项目依赖，这个过程会下载所有必要的包。安装完成后，执行开发构建命令，Plasmo会自动编译代码并生成可加载的扩展文件。
-构建成功后，你会在frontend目录下看到一个build文件夹，其中的chrome-mv3-dev子目录就是可以加载的扩展程序。打开Chrome浏览器，在地址栏输入chrome://extensions/，进入扩展管理页面。确保右上角的开发者模式已开启，然后点击左上角的"加载已解压的扩展程序"按钮，选择刚才提到的chrome-mv3-dev目录。
-如果一切顺利，你会在扩展列表中看到心迹Vesti的图标。现在打开ChatGPT或Claude的网页，开始一段对话，你会发现心迹已经在后台默默工作了。点击浏览器右上角的心迹图标，或者通过侧边栏按钮打开心迹面板，你应该能看到刚才的对话已经被捕获并显示在时间轴中。
+获取 API 密钥：
 
-### ⚙️ 配置 ModelScope API
+访问 ModelScope 官网并注册账号。
 
-心迹的摘要功能通过调用 ModelScope (魔搭社区) 的大模型 API 来实现。请按照以下步骤获取密钥并完成配置：
+点击右上角头像进入「个人中心」→「访问令牌」。
 
-#### 第一步：获取访问令牌 (Access Token)
+复制以 sdk_ 或 ms_ 开头的字符串。
 
-1. 访问 [ModelScope 官网](https://www.modelscope.cn/) 并注册/登录账号。
-2. 点击右上角头像进入「个人中心」，在左侧菜单栏找到并点击 **“访问控制”**。
-3. 进入 **“访问令牌”** 页面，复制以 `sdk_` 或 `ms_` 开头的字符串。
+在心迹中配置：
 
-<div align="center">
-<table>
-  <tr>
-    <td align="center" width="30%">
-      <img src=".github/assets/modelscope-sidebar.jpg" alt="侧边栏菜单 - 访问控制" width="100%">
-      <br><sub>① ModelScope 个人中心侧边栏</sub>
-    </td>
-    <td align="center" width="70%">
-      <img src=".github/assets/modelscope-access-token.png" alt="复制访问令牌页面" width="100%">
-      <br><sub>② 复制生成的 Access Token</sub>
-    </td>
-  </tr>
-</table>
-</div>
+点击心迹设置图标进入设置页面。
 
-#### 第二步：在心迹中完成配置
+在 ModelScope 配置区域填入 API Key。
 
-回到心迹扩展，点击右下角的设置图标进入设置页面，找到 ModelScope 配置区域。
+Model ID 填写推荐的模型（如 Qwen/Qwen2.5-Coder-32B-Instruct）。
 
-1.  **API Key**: 填入上一步复制的令牌字符串。
-2.  **Model ID**: 填入你想使用的模型 ID。
-    * *推荐使用 Qwen2.5-Coder 系列（如 `Qwen/Qwen2.5-Coder-32B-Instruct`），该系列在代码理解和响应速度上表现优异。*
-3.  **测试连接**: 配置完成后，务必点击 **"Test"** 按钮。如果看到 "连接成功" 提示，说明配置已完成。
+点击 Test 按钮验证连接。
 
-<div align="center">
-  <img src=".github/assets/vesti-settings-modelscope.png" alt="心迹设置页面 ModelScope 配置示例" width="80%">
-  <br><sub>✅ 最终配置效果示例（填入 ID 和 Key 后点击测试）</sub>
-</div>
+配置成功后，你可以在任何对话详情页点击"生成摘要"按钮，系统会调用 API 分析对话并生成结构化摘要。生成的摘要会被缓存在本地，下次查看时无需重新生成。
 
----
+
+***
 
 #### 附录：如何查找其他模型 ID？
 
