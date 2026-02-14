@@ -21,6 +21,10 @@ export function DemoVideo() {
               poster="/screenshot.jpg"
             >
               <source
+                src="/demo.mp4"
+                type="video/mp4"
+              />
+              <source
                 src="/demo.MOV"
                 type="video/quicktime"
               />
