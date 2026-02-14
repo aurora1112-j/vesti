@@ -1,24 +1,30 @@
 <div align="center">
 
-  <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
+  <h3>📷 Vesti 界面概览与核心功能演示</h3>
 
-  <br>
-
-  <b>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</b>
-
-  <br>
-
-  <table border="0" width="100%">
+  <table border="0" width="100%" cellspacing="0" cellpadding="10">
     <tr>
-      <td width="50%" align="center">
-        <img src=".github/assets/summary-generation-1.png" alt="ChatGPT Summary Capture" width="100%" style="border-radius: 8px;">
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/showcase.png" alt="Vesti Sidebar Right" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
         <br>
-        <sub>🤖 <b>ChatGPT</b>: 实时捕获对话流并生成结构化摘要</sub>
+        <sub><b>沉浸式侧边栏 (右侧)</b><br>在浏览网页时，随时呼出记录灵感与摘要。</sub>
       </td>
-      <td width="50%" align="center">
-        <img src=".github/assets/summary-generation-2.png" alt="Claude Insights Generation" width="100%" style="border-radius: 8px;">
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/showcase-2.png" alt="Vesti Chats List Left" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
         <br>
-        <sub>🧠 <b>Claude</b>: 深度解析长文脉络与关键洞察</sub>
+        <sub><b>全局对话管理 (左侧)</b><br>集中管理所有平台的 AI 对话历史，一键回溯。</sub>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/summary-generation-1.png" alt="ChatGPT Summary Capture" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <br>
+        <sub>🤖 <b>ChatGPT：即时结构化笔记</b><br>无缝跟随对话流，自动提取要点生成清晰摘要。</sub>
+      </td>
+      <td width="50%" align="center" valign="top">
+        <img src=".github/assets/summary-generation-2.png" alt="Claude Insights Generation" width="100%" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <br>
+        <sub>🧠 <b>Claude：深度思维路径可视化</b><br>梳理长文脉络，呈现核心问题与思考演进过程。</sub>
       </td>
     </tr>
   </table>
@@ -37,7 +43,6 @@
   ![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 </div>
-
 ## 👋 项目介绍
 
 **心迹 Vesti** —— 你的 **本地优先 AI 对话记忆中枢 (Local-First AI Conversation Memory Hub)**。
