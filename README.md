@@ -135,7 +135,7 @@
   <a href="https://vesti-landing-page0211.vercel.app/">
     <img src="https://img.shields.io/badge/官网下载-Vercel-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel 官网下载" style="margin: 0 4px;">
   </a>
-  <a href="https://modelscope.cn/studios/aurorasein/Vesti/summary">
+  <a href="https://modelscope.cn/studios/aurorasein/Vesti2/summary">
     <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载" style="margin: 0 4px;">
   </a>
   <a href="vesti-release/">
