@@ -33,8 +33,8 @@
   </table>
 
   <br>
-  
-  https://github.com/user-attachments/assets/9f3f04a6-4abd-4d46-bcb5-b0d12e1b732f
+
+  https://github.com/user-attachments/assets/3d702080-91c8-4461-8566-92e1bd82f05e
 
   <b>🎥 视频演示：捕获对话与其他试验功能</b>
 
