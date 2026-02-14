@@ -129,14 +129,17 @@
 
 ### 方式一：离线安装包（推荐）
 
-无需配置编程环境，三步即可体验心迹。请先访问以下任一项目主页或者直接在本仓库中的vesti_release目录下载最新版本的安装包：
+无需配置编程环境，三步即可体验心迹。请先访问以下任一项目主页，或者直接在本仓库的 `vesti-release` 目录中下载最新版本的安装包：
 
 <div align="center">
   <a href="https://vesti-landing-page0211.vercel.app/">
-    <img src="https://img.shields.io/badge/官网下载-Vercel-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel 官网下载">
+    <img src="https://img.shields.io/badge/官网下载-Vercel-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel 官网下载" style="margin: 0 4px;">
   </a>
   <a href="https://modelscope.cn/studios/aurorasein/Vesti/summary">
-    <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载">
+    <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载" style="margin: 0 4px;">
+  </a>
+  <a href="vesti-release/">
+    <img src="https://img.shields.io/badge/本仓下载-vesti--release-181717?style=for-the-badge&logo=github&logoColor=white" alt="本仓下载" style="margin: 0 4px;">
   </a>
 </div>
 
