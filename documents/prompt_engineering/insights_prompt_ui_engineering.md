@@ -1,396 +1,280 @@
-﻿# Vesti Insights 综合工程文档（提示词工程 + AI Summary 前端设计）
+# Vesti Insights Engineering Spec (Prompt + UI/UX v2.0)
 
-- 文档版本：v1.0
-- 更新日期：2026-02-12
-- 适用范围：Vesti Insights（Conversation Summary + Weekly Report）
-- 读者对象：Frontend / Backend / Prompt / QA / PM
-- 文档定位：v1.1 ~ v1.2 迭代实施主文档（权威执行基线）
-
----
-
-## 0. 背景与目标
-
-### 0.1 现状问题
-
-当前 Insights 能够完成“结构化生成 + 前端展示”，但在下一阶段仍面临以下工程问题：
-
-1. 提示词能力分散：缺少统一的 prompt 版本治理、约束规范与迭代准则。
-2. 前端摘要风格尚未形成统一 PRD：不同卡片形态容易偏“AI 炫技”，不利于稳定可读。
-3. 评测体系缺失：提示词升级后缺少离线金标准验证，质量回退难以及时发现。
-4. 文档规范分散：实现逻辑、验收标准、风险处理散落在多处讨论中。
-
-### 0.2 核心目标
-
-本文件统一收敛并固化四类规范：
-
-1. Prompt Engineering：单会话/周摘要模板、输出约束、防注入、回退机制、版本治理。
-2. AI Summary Frontend PRD：去 AI 化、结构化笔记质感、固定信息层级、状态与容错规范。
-3. 离线评测体系：金标准样本组织、自动评分指标、门禁阈值。
-4. 执行路线：分支策略、里程碑、DoD、风险与回滚。
-
-### 0.3 非目标
-
-本轮不做以下事项：
-
-- 不引入复杂动效、D3 时间轴、霓虹视觉风格。
-- 不新增业务代码实现（本文件是工程规范，不是实现 PR）。
-- 不修改既有文档，仅在本文件规划后续回链动作。
-
-### 0.4 设计哲学
-
-- 结构化可读性优先：先保证输出稳定、可验证、可复现，再追求洞察深度。
-- 去 AI 化界面：不强调“智能炫技感”，强调“专业文档整理感”。
-- 旁路评测（sidecar）：评测系统与生产管线解耦，独立运行、独立门禁。
+- Document version: v1.2-ui-pre.5
+- Updated on: 2026-02-14
+- Scope: Vesti Sidepanel (Insights first, linked with Settings/Timeline/Reader)
+- Positioning: `v1.1 guardrail` (stable delivery) + `v1.2 target` (design convergence)
+- Related doc: `documents/prompt_engineering/model_settings.md`
 
 ---
 
-## 1. 总体架构与数据流
+## 0. Revision Notes
 
-### 1.1 当前链路（基线）
-
-当前 Insights 相关数据流为：
-
-`UI Trigger (InsightsPage) -> storageService -> offscreen/background handler -> insightGenerationService -> llmService + insightSchemas -> repository (Dexie) -> UI render`
-
-关键说明：
-
-- 生成层包含 `json_mode -> prompt_json -> fallback_text` 的三级回退。
-- 存储层已支持 structured + plain text 双轨兼容。
-- 前端已具备 structured card 与 fallback badge 展示能力。
-
-### 1.2 下一阶段目标链路
-
-目标在不破坏现有稳定性的前提下，引入 Prompt Registry 与 Eval Gate：
-
-`Prompt Registry (versioned) -> Structured Generation -> Validation + Adapter -> UI Card -> Offline Eval/Gate`
-
-### 1.3 失败回退路径（必须保留）
-
-1. 首次请求：`json_mode`
-2. 格式失败：`prompt_json`（同 schema 修复）
-3. 仍失败：`fallback_text`（sanitized）
-
-回退路径在任意版本迭代中都不得移除。
+1. Synced with `v1.1.0-rc.4` implementation: Summary v2 + Weekly Lite + adapter bridge coexistence.
+2. Synced with Demo routing: Node proxy dual-model fallback (`DS14 -> Qwen3-14B`, one retry).
+3. Synced with output resilience: empty `json_mode` content degrades to `prompt_json`, then `fallback_text`.
+4. Warm Paper theme is mandatory: restore sepia-like paper palette, keep typography upgrades.
+5. Settings toggle/input/button are refined to match warm shell semantics and interaction quality.
 
 ---
 
-## 2. Prompt Engineering 规范
+## 1. Goals and Non-goals
 
-### 2.1 目标能力定义
+### 1.1 Goals
 
-Prompt 不是“摘要压缩器”，而是“思维轨迹观察器”。
+1. Keep Insights as thinking-journey recap, not shallow compression.
+2. Keep Weekly in Lite scope for MVP reliability.
+3. Keep readable, breathable, and testable UI baseline.
+4. Keep one shared contract across Prompt, Schema, Adapter, Proxy, and UI.
 
-- 单会话：强调核心问题、思维转折、关键洞察、未决线程、可行动项。
-- 周摘要：强调跨会话关联、主题演化、重复模式、动量变化、下周聚焦建议。
+### 1.2 Non-goals
 
-### 2.2 Prompt 资产组织（计划接口）
+1. No new runtime message protocol names.
+2. No forced stream/reasoning rollout in this phase.
+3. No long-horizon weekly claims (monthly/quarterly trend language).
 
-建议后续实现采用如下接口治理（本轮仅定义）：
+---
+
+## 2. Design Formula
+
+- `Shell = Neutral Sans + Utility Priority`
+- `Artifact = Warm Serif + Reading Priority`
+- `Breathability = Larger Type + Higher Line-height + Wider Spacing`
+
+Interpretation:
+
+1. `app_shell` surfaces (sidebar, settings, input, controls) stay calm, precise, and sans-first.
+2. `artifact_content` surfaces (summary/weekly body) prioritize serif reading comfort.
+3. Visual goal is "academic paper room" quality, not bright SaaS dashboard style.
+
+---
+
+## 3. Warm Paper Theme (Mandatory)
+
+### 3.1 Palette contract
+
+| Token | Value | Intent |
+| --- | --- | --- |
+| `bg-app` | `#FAF9F5` | app base paper tint |
+| `bg-sidebar` | `#F7F6F2` | sidebar layer separation |
+| `bg-surface` | `#F0EEE6` | card/article surface |
+| `bg-surface-hover` | `#EAE8DF` | subtle warm hover |
+| `text-primary` | `#1A1918` | ink-like primary text |
+| `text-secondary` | `#5C5855` | pencil-like secondary text |
+| `border-subtle` | `#E6E2D6` | warm subtle borders |
+| `shadow-color` | `28, 20, 15` | warm shadow base |
+
+### 3.2 Warm shadow and tag behavior
+
+1. Card shadows must use warm brown rgba blend; avoid cold gray shadows.
+2. Tags use embedded-paper style: white translucent fill + subtle warm border.
+3. Keep artifact cards light and breathable under warm surface color.
+
+---
+
+## 4. Prompt and Stability Contract
+
+### 4.1 Default prompt strategy (`current`)
+
+1. Conversation Summary: thinking-journey template (v2 schema target).
+2. Weekly Digest: Weekly Lite template (short context, MVP-safe).
+
+### 4.2 Prompt version governance
+
+1. `current`: production default.
+2. `experimental`: rollback anchor and experiment branch.
+
+### 4.3 Output and fallback rules
+
+1. Structured chain: `json_mode -> prompt_json -> fallback_text`.
+2. `json_mode` empty content triggers `prompt_json` retry automatically.
+3. Handle `<think>...</think>` via `thinkHandlingPolicy` (default `strip`).
+
+### 4.4 Weekly Lite boundary (hard rule)
+
+1. Input window is recent 7 days only.
+2. `total_conversations < 3` must set `insufficient_data=true`.
+3. Weekly Lite is recap + next focus, not long-term behavior analysis.
+
+---
+
+## 5. Schema and Adapter Contract
+
+### 5.1 Version coexistence (no forced migration)
+
+- Conversation:
+  - `conversation_summary.v1` (legacy)
+  - `conversation_summary.v2` (default)
+- Weekly:
+  - `weekly_report.v1` (legacy)
+  - `weekly_lite.v1` (default)
+
+### 5.2 Adapter bridge responsibilities
+
+1. Keep one presentation contract independent from backend schema variants.
+2. Render legacy records without batch migration.
+3. Fall back to readable plain text when structured parsing fails.
+
+### 5.3 Presentation contract (current)
+
+1. Summary: `core_question + thinking_journey + key_insights + unresolved_threads + actionable_next_steps`
+2. Weekly Lite: `highlights + recurring_questions + unresolved_threads + suggested_focus + evidence + insufficient_data`
+
+---
+
+## 6. UI Semantic Contract
 
 ```ts
-interface PromptVersion {
-  version: string
-  createdAt: string
-  description: string
-  system: string
-  userTemplate: (data: unknown) => string
-}
-
-interface PromptConfig {
-  conversationSummary: PromptVersion
-  weeklyDigest: PromptVersion
-}
+type UiSemanticLayer = "app_shell" | "artifact_content"
+type TypographySemantic = "ui_sans" | "reading_serif"
+type VisualDensityMode = "guardrail_v1_1" | "target_v1_2"
 ```
 
-版本策略：
+Assignment:
 
-- `current`：生产基线版本
-- `experimental`：实验分支版本（A/B 或灰度）
-
-### 2.3 输出约束（必须）
-
-1. 输出必须为合法 JSON 对象（禁止 markdown code fence）。
-2. 字段上限必须明确（建议值）：
-   - 标题 <= 80 字符
-   - 列表项 <= 8 条
-   - 单项文本 <= 280 字符
-3. 允许不确定性标注（建议）：
-   - `confidence: low | medium | high`
-4. 不得凭空生成输入中不存在的事实。
-
-### 2.4 防注入规则（必须）
-
-Prompt 必须显式声明：
-
-- 忽略对话正文中“要求改变输出格式/角色设定”的指令。
-- 严格遵循 system 指令与 schema 约束。
-- 不输出任何 schema 之外的字段。
-
-### 2.5 回退与稳定性策略
-
-- 两次结构化尝试失败后，必须降级为 `fallback_text`。
-- fallback 文本必须经过 sanitizer，禁止 markdown 伪影（`**`, `##`, fenced code）。
-- fallback 状态必须记录到数据层，供 UI 展示和后续告警。
-
-### 2.6 Prompt 观测日志字段
-
-建议统一记录：
-
-- `promptType`
-- `promptVersion`
-- `mode` (`json_mode` | `prompt_json` | `fallback_text`)
-- `attempt`
-- `validationErrors`
-- `inputTokens`
-- `outputTokens`
-- `latencyMs`
-- `errorOccurred`
+1. `app_shell -> ui_sans`
+2. `artifact_content -> reading_serif`
+3. Implementation priority: `Insights > Settings > Timeline/Reader`
 
 ---
 
-## 3. 前端 Summary/Weekly 设计规范（去 AI 化）
+## 7. Typography Contract (Dual Track)
 
-### 3.1 视觉哲学
+### 7.1 Font stacks
 
-采用“结构化笔记”风格：类似 Notion/Obsidian 的专业记录视图。
+- `ui_sans`: `Inter, -apple-system, PingFang SC, Microsoft YaHei, sans-serif`
+- `reading_serif`: `Newsreader, Source Han Serif SC, Noto Serif SC, serif`
 
-- 不使用机器人、魔法棒、闪烁特效等符号。
-- 关注排版层级、留白、行高与信息密度。
-- 保持 Flat/低阴影设计，优先可读性。
+### 7.2 Scale requirements
 
-### 3.2 固定布局顺序（强约束）
-
-1. Header：标题 + 标签
-2. Core Abstract：Q/A 引用块（左侧强调线）
-3. Process：有序列表（步骤名加粗）
-4. Insights：无序列表
-5. Action Items：仅在有数据时渲染 checklist
-
-### 3.3 状态规范
-
-- Loading：skeleton 或 `Analyzing conversation context...` + 简单 spinner
-- Error：`Failed to summarize.` + `Retry`
-- Fallback：展示轻提示 badge（例如 `Fallback plain text`）
-
-### 3.4 容错与降级
-
-- `action_items` 为空：不渲染整个区块。
-- `tags` 为空：用 adapter 补齐（关键词推断，兜底 `General`）。
-- `process.step` 缺失：自动生成 `Step 1/2/3...`。
-- `core` 缺失：退回 plain text 渲染。
-
-### 3.5 与现有 token 兼容要求
-
-允许采用 PRD 所述视觉层级，但配色/间距必须优先复用现有设计 token，不额外引入新设计系统，避免风格分叉。
+| Level | v1.1 guardrail | v1.2 target | Semantic |
+| --- | --- | --- | --- |
+| H1/Hero | >=22px, lh<=1.35 | 26px, lh 1.3 | reading_serif |
+| H3/Title | >=18px | 20px, medium | reading_serif |
+| Body L | >=16px, lh>=1.6 | 18px, lh 1.65 | reading_serif |
+| Body M | >=15px, lh>=1.55 | 16px, lh 1.6 | reading_serif |
+| UI Base | >=14px | 15px, lh 1.5 | ui_sans |
+| Caption | >=12px | 13px, lh 1.4 | ui_sans |
 
 ---
 
-## 4. Schema 与 Adapter 约束
+## 8. Component Specs (Insights first)
 
-### 4.1 原则
+### 8.1 App Shell
 
-后端 schema 与前端展示 schema 不要求同名，必须通过 adapter 进行映射隔离。
+1. Sidebar/settings/input/buttons stay `ui_sans`.
+2. Keep hierarchy explicit and motion minimal.
 
-### 4.2 计划中的渲染契约（示意）
+### 8.2 Insight Card
 
-```ts
-interface ChatSummaryData {
-  meta: {
-    title: string
-    generated_at: string
-    tags: string[]
-  }
-  core: {
-    problem: string
-    solution: string
-  }
-  process: Array<{
-    step: string
-    detail: string
-  }>
-  key_insights: string[]
-  action_items?: string[]
-}
-```
+1. Radius/padding: guardrail >=12/16, target 16/24.
+2. Artifact body uses serif + reading rhythm + warm shadow.
+3. Tags use embedded-paper style (not sticker style).
 
-### 4.3 Adapter 职责
+### 8.3 Weekly Lite block
 
-- 字段映射：从后端 structured 字段映射到 `ChatSummaryData`。
-- 缺失补齐：空字段兜底与默认值策略。
-- 旧数据兼容：无 structured 记录映射为 plain text 模式。
-- 标签补全：优先结构化标签，次选关键词推断，最终兜底 `General`。
+1. Must expose Weekly Lite semantics.
+2. Show boundary hint when `insufficient_data=true`.
+3. Evidence list stays secondary in hierarchy.
 
-### 4.4 Lazy Migration 规则
+### 8.4 Settings interaction contract
 
-- 历史数据不做批量重写。
-- 读取时归一化：
-  - 有 structured -> `structured_v1`
-  - 无 structured -> `plain_text/fallback`
+1. Toggle must be `44px x 24px` with no clipping/crescent artifacts.
+2. Toggle color logic: off warm gray, on ink-dark; no default system blue.
+3. Input/select fields: 40px height, white surface, warm subtle border.
+4. Button hierarchy: `Test` ghost, `Save` solid dark primary.
 
 ---
 
-## 5. 离线评测体系（金标准 + 自动评分）
+## 9. Engineering Notes
 
-### 5.1 旁路目录（与生产解耦）
+### 9.1 Token mapping contract
 
-```text
-eval/
-  gold/
-    conversation/*.json
-    weekly/*.json
-  rubrics/
-    conversation_rubric.json
-    weekly_rubric.json
-  reports/
-    baseline.json
-    latest.json
-scripts/
-  eval-prompts.ts
-  eval-lib/*.ts
-```
+| PRD Token | Current map | v1.1 guardrail | v1.2 target |
+| --- | --- | --- | --- |
+| `bg-app` | `--bg-tertiary` | map-first | keep warm paper value |
+| `bg-surface` | `--surface-card` | map-first | keep warm paper value |
+| `bg-surface-hover` | `--surface-card-hover` | map-first | keep warm paper value |
+| `text-primary` | `--text-primary` | keep | keep |
+| `text-secondary` | `--text-secondary` | keep | keep |
+| `border-subtle` | `--border-subtle` | keep | keep |
 
-说明：`eval/` 和 `scripts/eval-*` 不进入扩展运行链路，不参与 sidepanel/offscreen 打包逻辑。
+### 9.2 Demo proxy linkage
 
-### 5.2 样本规模计划
+1. Endpoint: `POST /api/chat` (Node runtime).
+2. Model path: `DS14 -> Qwen3-14B` with at most one retry.
+3. Retry trigger only on network/timeout/429/5xx.
+4. Diagnostics: `x-request-id`, `x-proxy-model-used`, `x-proxy-attempt`.
 
-- 首版：10 条（7 conversation + 3 weekly）
-- 扩展版：20 条（12 conversation + 8 weekly）
+### 9.3 Frontend route constraints
 
-每条样本建议包含：
-
-- 输入对话（脱敏）
-- `must_include`
-- `forbidden_claims`
-- `acceptable_variants`
-
-### 5.3 指标定义
-
-1. 格式合规率（JSON + schema 通过率）
-2. 信息覆盖率（must_include 命中）
-3. 幻觉率（无证据断言占比）
-4. 主观满意度（rubric，LLM-judge + 人工抽样校准）
-
-### 5.4 门禁阈值（建议固定）
-
-- 合规率 >= 98%
-- 覆盖率 >= 85%
-- 幻觉率 <= 8%
-- 主观满意度 >= 4.0/5
-
-### 5.5 执行与报告
-
-- 本地命令：`pnpm run eval:prompts`
-- 报告产物：
-  - `eval/reports/latest.json`
-  - `eval/reports/diff-vs-baseline.md`
+1. Demo defaults to DS14; legacy demo model IDs lazily normalize.
+2. Settings must show primary/backup route and gateway lock (`modelscope.cn`).
+3. BYOK remains direct-to-ModelScope.
 
 ---
 
-## 6. 实施路线与分支计划
+## 10. QA Checklist (rc.4)
 
-### 6.1 推荐分支
+### A. Prompt / Schema
 
-- `feature/prompt-engineering-v1`
-- `feature/summary-card-v1`
-- `feature/prompt-eval-suite`
+1. Conversation output hits v2 required fields.
+2. Weekly output hits `weekly_lite.v1`; `<3` conversations sets `insufficient_data=true`.
+3. Structured failure degrades to readable `fallback_text`.
 
-### 6.2 里程碑
+### B. Warm theme
 
-1. Prompt & Schema 固化
-   - 输出：版本化 prompt 清单 + schema 约束文档
-2. SummaryCard/WeeklyCard 统一渲染
-   - 输出：UI PRD 对齐实现，容错与状态完备
-3. Eval 脚手架 + baseline
-   - 输出：10 条样本可跑通，产出 baseline 报告
-4. Gate 接入与回归
-   - 输出：CI 门禁、异常阈值报警、回归记录
+1. App base is warm paper (`#FAF9F5`), cards are warm surface (`#F0EEE6`).
+2. Sidebar layer uses slightly deeper warm tint (`#F7F6F2`).
+3. Shadows are warm; no cold-gray dirty look.
 
-### 6.3 发布建议
+### C. Settings quality
 
-- 先发 `-rc` 验证评测门禁与前端体验。
-- 再发正式 tag（通过 DoD 后）。
+1. Toggle is exactly 44x24 and aligned.
+2. No blue accent in toggle/focus hierarchy.
+3. Inputs are 40px, white, and clearly bounded.
 
----
+### D. Typography
 
-## 7. 观测与日志标准
+1. Settings is sans.
+2. Insights artifact is serif with body 17-18 and line-height 1.65.
+3. Timeline top brand text can use serif as approved brand accent.
 
-### 7.1 统一字段
+### E. Stability
 
-- `mode`
-- `attempt`
-- `validationErrors`
-- `format`
-- `status`
-- `latencyMs`
-
-### 7.2 告警条件
-
-- 连续 fallback（同会话或同周报范围）
-- 单周格式合规率骤降
-- 空洞察/空标签异常占比升高
-- 关键字段（core/process）缺失率升高
+1. Demo Summary and Weekly generate successfully.
+2. BYOK route behavior and key isolation stay unchanged.
+3. Non-stream stable path remains default.
 
 ---
 
-## 8. 验收标准（DoD）
+## 11. Roadmap
 
-1. 用户界面不可见 markdown 源码伪影。
-2. 摘要信息层级清晰可辨（结论优先，过程次之）。
-3. UI 去 AI 化且视觉统一，无多余动效。
-4. 结构化失败时可降级且可读。
-5. 离线评测可重复运行并产出 baseline 对比报告。
-6. 文档可直接指导实现，不需要二次决策。
+### P0 (implemented baseline)
 
----
+1. Summary v2 + Weekly Lite templates
+2. Adapter bridge for legacy compatibility
+3. Warm Paper UI + Settings interaction fixes
+4. Node proxy + dual-model fallback
 
-## 9. 风险与回滚
+### P1.5 (next)
 
-### 9.1 风险
+1. Stream-switch framework hardening
+2. State-machine and rollback hook strengthening
+3. Keep stable path untouched by research route
 
-- 模型输出格式波动导致解析失败。
-- 提示词迭代引发质量回退。
-- schema 频繁变化导致前端渲染不稳定。
-- 过度追求洞察导致幻觉率上升。
+### P2 (later)
 
-### 9.2 应对
-
-- 双重重试 + fallback 保底。
-- baseline 对比 + gate 拦截回退。
-- adapter 隔离后端与 UI schema 变化。
-- 将深度洞察和稳定合规解耦分阶段推进。
-
-### 9.3 回滚策略
-
-- Prompt 回滚到上一个稳定版本。
-- UI 强制降级 plain_text 渲染。
-- 暂停 experimental prompt 分流，仅保留 current。
+1. Capability detector improvements
+2. Reasoning/stream integration tuning
+3. Provider-catalog capability source integration
 
 ---
 
-## 10. 文档联动计划（仅规划，不在本轮执行）
+## 12. Document Acceptance
 
-后续联动动作：
-
-1. 在 `documents/engineering_doc_next.md` 增加本文件引用，标注为 Insights 主规范。
-2. 在 `CHANGELOG.md` 对应版本条目中附文档链接与实施范围。
-3. 在 PR 模板中增加“是否通过 eval 门禁”检查项。
-
-本轮仅完成本综合文档，不修改上述文件。
-
----
-
-## 附录 A：统一术语表
-
-- Prompt Registry：版本化提示词管理机制
-- Adapter：后端 schema 到前端渲染契约的映射层
-- Fallback：结构化失败后的纯文本降级路径
-- Gate：评测门禁阈值与拦截规则
-- Baseline：评测基线报告，用于版本对比
-
-## 附录 B：文档验收清单
-
-- [ ] 文件路径正确：`documents/insights_prompt_ui_engineering.md`
-- [ ] UTF-8 BOM 编码，Windows/IDE 无乱码
-- [ ] 章节 0-10 完整
-- [ ] 与当前代码链路一致，无明显冲突
-- [ ] Prompt / UI / Eval / Milestone / DoD / 风险均可执行
+1. Path is `documents/prompt_engineering/insights_prompt_ui_engineering.md`.
+2. Terms align with `documents/prompt_engineering/model_settings.md`.
+3. Weekly Lite boundary and Warm Paper contract are explicit.
+4. Demo dual-model failover and trigger scope are explicit.
+5. Spec is directly implementable without reopening direction decisions.
