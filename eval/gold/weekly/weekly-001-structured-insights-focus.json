@@ -1,0 +1,67 @@
+{
+  "id": "weekly-001-structured-insights-focus",
+  "type": "weekly",
+  "locale": "zh",
+  "range_start": 1770762000000,
+  "range_end": 1771280580000,
+  "conversations": [
+    {
+      "id": 101,
+      "title": "Summary ???????",
+      "platform": "Claude",
+      "created_at": 1771021200000,
+      "snippet": "??????? JSON schema??? fallback?",
+      "message_count": 16
+    },
+    {
+      "id": 102,
+      "title": "Insight Adapter ??",
+      "platform": "ChatGPT",
+      "created_at": 1771107600000,
+      "snippet": "??????????? adapter ???????",
+      "message_count": 12
+    },
+    {
+      "id": 103,
+      "title": "Weekly Card ????",
+      "platform": "Claude",
+      "created_at": 1771194000000,
+      "snippet": "Summary ? Weekly ?????????",
+      "message_count": 9
+    }
+  ],
+  "gold": {
+    "required_facts": [
+      "summary",
+      "weekly",
+      "adapter",
+      "fallback"
+    ],
+    "forbidden_facts": [
+      "Kubernetes",
+      "Kafka"
+    ],
+    "reference": {
+      "period_title": "??? Insights ????",
+      "main_themes": [
+        "Summary/Weekly ???????",
+        "Adapter ???????????",
+        "Fallback ?????????"
+      ],
+      "key_takeaways": [
+        "???????????????????",
+        "UI ??????? adapter ????",
+        "?????????????????"
+      ],
+      "action_items": [
+        "????????? baseline?",
+        "?? malformed JSON ??????"
+      ],
+      "tech_stack_detected": [
+        "React",
+        "TypeScript",
+        "Zod"
+      ]
+    }
+  }
+}

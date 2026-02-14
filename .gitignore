@@ -27,3 +27,11 @@ yarn-error.log*
 
 # Deliverables
 release/
+# Local tooling artifacts
+/.tmp/
+**/*.tsbuildinfo
+# Eval debug artifacts
+eval/reports/raw/
+
+eval/reports/latest.json
+eval/reports/diff-vs-baseline.md

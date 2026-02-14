@@ -1,0 +1,57 @@
+{
+  "id": "conv-003-version-governance",
+  "type": "conversation",
+  "locale": "zh",
+  "title": "v1.0.0 ???????",
+  "messages": [
+    {
+      "role": "user",
+      "content": "v1.0.0 ???????? main ???",
+      "timestamp": 1770934800000
+    },
+    {
+      "role": "ai",
+      "content": "?? Trunk-Based Lite?feature/fix/docs/chore ??? PR ???",
+      "timestamp": 1770934860000
+    },
+    {
+      "role": "user",
+      "content": "???? annotated tag?? package version ????",
+      "timestamp": 1770934920000
+    },
+    {
+      "role": "ai",
+      "content": "?? SemVer????? rc/beta???? CHANGELOG?",
+      "timestamp": 1770934980000
+    }
+  ],
+  "gold": {
+    "required_facts": [
+      "feature",
+      "annotated tag",
+      "SemVer",
+      "CHANGELOG"
+    ],
+    "forbidden_facts": [
+      "svn",
+      "submodule"
+    ],
+    "reference": {
+      "topic_title": "????????",
+      "key_takeaways": [
+        "main ??? PR ????????????",
+        "???????? annotated tag????????",
+        "SemVer ? CHANGELOG ????????"
+      ],
+      "sentiment": "positive",
+      "action_items": [
+        "????? package version ? git tag ???",
+        "?? hotfix SOP ??????"
+      ],
+      "tech_stack_detected": [
+        "Git",
+        "SemVer"
+      ]
+    }
+  }
+}

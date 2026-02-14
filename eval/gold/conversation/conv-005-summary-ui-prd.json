@@ -1,0 +1,57 @@
+{
+  "id": "conv-005-summary-ui-prd",
+  "type": "conversation",
+  "locale": "zh",
+  "title": "SummaryCard ? AI ? UI ??",
+  "messages": [
+    {
+      "role": "user",
+      "content": "??????????????????",
+      "timestamp": 1771107600000
+    },
+    {
+      "role": "ai",
+      "content": "????? Header?Core Q/A?Process?Insights?Actions?",
+      "timestamp": 1771107660000
+    },
+    {
+      "role": "user",
+      "content": "loading ? error ??????action_items ??????",
+      "timestamp": 1771107720000
+    },
+    {
+      "role": "ai",
+      "content": "???? design tokens?????????",
+      "timestamp": 1771107780000
+    }
+  ],
+  "gold": {
+    "required_facts": [
+      "Header",
+      "Core",
+      "Process",
+      "action_items"
+    ],
+    "forbidden_facts": [
+      "sparkles",
+      "neon"
+    ],
+    "reference": {
+      "topic_title": "??????? UI",
+      "key_takeaways": [
+        "SummaryCard ??????????? AI ?????",
+        "?????????????????",
+        "? action_items ???????????"
+      ],
+      "sentiment": "positive",
+      "action_items": [
+        "?? loading/error/fallback ?????",
+        "WeeklyCard ? SummaryCard ?????????"
+      ],
+      "tech_stack_detected": [
+        "React",
+        "Tailwind CSS"
+      ]
+    }
+  }
+}
