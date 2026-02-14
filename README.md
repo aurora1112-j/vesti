@@ -1,16 +1,35 @@
-<p align="center">
-  <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
-  <br>
-  <b>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</b>
-</p>
-
 <div align="center">
 
-https://github.com/user-attachments/assets/a6c60f28-f602-4a48-9fc8-221dde4a5575
-
-<b>🎥 视频演示：捕获对话与其他试验功能</b>
+  <img src=".github/assets/showcase.png" alt="Vesti UI Showcase" width="100%" />
 
   <br>
+
+  <b>📷 Vesti 界面预览：沉浸式阅读与跨平台记忆关联</b>
+
+  <br>
+
+  <table border="0" width="100%">
+    <tr>
+      <td width="50%" align="center">
+        <img src=".github/assets/summary-generation-1.png" alt="ChatGPT Summary Capture" width="100%" style="border-radius: 8px;">
+        <br>
+        <sub>🤖 <b>ChatGPT</b>: 实时捕获对话流并生成结构化摘要</sub>
+      </td>
+      <td width="50%" align="center">
+        <img src=".github/assets/summary-generation-2.png" alt="Claude Insights Generation" width="100%" style="border-radius: 8px;">
+        <br>
+        <sub>🧠 <b>Claude</b>: 深度解析长文脉络与关键洞察</sub>
+      </td>
+    </tr>
+  </table>
+
+  <br>
+  
+  https://github.com/user-attachments/assets/9f3f04a6-4abd-4d46-bcb5-b0d12e1b732f
+
+  <b>🎥 视频演示：捕获对话与其他试验功能</b>
+
+  <br><br>
 
   ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
   ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
