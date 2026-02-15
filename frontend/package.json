@@ -40,7 +40,8 @@
     "permissions": [
       "storage",
       "offscreen",
-      "sidePanel"
+      "sidePanel",
+      "unlimitedStorage"
     ]
   }
 }

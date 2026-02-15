@@ -37,11 +37,31 @@ export interface DashboardStats {
   heatmapData: { date: string; count: number }[];
 }
 
+export type ExportFormat = "json" | "txt" | "md";
+
+export interface ExportPayload {
+  content: string;
+  mime: string;
+  filename: string;
+}
+
+export type StorageUsageStatus = "ok" | "warning" | "blocked";
+
+export interface StorageUsageSnapshot {
+  originUsed: number;
+  originQuota: number | null;
+  localUsed: number;
+  unlimitedStorageEnabled: boolean;
+  softLimit: number;
+  hardLimit: number;
+  status: StorageUsageStatus;
+}
+
 export type CapsuleState = "RECORDING" | "STANDBY" | "PAUSED" | "SAVED";
 
 export type CaptureMode = "full_mirror" | "smart_denoise" | "curator";
 
-export type PageId = "timeline" | "insights" | "dashboard" | "settings";
+export type PageId = "timeline" | "insights" | "data" | "settings";
 export type UiSemanticLayer = "app_shell" | "artifact_content";
 export type TypographySemantic = "ui_sans" | "reading_serif";
 export type VisualDensityMode = "guardrail_v1_1" | "target_v1_2";
