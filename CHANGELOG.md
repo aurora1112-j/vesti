@@ -11,21 +11,51 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 ## [Unreleased]
 
 ### Added
-- 新增版本治理工程文档：`documents/version_control_plan.md`
-- 在工程文档中补充分支/标签/发布流程入口与执行摘要
+- N/A
 
 ### Changed
-- 版本控制策略从“单主分支 + 临时发布”升级为“Trunk-Based Lite + SemVer + pre-release”
-- 后续发布要求 Git tag 与 `frontend/package.json` 版本号强绑定（发布前校验）
+- N/A
 
 ### Fixed
 - N/A
 
 ### Docs
-- 初始化 `CHANGELOG.md` 基线结构（含 `Unreleased` 与版本锚点）
+- N/A
 
 ### Chore
 - N/A
+
+---
+
+## [1.1.0-rc.4] - 2026-02-15
+
+### Added
+- Timeline conversation cards now support inline title rename with persistence (`Pencil`, `Enter/Blur` save, `Esc` cancel).
+- Added dedicated `Data` tab in Dock with full Data Management panel.
+- Added local telemetry action type `rename_title` for card action tracking.
+- Added `unlimitedStorage` permission and storage limit helpers (`900MB` warning, `1GB` write block).
+- Added export serializer layer for `json/txt/md` with unified payload (`content`, `mime`, `filename`).
+- Added bundled serif assets: `frontend/public/fonts/TiemposHeadline-Medium.woff2`, `frontend/public/fonts/TiemposText-Regular.woff2`.
+
+### Changed
+- Settings page now keeps model access controls and links to Data Management instead of duplicating full data actions.
+- Sidepanel typography contract tightened (`vesti-page-title`, `vesti-brand-wordmark`) with preload/fallback behavior.
+- Export pipeline uses structured `EXPORT_DATA` format responses across runtime handlers.
+- Release artifacts refreshed from commit `a9e1572`.
+
+### Fixed
+- Settings toggle thumb vertical alignment is center-locked (`44x24` track, `20x20` thumb, no Y-axis jitter).
+- Duration utility ambiguity resolved to explicit transition duration syntax in key UI controls.
+
+### Docs
+- Added `documents/engineering_data_management_v1_2.md`.
+- Updated `documents/prompt_engineering/insights_prompt_ui_engineering.md` to `v1.2-ui-pre.6`.
+- Added UI guardrail section in `Frontend_Polish/frontend-prompting-system.md`.
+
+### Release Artifact
+- `release/Vesti_MVP_v1.1.0-rc.4.zip`
+- `SHA256: B86BF1B8BC4064504D1CA850A4A80CCD8FEFAFD93E723635FD86E2D2D99F7AF6`
+- Built at: `2026-02-15 21:38:32 +08:00`
 
 ---
 
@@ -41,5 +71,6 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ---
 
-[Unreleased]: https://github.com/abraxas914/VESTI/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/abraxas914/VESTI/compare/v1.1.0-rc.4...HEAD
+[1.1.0-rc.4]: https://github.com/abraxas914/VESTI/releases/tag/v1.1.0-rc.4
 [1.0.0]: https://github.com/abraxas914/VESTI/releases/tag/v1.0.0
