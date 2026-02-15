@@ -1,7 +1,7 @@
 # Vesti Insights Engineering Spec (Prompt + UI/UX v2.0)
 
-- Document version: v1.2-ui-pre.5
-- Updated on: 2026-02-14
+- Document version: v1.2-ui-pre.6
+- Updated on: 2026-02-15
 - Scope: Vesti Sidepanel (Insights first, linked with Settings/Timeline/Reader)
 - Positioning: `v1.1 guardrail` (stable delivery) + `v1.2 target` (design convergence)
 - Related doc: `documents/prompt_engineering/model_settings.md`
@@ -15,6 +15,8 @@
 3. Synced with output resilience: empty `json_mode` content degrades to `prompt_json`, then `fallback_text`.
 4. Warm Paper theme is mandatory: restore sepia-like paper palette, keep typography upgrades.
 5. Settings toggle/input/button are refined to match warm shell semantics and interaction quality.
+6. Data Management is promoted to an independent Dock entry (`Data`), while Settings keeps only an entry card.
+7. Toggle geometry is corrected with Y-axis center-lock to remove thumb downward drift/jitter.
 
 ---
 
@@ -278,3 +280,46 @@ Assignment:
 3. Weekly Lite boundary and Warm Paper contract are explicit.
 4. Demo dual-model failover and trigger scope are explicit.
 5. Spec is directly implementable without reopening direction decisions.
+
+---
+
+## 13. UI Defect Learnings and Preventive Guardrails (v1.2.x)
+
+### 13.1 Defects we must not repeat
+
+1. **Typography utility collision**: size utilities (`text-vesti-*`) must not own `font-family`; they can silently override brand serif assignments.
+2. **Non-geometric toggle positioning**: hardcoded thumb `top` offsets inside bordered tracks create vertical drift and switching jitter.
+3. **IA coupling in Settings**: low-frequency/high-impact data governance mixed into Settings weakens progressive disclosure and discoverability.
+4. **Theme drift by local overrides**: ad-hoc color tweaks outside semantic tokens break Warm Paper consistency.
+5. **Asset contract gaps**: introducing branded typography without clear asset naming/preload/fallback causes unstable rendering.
+
+### 13.2 Enforced design-engineering rules
+
+1. **Font role separation**
+   - `vesti-page-title`: page-level H1 only.
+   - `vesti-brand-wordmark`: Timeline brand wordmark only.
+   - `app_shell`: sans-first; `artifact_content`: reading serif.
+   - Do not define `font-family` in generic size helpers.
+2. **Toggle geometry contract**
+   - Track: `44x24`; Thumb: `20x20`; X travel: `20px`.
+   - Y alignment must use center-lock (`top: 50%` + `translateY(-50%)`).
+   - Checked/unchecked state may change X only; Y must remain constant.
+3. **Progressive disclosure contract**
+   - Data governance is a dedicated `Data` tab in Dock.
+   - Settings keeps concise entry guidance, not full duplicated operation blocks.
+4. **Action safety ordering**
+   - Conversation card actions remain `Copy -> Open Source -> Delete`.
+   - Destructive action is always right-most and visually de-emphasized.
+5. **Theme contract**
+   - Warm Paper tokens are source-of-truth; no one-off cold-gray substitutions.
+   - Shadows/tags must follow warm semantic tokens.
+6. **Font asset contract**
+   - Ship WOFF2 in-repo, preload at app bootstrap, warn once on missing files, degrade gracefully.
+
+### 13.3 Release-gate checklist (UI)
+
+1. Verify serif/sans role mapping on Timeline, Insights, Settings, and Data pages.
+2. Verify toggle pixel centering in both states and during rapid toggling.
+3. Verify Dock progressive disclosure path (`Data` direct + Settings entry card).
+4. Verify destructive flows still require explicit confirmation and preserve configured LLM settings.
+5. Verify packaged build behavior equals dev behavior (`pnpm -C frontend build` + `pnpm -C frontend package`).

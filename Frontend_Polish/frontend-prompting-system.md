@@ -695,3 +695,51 @@ App.tsx                  — Shell + Dock + 页面路由
 7. 胶囊组件迁移到 Plasmo 的 `csui` Content Script UI
 
 **原型中的每一个 `mockService` 调用都会映射到一个真实的 Dexie 操作。** 这就是服务层隔离的价值。
+
+
+---
+
+## Frontend UI Guardrails (v1.2.x Short)
+
+### 1) Token and Theme Contract
+
+- Warm Paper palette is mandatory; do not introduce ad-hoc cold-gray overrides.
+- All surface, text, border, and shadow values must come from semantic tokens.
+- Tag and card shadows must stay in warm tone family.
+
+### 2) Typography Role Separation
+
+- `vesti-page-title`: page-level H1 only.
+- `vesti-brand-wordmark`: Timeline brand wordmark only.
+- `app_shell` content uses sans; `artifact_content` uses reading serif.
+- Do not bind `font-family` inside generic size utilities.
+
+### 3) Toggle Geometry Contract (No Jitter)
+
+- Track: `44x24`; Thumb: `20x20`; X travel: `20px`.
+- Vertical alignment must be center-locked: `top: 50% + translateY(-50%)`.
+- Checked/unchecked transitions may change X only; Y must remain fixed.
+
+### 4) Progressive Disclosure IA
+
+- Data governance must live in dedicated Dock tab: `Data`.
+- Settings keeps concise entry guidance, not duplicated full data operation blocks.
+
+### 5) Action Safety and Interaction Rhythm
+
+- Conversation card actions order: `Copy -> Open Source -> Delete`.
+- Tooltip delay: `200ms`; copy feedback reset: `1500ms`.
+- Destructive actions stay right-most and visually de-emphasized.
+
+### 6) Font Asset Contract
+
+- Ship WOFF2 assets in repo and preload at sidepanel bootstrap.
+- On missing assets, warn once and degrade gracefully to fallback serif stack.
+
+### 7) UI Release Gate (Fast Checklist)
+
+- Verify serif/sans role mapping on Timeline, Insights, Data, and Settings.
+- Verify toggle pixel centering in both states and under rapid switching.
+- Verify Data tab path works from both Dock and Settings entry card.
+- Verify dangerous operations keep explicit confirmation and preserve LLM config.
+- Verify packaged behavior equals dev behavior (`pnpm -C frontend build`, `pnpm -C frontend package`).
