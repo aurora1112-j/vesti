@@ -6,9 +6,10 @@ import {
   listConversations,
   listMessages,
   deleteConversation,
+  updateConversationTitle,
   getDashboardStats,
   getStorageUsage,
-  exportAllDataAsJson,
+  exportAllData,
   clearAllData,
   getSummary,
   getWeeklyReport,
@@ -64,6 +65,13 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
         const deleted = await deleteConversation(message.payload.id);
         return { ok: true, type: messageType, data: { deleted } };
       }
+      case "UPDATE_CONVERSATION_TITLE": {
+        const conversation = await updateConversationTitle(
+          message.payload.id,
+          message.payload.title
+        );
+        return { ok: true, type: messageType, data: { updated: true, conversation } };
+      }
       case "GET_DASHBOARD_STATS": {
         const data = await getDashboardStats();
         return { ok: true, type: messageType, data };
@@ -73,8 +81,8 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
         return { ok: true, type: messageType, data };
       }
       case "EXPORT_DATA": {
-        const json = await exportAllDataAsJson();
-        return { ok: true, type: messageType, data: { json } };
+        const data = await exportAllData(message.payload.format);
+        return { ok: true, type: messageType, data };
       }
       case "CLEAR_ALL_DATA": {
         const cleared = await clearAllData();

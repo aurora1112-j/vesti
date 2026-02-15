@@ -1,9 +1,11 @@
-﻿import type {
+import type {
   Conversation,
-  Message,
   DashboardStats,
-  Platform,
+  ExportFormat,
   LlmConfig,
+  Message,
+  Platform,
+  StorageUsageSnapshot,
   SummaryRecord,
   WeeklyReportRecord,
 } from "../types";
@@ -40,6 +42,29 @@ export async function deleteConversation(id: number): Promise<void> {
     target: "offscreen",
     payload: { id },
   });
+
+  chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+    void chrome.runtime.lastError;
+  });
+}
+
+export async function updateConversationTitle(
+  id: number,
+  title: string
+): Promise<Conversation> {
+  const result = (await sendRequest({
+    type: "UPDATE_CONVERSATION_TITLE",
+    target: "offscreen",
+    payload: { id, title },
+  })) as { updated: boolean; conversation: Conversation };
+
+  if (result.updated) {
+    chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  return result.conversation;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -49,27 +74,37 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }) as Promise<DashboardStats>;
 }
 
-export async function getStorageUsage(): Promise<{ used: number; total: number }> {
+export async function getStorageUsage(): Promise<StorageUsageSnapshot> {
   return sendRequest({
     type: "GET_STORAGE_USAGE",
     target: "offscreen",
-  }) as Promise<{ used: number; total: number }>;
+  }) as Promise<StorageUsageSnapshot>;
 }
 
-export async function exportData(format: "json"): Promise<Blob> {
-  void format;
+export async function exportData(
+  format: ExportFormat
+): Promise<{ blob: Blob; filename: string; mime: string }> {
   const result = (await sendRequest({
     type: "EXPORT_DATA",
     target: "offscreen",
-    payload: { format: "json" },
-  })) as { json: string };
-  return new Blob([result.json], { type: "application/json" });
+    payload: { format },
+  })) as { content: string; filename: string; mime: string };
+
+  return {
+    blob: new Blob([result.content], { type: result.mime }),
+    filename: result.filename,
+    mime: result.mime,
+  };
 }
 
 export async function clearAllData(): Promise<void> {
   await sendRequest({
     type: "CLEAR_ALL_DATA",
     target: "offscreen",
+  });
+
+  chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+    void chrome.runtime.lastError;
   });
 }
 
@@ -146,4 +181,3 @@ export async function generateWeeklyReport(
     LONG_RUNNING_TIMEOUT_MS
   ) as Promise<WeeklyReportRecord>;
 }
-

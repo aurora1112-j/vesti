@@ -2,8 +2,11 @@ import type {
   Conversation,
   Message,
   DashboardStats,
+  ExportFormat,
+  ExportPayload,
   Platform,
   LlmConfig,
+  StorageUsageSnapshot,
   SummaryRecord,
   WeeklyReportRecord,
 } from "../types";
@@ -70,6 +73,13 @@ export type RequestMessage =
       payload: { id: number };
     }
   | {
+      type: "UPDATE_CONVERSATION_TITLE";
+      target?: "offscreen";
+      via?: "background";
+      requestId?: string;
+      payload: { id: number; title: string };
+    }
+  | {
       type: "GET_DASHBOARD_STATS";
       target?: "offscreen";
       via?: "background";
@@ -86,7 +96,7 @@ export type RequestMessage =
       target?: "offscreen";
       via?: "background";
       requestId?: string;
-      payload: { format: "json" };
+      payload: { format: ExportFormat };
     }
   | {
       type: "CLEAR_ALL_DATA";
@@ -147,9 +157,10 @@ export type ResponseDataMap = {
   GET_CONVERSATIONS: Conversation[];
   GET_MESSAGES: Message[];
   DELETE_CONVERSATION: { deleted: boolean };
+  UPDATE_CONVERSATION_TITLE: { updated: boolean; conversation: Conversation };
   GET_DASHBOARD_STATS: DashboardStats;
-  GET_STORAGE_USAGE: { used: number; total: number };
-  EXPORT_DATA: { json: string };
+  GET_STORAGE_USAGE: StorageUsageSnapshot;
+  EXPORT_DATA: ExportPayload;
   CLEAR_ALL_DATA: { cleared: boolean };
   GET_LLM_SETTINGS: { settings: LlmConfig | null };
   SET_LLM_SETTINGS: { saved: boolean };

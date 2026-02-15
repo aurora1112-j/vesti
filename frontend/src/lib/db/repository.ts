@@ -1,17 +1,26 @@
 import type {
   Conversation,
   ConversationSummaryV2,
+  ExportFormat,
+  ExportPayload,
   Message,
   DashboardStats,
   Platform,
   InsightFormat,
   InsightStatus,
+  StorageUsageSnapshot,
   SummaryRecord,
   WeeklyLiteReportV1,
   WeeklyReportRecord,
 } from "../types";
 import type { ConversationFilters } from "../messaging/protocol";
+import {
+  buildExportJsonV1,
+  buildExportMdV1,
+  buildExportTxtV1,
+} from "../services/exportSerializers";
 import { db } from "./schema";
+import { enforceStorageWriteGuard, getStorageUsageSnapshot } from "./storageLimits";
 import type {
   ConversationRecord,
   MessageRecord,
@@ -112,6 +121,8 @@ function initPlatformDistribution(): Record<Platform, number> {
   };
 }
 
+const MAX_CONVERSATION_TITLE_LENGTH = 120;
+
 export async function listConversations(
   filters?: ConversationFilters
 ): Promise<Conversation[]> {
@@ -185,12 +196,137 @@ export async function deleteConversation(id: number): Promise<boolean> {
   return true;
 }
 
+export async function updateConversationTitle(
+  id: number,
+  title: string
+): Promise<Conversation> {
+  const normalizedTitle = title.trim();
+  if (!normalizedTitle) {
+    throw new Error("TITLE_EMPTY");
+  }
+  if (normalizedTitle.length > MAX_CONVERSATION_TITLE_LENGTH) {
+    throw new Error("TITLE_TOO_LONG");
+  }
+
+  const existing = await db.conversations.get(id);
+  if (!existing) {
+    throw new Error("CONVERSATION_NOT_FOUND");
+  }
+  if (existing.id === undefined) {
+    throw new Error("Conversation record missing id");
+  }
+  if (existing.title === normalizedTitle) {
+    return toConversation(existing);
+  }
+
+  await db.conversations.update(id, { title: normalizedTitle });
+  return toConversation({ ...existing, title: normalizedTitle, id: existing.id });
+}
+
 export async function clearAllData(): Promise<boolean> {
-  await db.transaction("rw", db.conversations, db.messages, async () => {
-    await db.messages.clear();
-    await db.conversations.clear();
-  });
+  await db.transaction(
+    "rw",
+    db.conversations,
+    db.messages,
+    db.summaries,
+    db.weekly_reports,
+    async () => {
+      await db.messages.clear();
+      await db.conversations.clear();
+      await db.summaries.clear();
+      await db.weekly_reports.clear();
+    }
+  );
   return true;
+}
+
+async function collectExportDataset() {
+  const conversations = (await db.conversations.toArray()).map(toConversation);
+  const messages = (await db.messages.toArray()).map(toMessage);
+  const summaries = (await db.summaries.toArray()).map(toSummary);
+  const weeklyReports = (await db.weekly_reports.toArray()).map(toWeeklyReport);
+  return { conversations, messages, summaries, weeklyReports };
+}
+
+export async function getStorageUsage(): Promise<StorageUsageSnapshot> {
+  return getStorageUsageSnapshot();
+}
+
+export async function exportAllData(format: ExportFormat): Promise<ExportPayload> {
+  const dataset = await collectExportDataset();
+  if (format === "txt") {
+    return buildExportTxtV1(dataset);
+  }
+  if (format === "md") {
+    return buildExportMdV1(dataset);
+  }
+  return buildExportJsonV1(dataset);
+}
+
+export async function exportAllDataAsJson(): Promise<string> {
+  const payload = await exportAllData("json");
+  return payload.content;
+}
+
+export async function getSummary(
+  conversationId: number
+): Promise<SummaryRecord | null> {
+  const record = await db.summaries
+    .where("conversationId")
+    .equals(conversationId)
+    .last();
+  return record ? toSummary(record) : null;
+}
+
+export async function saveSummary(
+  record: Omit<SummaryRecord, "id">
+): Promise<SummaryRecord> {
+  await enforceStorageWriteGuard();
+
+  const existing = await db.summaries
+    .where("conversationId")
+    .equals(record.conversationId)
+    .first();
+
+  if (existing?.id !== undefined) {
+    await db.summaries.update(existing.id, record);
+    return toSummary({ ...existing, ...record, id: existing.id });
+  }
+
+  const id = await db.summaries.add(record);
+  return toSummary({ ...record, id });
+}
+
+export async function getWeeklyReport(
+  rangeStart: number,
+  rangeEnd: number
+): Promise<WeeklyReportRecord | null> {
+  const record = await db.weekly_reports
+    .where("rangeStart")
+    .equals(rangeStart)
+    .and((item) => item.rangeEnd === rangeEnd)
+    .first();
+  return record ? toWeeklyReport(record) : null;
+}
+
+export async function saveWeeklyReport(
+  record: Omit<WeeklyReportRecord, "id">
+): Promise<WeeklyReportRecord> {
+  await enforceStorageWriteGuard();
+
+  const existing = await db.weekly_reports
+    .where("rangeStart")
+    .equals(record.rangeStart)
+    .and((item) => item.rangeEnd === record.rangeEnd)
+    .first();
+
+  if (existing?.id !== undefined) {
+    await db.weekly_reports.update(existing.id, record);
+    return toWeeklyReport({ ...existing, ...record, id: existing.id });
+  }
+
+  const id = await db.weekly_reports.add(record);
+  return toWeeklyReport({ ...record, id });
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -230,84 +366,4 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     platformDistribution: distribution,
     heatmapData,
   };
-}
-
-export async function getStorageUsage(): Promise<{ used: number; total: number }> {
-  if (navigator.storage && navigator.storage.estimate) {
-    const estimate = await navigator.storage.estimate();
-    return {
-      used: estimate.usage ?? 0,
-      total: estimate.quota ?? 0,
-    };
-  }
-  return { used: 0, total: 0 };
-}
-
-export async function exportAllDataAsJson(): Promise<string> {
-  const conversations = (await db.conversations.toArray()).map(toConversation);
-  const messages = (await db.messages.toArray()).map(toMessage);
-  const summaries = (await db.summaries.toArray()).map(toSummary);
-  const weeklyReports = (await db.weekly_reports.toArray()).map(toWeeklyReport);
-  return JSON.stringify(
-    { conversations, messages, summaries, weeklyReports },
-    null,
-    2
-  );
-}
-
-export async function getSummary(
-  conversationId: number
-): Promise<SummaryRecord | null> {
-  const record = await db.summaries
-    .where("conversationId")
-    .equals(conversationId)
-    .last();
-  return record ? toSummary(record) : null;
-}
-
-export async function saveSummary(
-  record: Omit<SummaryRecord, "id">
-): Promise<SummaryRecord> {
-  const existing = await db.summaries
-    .where("conversationId")
-    .equals(record.conversationId)
-    .first();
-
-  if (existing?.id !== undefined) {
-    await db.summaries.update(existing.id, record);
-    return toSummary({ ...existing, ...record, id: existing.id });
-  }
-
-  const id = await db.summaries.add(record);
-  return toSummary({ ...record, id });
-}
-
-export async function getWeeklyReport(
-  rangeStart: number,
-  rangeEnd: number
-): Promise<WeeklyReportRecord | null> {
-  const record = await db.weekly_reports
-    .where("rangeStart")
-    .equals(rangeStart)
-    .and((item) => item.rangeEnd === rangeEnd)
-    .first();
-  return record ? toWeeklyReport(record) : null;
-}
-
-export async function saveWeeklyReport(
-  record: Omit<WeeklyReportRecord, "id">
-): Promise<WeeklyReportRecord> {
-  const existing = await db.weekly_reports
-    .where("rangeStart")
-    .equals(record.rangeStart)
-    .and((item) => item.rangeEnd === record.rangeEnd)
-    .first();
-
-  if (existing?.id !== undefined) {
-    await db.weekly_reports.update(existing.id, record);
-    return toWeeklyReport({ ...existing, ...record, id: existing.id });
-  }
-
-  const id = await db.weekly_reports.add(record);
-  return toWeeklyReport({ ...record, id });
 }
