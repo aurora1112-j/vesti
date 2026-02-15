@@ -43,7 +43,7 @@ export function ReaderView({ conversation, onBack, refreshToken }: ReaderViewPro
           type="button"
           aria-label="Back"
           onClick={onBack}
-          className="flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary transition-colors duration-[120ms] hover:bg-accent-primary-light hover:text-accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary transition-colors [transition-duration:120ms] hover:bg-accent-primary-light hover:text-accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
         </button>

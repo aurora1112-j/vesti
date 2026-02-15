@@ -38,7 +38,7 @@ export function MessageBubble({ message, platform }: MessageBubbleProps) {
           type="button"
           aria-label="Copy message"
           onClick={handleCopy}
-          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-sm text-text-tertiary opacity-0 pointer-events-none transition-[opacity,colors] duration-[120ms] hover:bg-accent-primary-light hover:text-accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+              className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-sm text-text-tertiary opacity-0 pointer-events-none transition-[opacity,colors] [transition-duration:120ms] hover:bg-accent-primary-light hover:text-accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
         >
           {copied ? (
             <Check className="h-3.5 w-3.5 text-success" strokeWidth={1.75} />
@@ -65,7 +65,7 @@ export function MessageBubble({ message, platform }: MessageBubbleProps) {
           <button
             type="button"
             onClick={() => setIsExpanded(true)}
-            className="mt-1 flex items-center gap-1 text-vesti-sm font-medium text-accent-primary transition-colors duration-[120ms] hover:text-accent-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="mt-1 flex items-center gap-1 text-vesti-sm font-medium text-accent-primary transition-colors [transition-duration:120ms] hover:text-accent-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             Expand
             <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.75} />

@@ -82,6 +82,7 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-ui)"],
         serif: ["var(--font-serif)"],
+        "vesti-serif": ["var(--font-vesti-serif)"],
         mono: ["var(--font-mono)"],
       },
       fontSize: {
