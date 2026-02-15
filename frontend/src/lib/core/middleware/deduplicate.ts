@@ -1,6 +1,7 @@
 import type { ConversationDraft, ParsedMessage } from "../../messaging/protocol";
 import { db } from "../../db/schema";
 import type { ConversationRecord, MessageRecord } from "../../db/schema";
+import { enforceStorageWriteGuard } from "../../db/storageLimits";
 
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -34,12 +35,14 @@ export async function deduplicateAndSave(
   conversation: ConversationDraft,
   messages: ParsedMessage[]
 ): Promise<{ saved: boolean; newMessages: number; conversationId?: number }> {
-  return db.transaction("rw", db.conversations, db.messages, async () => {
-    const cleanMessages = sanitizeIncomingMessages(messages);
-    if (cleanMessages.length === 0) {
-      return { saved: false, newMessages: 0 };
-    }
+  const cleanMessages = sanitizeIncomingMessages(messages);
+  if (cleanMessages.length === 0) {
+    return { saved: false, newMessages: 0 };
+  }
 
+  await enforceStorageWriteGuard();
+
+  return db.transaction("rw", db.conversations, db.messages, async () => {
     const existing = await db.conversations
       .where("uuid")
       .equals(conversation.uuid)
@@ -70,6 +73,7 @@ export async function deduplicateAndSave(
 
       await db.messages.bulkAdd(inserts);
 
+      // Keep user-renamed titles stable across recaptures.
       await db.conversations.update(existing.id, {
         updated_at: conversation.updated_at,
         message_count: cleanMessages.length,
