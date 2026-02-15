@@ -1,72 +1,91 @@
-﻿---
+---
 name: vesti-parser-debugging
-description: Claude/ChatGPT parser debugging SOP for role mismatch, AI response loss, duplicate messages, and ordering issues. Use to run sampling, root-cause analysis, fix strategy selection, and acceptance verification.
+description: Parser and capture-governance debugging SOP for Vesti. Use when capture issues involve role mismatch, response loss, duplicate/order problems, smart/manual interception decisions, transient force-archive failures, or release sampling evidence for v1.2/v1.3.
 ---
 
 # Vesti Parser Debugging Skill
 
 ## Scope
 
-当 Vesti 出现以下问题时使用本 Skill：
-- 角色错配（例如 `user:3, ai:0/1`）
-- AI 回复缺失
-- 用户消息重复
-- Sidepanel 顺序与网页顺序不一致
+Use this skill when Vesti capture behavior is incorrect in parser or governance layers:
+- role mismatch (`user:N, ai:0/1`)
+- AI response missing or partial capture
+- duplicate messages or ordering mismatch
+- smart mode never commits or always holds
+- manual mode force archive does not persist
+- release sampling evidence is incomplete or inconsistent
 
 ## Preconditions
 
-- 在 `chrome://extensions` 仅保留一个 Vesti 实例。
-- 在真实对话页复现问题（建议同时准备 1 个新会话 + 1 个受污染旧会话）。
-- 打开 DevTools Console，确认 parser 日志可见。
+- Keep one Vesti extension instance in `chrome://extensions`.
+- Reproduce on real conversation pages (new + historical session when possible).
+- Open DevTools and confirm parser logs + capture decision logs are visible.
+- Load these references first:
+  - `documents/capture_engine/v1_2_capture_governance_spec.md`
+  - `documents/capture_engine/capture_debugging_playbook.md`
+  - `documents/capture_engine/manual_sampling_and_acceptance.md`
+- Use `documents/parser_debug_playbook.md` as legacy parser-only supplement.
 
 ## Step-by-step
 
-1. **隔离环境**
-   - 关闭其他同类扩展。
-   - Reload 扩展并刷新页面。
+1. **Environment isolation**
+   - Disable other similar extensions.
+   - Reload extension and refresh target page.
 
-2. **采样取证**
-   - 运行 selector probe、testid histogram、anchor chain、top-vs-iframe 脚本。
-   - 保存最新 parser stats + 1 张截图。
+2. **Sampling and evidence**
+   - Collect parser stats, capture decision logs, and status event traces.
+   - Collect `chrome.storage.local` capture settings snapshot.
+   - Collect IndexedDB before/after counts.
+   - Save screenshots with local timestamp.
 
-3. **根因归类**
-   - selector miss（assistant 标识缺失）
-   - content pollution（Thought/Show more/Done 混入）
-   - mixed container role confusion
-   - storage amplification（count-only 增量放大问题）
+3. **Root cause classification**
+   - `parser_miss` (assistant marker drift)
+   - `parser_noise` (Thought/toolbar content pollution)
+   - `gate_misdecision` (smart/manual rule wrong)
+   - `transient_chain_failure` (force archive path break)
+   - `storage_persist_failure` (write rejected/failed)
 
-4. **策略修复**
-   - assistant 标识不稳时，优先 `Anchor & Exclusion`。
-   - action bar 稳定时，增加 copy-action reverse lookup。
-   - selector 策略仅作为 fallback。
-   - 存储层使用 signature compare + replace，修复旧会话污染。
+4. **Fix strategy**
+   - For parser drift: prioritize `anchor + exclusion`, keep selector as fallback.
+   - For governance drift: inspect mode/decision/reason fields first.
+   - For force archive: verify sidepanel -> background -> active tab -> offscreen chain.
+   - Keep fixes minimal and single-cause per round.
 
-5. **验收回归**
-   - 检查角色分布、顺序、重复、正文清洁度。
-   - 覆盖手动保存与自动捕获两条路径。
+5. **Regression acceptance**
+   - Validate role distribution, ordering, duplicate suppression, and noise cleaning.
+   - Validate smart/manual interception decisions.
+   - Validate force archive success and event correctness.
+   - Run mandatory regression set from `documents/capture_engine/manual_sampling_and_acceptance.md`.
 
 ## Decision Table
 
 | Condition | Primary Strategy | Secondary Strategy |
 | --- | --- | --- |
-| Assistant selector 稳定 | Role Selector | Anchor fallback |
-| Assistant selector 缺失/classless | Anchor & Exclusion | Copy-action reverse |
-| Thought 文本污染 | Text cleaning regex | Message content selector refinement |
-| 重复写入 / 历史脏数据 | Signature compare + replace | Transactional full rewrite by uuid |
+| Assistant selector stable | Role Selector | Anchor fallback |
+| Assistant selector missing/classless | Anchor & Exclusion | Copy-action reverse |
+| Thought text pollution | Text cleaning regex | Message content selector refinement |
+| Duplicate writes / historical dirty data | Signature compare + replace | Transactional full rewrite by uuid |
+| Smart mode no commit | Capture decision trace (`reason`) | Rule normalization fix |
+| Manual force archive failed | Transient status + route trace | Active-tab routing hardening |
 
 ## Required Outputs per Debug Round
 
-- 1 句症状描述
-- 最新 parser stats 对象
-- 1 份 DOM 证据包（dump + histogram）
-- 1 张截图（可选但推荐）
-- 本轮结论（改了什么、还剩什么）
+- One-line symptom statement
+- Parser stats object
+- Capture decision log object
+- `chrome.storage.local` settings snapshot
+- IndexedDB before/after counts
+- At least one timestamped screenshot
+- Round conclusion (what changed, what remains)
 
 ## Acceptance Checklist
 
-- [ ] 非空会话不再出现单边角色分布
-- [ ] 解析消息数与页面气泡数接近
-- [ ] 手动保存后无相邻重复
-- [ ] AI 文本不含 `Thought for Ns` / `Show more` / `Done` 污染
-- [ ] Sidepanel 顺序与网页顺序一致
-- [ ] 手动保存和自动捕获都通过
+- [ ] Non-empty sessions do not show persistent single-side role distribution
+- [ ] Parsed message count is close to visible page bubbles
+- [ ] No adjacent duplicates after save
+- [ ] AI text is clean from `Thought for Ns` / `Show more` / `Done`
+- [ ] Sidepanel ordering matches page ordering
+- [ ] Smart/manual decisions match active settings
+- [ ] `VESTI_DATA_UPDATED` fires only on real successful writes
+- [ ] `FORCE_ARCHIVE_TRANSIENT` persists reliably when transient exists
+- [ ] Sampling deliverables satisfy `manual_sampling_and_acceptance.md`
