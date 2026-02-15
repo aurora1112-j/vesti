@@ -59,7 +59,15 @@ export interface StorageUsageSnapshot {
 
 export type CapsuleState = "RECORDING" | "STANDBY" | "PAUSED" | "SAVED";
 
-export type CaptureMode = "full_mirror" | "smart_denoise" | "curator";
+export type CaptureMode = "mirror" | "smart" | "manual";
+
+export interface CaptureSettings {
+  mode: CaptureMode;
+  smartConfig: {
+    minTurns: number;
+    blacklistKeywords: string[];
+  };
+}
 
 export type PageId = "timeline" | "insights" | "data" | "settings";
 export type UiSemanticLayer = "app_shell" | "artifact_content";

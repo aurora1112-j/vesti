@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Eye, EyeOff, FolderGit2, Loader2, Sparkles } from "lucide-react";
-import type { AsyncStatus, LlmConfig } from "~lib/types";
+import {
+  Archive,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  FolderGit2,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import type { AsyncStatus, CaptureMode, CaptureSettings, LlmConfig } from "~lib/types";
+import {
+  DEFAULT_CAPTURE_SETTINGS,
+  getCaptureSettings,
+  setCaptureSettings,
+} from "~lib/services/captureSettingsService";
 import {
   DEFAULT_BACKUP_MODEL,
   DEFAULT_PROXY_URL,
@@ -17,10 +31,43 @@ import {
 } from "~lib/services/storageService";
 
 const MODEL_OPTIONS = [DEFAULT_STABLE_MODEL, DEFAULT_BACKUP_MODEL];
+const MIN_TURNS_DEFAULT = DEFAULT_CAPTURE_SETTINGS.smartConfig.minTurns;
+
+const CAPTURE_MODE_OPTIONS: Array<{ value: CaptureMode; label: string; description: string }> = [
+  {
+    value: "mirror",
+    label: "Full Mirror",
+    description: "Capture all parsed conversation updates.",
+  },
+  {
+    value: "smart",
+    label: "Smart Denoising",
+    description: "Capture only when min-turn and keyword rules pass.",
+  },
+  {
+    value: "manual",
+    label: "Manual Archive",
+    description: "Hold captures until manual archive is enabled in next step.",
+  },
+];
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function parseKeywordsInput(value: string): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  for (const segment of value.split(",")) {
+    const keyword = segment.trim();
+    if (!keyword || seen.has(keyword)) continue;
+    seen.add(keyword);
+    result.push(keyword);
+  }
+
+  return result;
 }
 
 function resolveSettingsForMode(settings: LlmConfig): LlmConfig {
@@ -59,12 +106,23 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
   const [llmSettings, setLlmSettingsState] = useState<LlmConfig>(
     buildDefaultLlmSettings()
   );
+  const [captureSettings, setCaptureSettingsState] = useState<CaptureSettings>(
+    DEFAULT_CAPTURE_SETTINGS
+  );
+  const [minTurnsInput, setMinTurnsInput] = useState(
+    String(DEFAULT_CAPTURE_SETTINGS.smartConfig.minTurns)
+  );
+  const [blacklistInput, setBlacklistInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [modelStatus, setModelStatus] = useState<AsyncStatus>("idle");
   const [modelMessage, setModelMessage] = useState<string | null>(null);
+  const [captureStatus, setCaptureStatus] = useState<AsyncStatus>("idle");
+  const [captureMessage, setCaptureMessage] = useState<string | null>(null);
 
   const mode = getLlmAccessMode(llmSettings);
   const isCustomMode = mode === "custom_byok";
+  const isSmartMode = captureSettings.mode === "smart";
+  const isManualMode = captureSettings.mode === "manual";
 
   useEffect(() => {
     getLlmSettings()
@@ -76,6 +134,19 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
         }
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getCaptureSettings()
+      .then((settings) => {
+        setCaptureSettingsState(settings);
+        setMinTurnsInput(String(settings.smartConfig.minTurns));
+        setBlacklistInput(settings.smartConfig.blacklistKeywords.join(", "));
+      })
+      .catch((error) => {
+        setCaptureStatus("error");
+        setCaptureMessage(getErrorMessage(error));
+      });
   }, []);
 
   const setMode = (custom: boolean) => {
@@ -131,6 +202,44 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
     } catch (error) {
       setModelStatus("error");
       setModelMessage(getErrorMessage(error));
+    }
+  };
+
+  const setCaptureMode = (nextMode: CaptureMode) => {
+    setCaptureSettingsState((prev) => ({
+      ...prev,
+      mode: nextMode,
+    }));
+    setCaptureStatus("idle");
+    setCaptureMessage(null);
+  };
+
+  const handleSaveCaptureSettings = async () => {
+    setCaptureStatus("loading");
+    setCaptureMessage(null);
+
+    try {
+      const draft: CaptureSettings = {
+        ...captureSettings,
+        smartConfig: {
+          minTurns:
+            minTurnsInput.trim().length === 0
+              ? MIN_TURNS_DEFAULT
+              : Number(minTurnsInput),
+          blacklistKeywords: parseKeywordsInput(blacklistInput),
+        },
+      };
+
+      await setCaptureSettings(draft);
+      const normalized = await getCaptureSettings();
+      setCaptureSettingsState(normalized);
+      setMinTurnsInput(String(normalized.smartConfig.minTurns));
+      setBlacklistInput(normalized.smartConfig.blacklistKeywords.join(", "));
+      setCaptureStatus("ready");
+      setCaptureMessage("Capture settings saved.");
+    } catch (error) {
+      setCaptureStatus("error");
+      setCaptureMessage(getErrorMessage(error));
     }
   };
 
@@ -304,6 +413,131 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-2 flex items-center gap-1.5 text-vesti-sm font-medium text-text-secondary">
+            <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
+            Capture Engine
+          </h2>
+
+          <div className="card-shadow-warm rounded-card border border-border-subtle bg-bg-surface p-4">
+            <div className="grid gap-3">
+              <div className="grid gap-2" role="radiogroup" aria-label="Capture Mode">
+                {CAPTURE_MODE_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`cursor-pointer rounded-md border px-3 py-2 transition-colors duration-200 ${
+                      captureSettings.mode === option.value
+                        ? "border-text-primary bg-white/70"
+                        : "border-border-subtle bg-bg-surface-hover hover:bg-white/60"
+                    }`}
+                  >
+                    <span className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        name="capture-mode"
+                        value={option.value}
+                        checked={captureSettings.mode === option.value}
+                        onChange={() => setCaptureMode(option.value)}
+                        className="mt-0.5"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium text-text-primary">
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block text-[12px] leading-[1.45] text-text-secondary">
+                          {option.description}
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {isSmartMode && (
+                <div className="grid gap-2 rounded-md border border-border-subtle bg-bg-surface-hover p-3">
+                  <div className="grid gap-1">
+                    <label className="text-[11px] text-text-tertiary">
+                      Minimum turns (1-20)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={minTurnsInput}
+                      onChange={(event) => setMinTurnsInput(event.target.value)}
+                      className="settings-input"
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <label className="text-[11px] text-text-tertiary">
+                      Blacklist keywords (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={blacklistInput}
+                      onChange={(event) => setBlacklistInput(event.target.value)}
+                      className="settings-input"
+                      placeholder="translation, draft"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isManualMode && (
+                <p className="rounded-md border border-border-subtle bg-bg-surface-hover px-3 py-2 text-[12px] leading-[1.45] text-text-secondary">
+                  Manual mode configuration is saved now. Interception and manual archive
+                  enforcement activate in the next rollout step.
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-bg-surface-hover p-3">
+                <div>
+                  <p className="text-[12px] font-medium text-text-primary">
+                    Archive Active Thread Now
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-text-tertiary">
+                    Will be enabled in next step (transient flow).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="inline-flex items-center gap-1 rounded-md border border-border-default bg-transparent px-3 py-1.5 text-[12px] font-medium text-text-tertiary opacity-60"
+                >
+                  <Archive className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Archive Active Thread Now
+                </button>
+              </div>
+
+              <div className="mt-1 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveCaptureSettings}
+                  className="rounded-md border border-text-primary bg-text-primary px-4 py-2 text-[13px] font-medium text-white transition-colors duration-200 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Save Capture Settings
+                </button>
+                {captureStatus === "loading" && (
+                  <div className="flex items-center gap-1 text-[12px] text-text-tertiary">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Working...
+                  </div>
+                )}
+                {captureMessage && captureStatus !== "loading" && (
+                  <span
+                    className={`text-[12px] ${
+                      captureStatus === "error" ? "text-danger" : "text-text-secondary"
+                    }`}
+                  >
+                    {captureMessage}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </section>
