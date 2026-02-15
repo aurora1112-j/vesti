@@ -5,6 +5,7 @@ import { TimelinePage } from "./pages/TimelinePage";
 import { InsightsPage } from "./pages/InsightsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ReaderView } from "./containers/ReaderView";
+import { DataPage } from "./pages/DataPage";
 
 export function VestiSidepanel() {
   const [currentPage, setCurrentPage] = useState<PageId>("timeline");
@@ -37,6 +38,10 @@ export function VestiSidepanel() {
     setCurrentPage(page);
   };
 
+  const handleNavigateToData = () => {
+    setCurrentPage("data");
+  };
+
   return (
     <div className="flex h-screen w-full bg-bg-tertiary">
       <div className="flex h-full flex-1 overflow-hidden bg-bg-primary">
@@ -58,7 +63,9 @@ export function VestiSidepanel() {
               refreshToken={refreshToken}
             />
           ) : currentPage === "settings" ? (
-            <SettingsPage />
+            <SettingsPage onNavigateToData={handleNavigateToData} />
+          ) : currentPage === "data" ? (
+            <DataPage />
           ) : null}
         </main>
 

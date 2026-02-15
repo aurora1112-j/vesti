@@ -32,7 +32,12 @@ function formatDateTime(ts: number): string {
 }
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    if (error.message.includes("STORAGE_HARD_LIMIT_REACHED")) {
+      return "Storage limit reached (1GB). Export or clear data in the Data tab.";
+    }
+    return error.message;
+  }
   return String(error);
 }
 
@@ -139,7 +144,7 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
   return (
     <div className="vesti-shell flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-app">
       <header className="flex h-9 shrink-0 items-center px-4">
-        <h1 className="text-[18px] font-semibold tracking-tight text-text-primary">Insights</h1>
+        <h1 className="vesti-page-title text-text-primary">Insights</h1>
       </header>
 
       <div className="flex flex-col gap-5 p-4">

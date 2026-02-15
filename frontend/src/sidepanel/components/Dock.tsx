@@ -1,13 +1,15 @@
-﻿import React from "react";
-import { LOGO_BASE64 } from "~lib/ui/logo";
-import { Home, Sparkles, Settings } from "lucide-react";
+import React from "react";
+import { Database, FolderGit2, Home, Settings, Sparkles } from "lucide-react";
 import type { PageId } from "~lib/types";
+import { LOGO_BASE64 } from "~lib/ui/logo";
 
 interface DockItem {
   id: PageId;
   icon: React.ReactNode;
   label: string;
 }
+
+const DataIcon = FolderGit2 ?? Database;
 
 const DOCK_ITEMS_TOP: DockItem[] = [
   {
@@ -23,6 +25,11 @@ const DOCK_ITEMS_TOP: DockItem[] = [
 ];
 
 const DOCK_ITEMS_BOTTOM: DockItem[] = [
+  {
+    id: "data",
+    icon: <DataIcon className="h-5 w-5" strokeWidth={1.75} />,
+    label: "Data Management",
+  },
   {
     id: "settings",
     icon: <Settings className="h-5 w-5" strokeWidth={1.75} />,
@@ -84,7 +91,7 @@ function DockButton({
       aria-label={item.label}
       aria-current={isActive ? "page" : undefined}
       onClick={onClick}
-      className={`flex h-9 w-9 items-center justify-center rounded-sm transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
+      className={`flex h-9 w-9 items-center justify-center rounded-sm transition-colors [transition-duration:120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
         isActive
           ? "bg-accent-primary-light text-accent-primary"
           : "text-text-secondary hover:bg-accent-primary-light hover:text-accent-primary"
