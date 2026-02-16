@@ -17,6 +17,10 @@ Locked decisions:
 - Interception happens before `deduplicateAndSave`.
 - `VESTI_DATA_UPDATED` is emitted only after a real DB write succeeds.
 
+Implementation log:
+- Step1-Step4 engineering execution details are tracked in
+  `documents/capture_engine/v1_2_step1_to_step4_execution_log.md`.
+
 ---
 
 ## 2. Current Baseline (As-Is)
