@@ -221,5 +221,7 @@ All three must sign before final release candidate tagging.
   - `documents/capture_engine/v1_2_capture_governance_spec.md`
 - Multi-platform phase rules:
   - `documents/capture_engine/v1_3_platform_expansion_spec.md`
+- Phase1 executable checklist:
+  - `documents/capture_engine/v1_3_phase1_manual_sampling_checklist.md`
 - Debug SOP:
   - `documents/capture_engine/capture_debugging_playbook.md`
