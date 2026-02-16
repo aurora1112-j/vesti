@@ -34,6 +34,25 @@ export class MemoryHubDB extends Dexie {
       summaries: "++id, conversationId, createdAt",
       weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
     });
+    this.version(3)
+      .stores({
+        conversations:
+          "++id, platform, title, created_at, updated_at, uuid, source_created_at, [platform+created_at], [platform+uuid]",
+        messages:
+          "++id, conversation_id, role, created_at, [conversation_id+created_at]",
+        summaries: "++id, conversationId, createdAt",
+        weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
+      })
+      .upgrade((tx) => {
+        return tx
+          .table("conversations")
+          .toCollection()
+          .modify((record: Partial<ConversationRecord>) => {
+            if (record.source_created_at === undefined) {
+              record.source_created_at = null;
+            }
+          });
+      });
   }
 }
 

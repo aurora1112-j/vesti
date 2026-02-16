@@ -1,4 +1,6 @@
 import type {
+  ActiveCaptureStatus,
+  CaptureDecisionMeta,
   Conversation,
   Message,
   DashboardStats,
@@ -6,6 +8,7 @@ import type {
   ExportPayload,
   Platform,
   LlmConfig,
+  ForceArchiveTransientResult,
   StorageUsageSnapshot,
   SummaryRecord,
   WeeklyReportRecord,
@@ -28,6 +31,7 @@ export interface ConversationDraft {
   title: string;
   snippet: string;
   url: string;
+  source_created_at: number | null;
   created_at: number;
   updated_at: number;
   message_count: number;
@@ -49,7 +53,11 @@ export type RequestMessage =
       target?: "offscreen";
       via?: "background";
       requestId?: string;
-      payload: { conversation: ConversationDraft; messages: ParsedMessage[] };
+      payload: {
+        conversation: ConversationDraft;
+        messages: ParsedMessage[];
+        forceFlag?: boolean;
+      };
     }
   | {
       type: "GET_CONVERSATIONS";
@@ -150,10 +158,25 @@ export type RequestMessage =
       via?: "background";
       requestId?: string;
       payload: { rangeStart: number; rangeEnd: number };
+    }
+  | {
+      type: "GET_ACTIVE_CAPTURE_STATUS";
+      target?: "background";
+      requestId?: string;
+    }
+  | {
+      type: "FORCE_ARCHIVE_TRANSIENT";
+      target?: "background";
+      requestId?: string;
     };
 
 export type ResponseDataMap = {
-  CAPTURE_CONVERSATION: { saved: boolean; newMessages: number; conversationId?: number };
+  CAPTURE_CONVERSATION: {
+    saved: boolean;
+    newMessages: number;
+    conversationId?: number;
+    decision: CaptureDecisionMeta;
+  };
   GET_CONVERSATIONS: Conversation[];
   GET_MESSAGES: Message[];
   DELETE_CONVERSATION: { deleted: boolean };
@@ -169,6 +192,8 @@ export type ResponseDataMap = {
   GENERATE_CONVERSATION_SUMMARY: SummaryRecord;
   GET_WEEKLY_REPORT: WeeklyReportRecord | null;
   GENERATE_WEEKLY_REPORT: WeeklyReportRecord;
+  GET_ACTIVE_CAPTURE_STATUS: ActiveCaptureStatus;
+  FORCE_ARCHIVE_TRANSIENT: ForceArchiveTransientResult;
 };
 
 export type ResponseMessage<T extends keyof ResponseDataMap = keyof ResponseDataMap> =

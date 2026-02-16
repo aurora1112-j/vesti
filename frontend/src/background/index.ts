@@ -1,7 +1,7 @@
 ﻿
 import { isRequestMessage } from "../lib/messaging/protocol";
 import type { RequestMessage, ResponseMessage } from "../lib/messaging/protocol";
-import { deduplicateAndSave } from "../lib/core/middleware/deduplicate";
+import { interceptAndPersistCapture } from "../lib/capture/storage-interceptor";
 import {
   listConversations,
   listMessages,
@@ -20,7 +20,14 @@ import {
   generateConversationSummary,
   generateWeeklyReport,
 } from "../lib/services/insightGenerationService";
-import type { LlmConfig } from "../lib/types";
+import { getCaptureSettings } from "../lib/services/captureSettingsService";
+import type {
+  ActiveCaptureStatus,
+  CaptureMode,
+  ForceArchiveTransientResult,
+  LlmConfig,
+  Platform,
+} from "../lib/types";
 import { logger } from "../lib/utils/logger";
 import { getLlmAccessMode, normalizeLlmSettings } from "../lib/services/llmConfig";
 
@@ -42,15 +49,235 @@ function requireSettings(settings: LlmConfig | null): LlmConfig {
   return normalized;
 }
 
-async function handleRequest(message: RequestMessage): Promise<ResponseMessage> {
+type ContentTransientStatusResponse =
+  | {
+      ok: true;
+      status: {
+        available: boolean;
+        reason: "ok" | "no_transient";
+        platform?: Platform;
+        sessionUUID?: string;
+        transientKey?: string;
+        messageCount?: number;
+        turnCount?: number;
+        lastDecision?: ActiveCaptureStatus["lastDecision"];
+        updatedAt?: number;
+      };
+    }
+  | { ok: false; error: string };
+
+type ContentForceArchiveResponse =
+  | {
+      ok: true;
+      result: {
+        saved: boolean;
+        newMessages: number;
+        conversationId?: number;
+        decision: ForceArchiveTransientResult["decision"];
+      };
+    }
+  | { ok: false; error: string };
+
+const SUPPORTED_CAPTURE_HOSTS = new Set([
+  "chatgpt.com",
+  "chat.openai.com",
+  "claude.ai",
+]);
+
+function resolvePlatformFromUrl(url: string): Platform | undefined {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes("chatgpt.com") || host.includes("chat.openai.com")) {
+      return "ChatGPT";
+    }
+    if (host.includes("claude.ai")) {
+      return "Claude";
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function isSupportedCaptureTabUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return Array.from(SUPPORTED_CAPTURE_HOSTS).some((supportedHost) =>
+      host.includes(supportedHost)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getModeFromSettings(mode: CaptureMode): CaptureMode {
+  if (mode === "mirror" || mode === "smart" || mode === "manual") {
+    return mode;
+  }
+  return "mirror";
+}
+
+async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      resolve(tabs[0] ?? null);
+    });
+  });
+}
+
+async function sendMessageToTab<T>(
+  tabId: number,
+  message: Record<string, unknown>
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response: T) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        reject(new Error(err.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+async function buildActiveCaptureStatus(mode: CaptureMode): Promise<ActiveCaptureStatus> {
+  const tab = await getActiveTab();
+  if (!tab?.id || !isSupportedCaptureTabUrl(tab.url)) {
+    return {
+      mode,
+      supported: false,
+      available: false,
+      reason: "unsupported_tab",
+    };
+  }
+
+  const platform = tab.url ? resolvePlatformFromUrl(tab.url) : undefined;
+
+  if (mode === "mirror") {
+    return {
+      mode,
+      supported: true,
+      available: false,
+      reason: "mode_mirror",
+      platform,
+    };
+  }
+
+  try {
+    const response = await sendMessageToTab<ContentTransientStatusResponse>(tab.id, {
+      type: "GET_TRANSIENT_CAPTURE_STATUS",
+    });
+
+    if (!response?.ok) {
+      return {
+        mode,
+        supported: true,
+        available: false,
+        reason: "content_unreachable",
+        platform,
+      };
+    }
+
+    return {
+      mode,
+      supported: true,
+      available: response.status.available,
+      reason: response.status.reason === "ok" ? "ok" : "no_transient",
+      platform: response.status.platform ?? platform,
+      sessionUUID: response.status.sessionUUID,
+      transientKey: response.status.transientKey,
+      messageCount: response.status.messageCount,
+      turnCount: response.status.turnCount,
+      lastDecision: response.status.lastDecision,
+      updatedAt: response.status.updatedAt,
+    };
+  } catch {
+    return {
+      mode,
+      supported: true,
+      available: false,
+      reason: "content_unreachable",
+      platform,
+    };
+  }
+}
+
+async function handleBackgroundRequest(
+  message: Extract<RequestMessage, { target?: "background" }>
+): Promise<ResponseMessage> {
+  const messageType = message.type;
+
+  try {
+    switch (message.type) {
+      case "GET_ACTIVE_CAPTURE_STATUS": {
+        const settings = await getCaptureSettings();
+        const mode = getModeFromSettings(settings.mode);
+        const data = await buildActiveCaptureStatus(mode);
+        return { ok: true, type: messageType, data };
+      }
+      case "FORCE_ARCHIVE_TRANSIENT": {
+        const settings = await getCaptureSettings();
+        const mode = getModeFromSettings(settings.mode);
+        if (mode === "mirror") {
+          throw new Error("ARCHIVE_MODE_DISABLED");
+        }
+
+        const tab = await getActiveTab();
+        if (!tab?.id) {
+          throw new Error("ACTIVE_TAB_UNAVAILABLE");
+        }
+        if (!isSupportedCaptureTabUrl(tab.url)) {
+          throw new Error("ACTIVE_TAB_UNSUPPORTED");
+        }
+
+        let response: ContentForceArchiveResponse;
+        try {
+          response = await sendMessageToTab<ContentForceArchiveResponse>(tab.id, {
+            type: "FORCE_ARCHIVE_TRANSIENT",
+          });
+        } catch (error) {
+          throw new Error((error as Error).message || "FORCE_ARCHIVE_FAILED");
+        }
+
+        if (!response?.ok) {
+          throw new Error(response?.error || "FORCE_ARCHIVE_FAILED");
+        }
+
+        const data: ForceArchiveTransientResult = {
+          forced: true,
+          saved: response.result.saved,
+          newMessages: response.result.newMessages,
+          conversationId: response.result.conversationId,
+          decision: response.result.decision,
+        };
+
+        return { ok: true, type: messageType, data };
+      }
+      default:
+        return {
+          ok: false,
+          type: messageType,
+          error: `Unsupported message type: ${messageType}`,
+        };
+    }
+  } catch (error) {
+    logger.error("background", "Background request failed", error as Error);
+    return {
+      ok: false,
+      type: messageType,
+      error: (error as Error).message || "Unknown error",
+    };
+  }
+}
+
+async function handleOffscreenRequest(message: RequestMessage): Promise<ResponseMessage> {
   const messageType = message.type;
   try {
     switch (message.type) {
       case "CAPTURE_CONVERSATION": {
-        const result = await deduplicateAndSave(
-          message.payload.conversation,
-          message.payload.messages
-        );
+        const result = await interceptAndPersistCapture(message.payload);
         return { ok: true, type: messageType, data: result };
       }
       case "GET_CONVERSATIONS": {
@@ -190,7 +417,23 @@ chrome.runtime.onMessage.addListener(
     if (message.target !== "offscreen") return;
 
     void (async () => {
-      const response = await handleRequest(message);
+      const response = await handleOffscreenRequest(message);
+      sendResponse(response);
+    })();
+
+    return true;
+  }
+);
+
+chrome.runtime.onMessage.addListener(
+  (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    if (!isRequestMessage(message)) return;
+    if (message.target !== "background") return;
+
+    void (async () => {
+      const response = await handleBackgroundRequest(
+        message as Extract<RequestMessage, { target?: "background" }>
+      );
       sendResponse(response);
     })();
 

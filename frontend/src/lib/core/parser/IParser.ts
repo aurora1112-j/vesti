@@ -12,5 +12,6 @@ export interface IParser {
   getConversationTitle(): string;
   getMessages(): ParsedMessage[];
   isGenerating(): boolean;
-  getSessionUUID(): string;
+  getSessionUUID(): string | null;
+  getSourceCreatedAt(): number | null;
 }

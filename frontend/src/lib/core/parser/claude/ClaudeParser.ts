@@ -2,6 +2,7 @@ import type { IParser, ParsedMessage } from "../IParser";
 import type { Platform } from "../../../types";
 import {
   closestAnySelector,
+  extractEarliestTimeFromSelectors,
   normalizeCandidateNodes,
   queryAllUnique,
   queryAllWithinUnique,
@@ -79,6 +80,7 @@ const SELECTORS = {
     /^thought for\s+\d+s/i,
     /^claude can make mistakes\.?/i,
   ],
+  sourceTimes: ["main time[datetime]", "article time[datetime]"],
 };
 
 type MessageRole = "user" | "ai";
@@ -146,10 +148,14 @@ export class ClaudeParser implements IParser {
     return queryFirst(SELECTORS.generating) !== null;
   }
 
-  getSessionUUID(): string {
+  getSessionUUID(): string | null {
     const match = window.location.pathname.match(/\/chat\/([a-zA-Z0-9-]+)/);
     if (match && match[1]) return match[1];
-    return `claude-${Date.now()}`;
+    return null;
+  }
+
+  getSourceCreatedAt(): number | null {
+    return extractEarliestTimeFromSelectors(SELECTORS.sourceTimes);
   }
 
   private extractUsingAnchorStrategy(): ExtractionResult {

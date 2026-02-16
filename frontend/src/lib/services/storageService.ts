@@ -1,7 +1,9 @@
 import type {
+  ActiveCaptureStatus,
   Conversation,
   DashboardStats,
   ExportFormat,
+  ForceArchiveTransientResult,
   LlmConfig,
   Message,
   Platform,
@@ -180,4 +182,18 @@ export async function generateWeeklyReport(
     },
     LONG_RUNNING_TIMEOUT_MS
   ) as Promise<WeeklyReportRecord>;
+}
+
+export async function getActiveCaptureStatus(): Promise<ActiveCaptureStatus> {
+  return sendRequest({
+    type: "GET_ACTIVE_CAPTURE_STATUS",
+    target: "background",
+  }) as Promise<ActiveCaptureStatus>;
+}
+
+export async function forceArchiveTransient(): Promise<ForceArchiveTransientResult> {
+  return sendRequest({
+    type: "FORCE_ARCHIVE_TRANSIENT",
+    target: "background",
+  }) as Promise<ForceArchiveTransientResult>;
 }

@@ -1,7 +1,7 @@
 
 import { isRequestMessage } from "../lib/messaging/protocol";
 import type { RequestMessage, ResponseMessage } from "../lib/messaging/protocol";
-import { deduplicateAndSave } from "../lib/core/middleware/deduplicate";
+import { interceptAndPersistCapture } from "../lib/capture/storage-interceptor";
 import {
   listConversations,
   listMessages,
@@ -47,10 +47,7 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
   try {
     switch (message.type) {
       case "CAPTURE_CONVERSATION": {
-        const result = await deduplicateAndSave(
-          message.payload.conversation,
-          message.payload.messages
-        );
+        const result = await interceptAndPersistCapture(message.payload);
         return { ok: true, type: messageType, data: result };
       }
       case "GET_CONVERSATIONS": {

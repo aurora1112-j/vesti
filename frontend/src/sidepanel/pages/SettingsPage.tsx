@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Archive,
   ArrowRight,
@@ -9,7 +9,13 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import type { AsyncStatus, CaptureMode, CaptureSettings, LlmConfig } from "~lib/types";
+import type {
+  ActiveCaptureStatus,
+  AsyncStatus,
+  CaptureMode,
+  CaptureSettings,
+  LlmConfig,
+} from "~lib/types";
 import {
   DEFAULT_CAPTURE_SETTINGS,
   getCaptureSettings,
@@ -25,6 +31,8 @@ import {
   normalizeLlmSettings,
 } from "~lib/services/llmConfig";
 import {
+  forceArchiveTransient,
+  getActiveCaptureStatus,
   getLlmSettings,
   setLlmSettings,
   testLlmConnection,
@@ -47,7 +55,7 @@ const CAPTURE_MODE_OPTIONS: Array<{ value: CaptureMode; label: string; descripti
   {
     value: "manual",
     label: "Manual Archive",
-    description: "Hold captures until manual archive is enabled in next step.",
+    description: "Hold captures until you archive the active thread manually.",
   },
 ];
 
@@ -68,6 +76,58 @@ function parseKeywordsInput(value: string): string[] {
   }
 
   return result;
+}
+
+function formatCaptureStatusReason(reason?: ActiveCaptureStatus["reason"]): string {
+  switch (reason) {
+    case "ok":
+      return "Ready";
+    case "mode_mirror":
+      return "Mirror mode does not need manual archive.";
+    case "unsupported_tab":
+      return "Open a ChatGPT or Claude thread in the active tab.";
+    case "no_transient":
+      return "No active thread snapshot detected yet.";
+    case "content_unreachable":
+      return "Cannot reach page content script. Refresh the page and try again.";
+    default:
+      return "Status unavailable";
+  }
+}
+
+function mapArchiveErrorMessage(error: unknown): string {
+  const code = getErrorMessage(error);
+  switch (code) {
+    case "ARCHIVE_MODE_DISABLED":
+      return "Manual archive is available only in Smart or Manual mode.";
+    case "ACTIVE_TAB_UNSUPPORTED":
+      return "Active tab is unsupported. Open ChatGPT or Claude.";
+    case "ACTIVE_TAB_UNAVAILABLE":
+      return "No active tab found.";
+    case "TRANSIENT_NOT_FOUND":
+      return "No active thread snapshot found. Send one message and try again.";
+    case "missing_conversation_id":
+      return "Current URL has no stable conversation ID yet. Continue the thread and retry.";
+    case "empty_payload":
+      return "No parsed messages available to archive.";
+    case "storage_limit_blocked":
+      return "Storage hard limit reached. Export or clear data before archiving.";
+    case "persist_failed":
+      return "Archive write failed. Please retry.";
+    case "FORCE_ARCHIVE_FAILED":
+      return "Manual archive failed. Please retry.";
+    default:
+      return code;
+  }
+}
+
+function formatStatusTimestamp(value?: number): string {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
 }
 
 function resolveSettingsForMode(settings: LlmConfig): LlmConfig {
@@ -118,11 +178,42 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
   const [modelMessage, setModelMessage] = useState<string | null>(null);
   const [captureStatus, setCaptureStatus] = useState<AsyncStatus>("idle");
   const [captureMessage, setCaptureMessage] = useState<string | null>(null);
+  const [activeCaptureStatus, setActiveCaptureStatus] =
+    useState<ActiveCaptureStatus | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<AsyncStatus>("idle");
+  const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
+  const [archiveSummary, setArchiveSummary] = useState<{
+    reason: string;
+    messageCount: number;
+    time: number;
+  } | null>(null);
 
   const mode = getLlmAccessMode(llmSettings);
   const isCustomMode = mode === "custom_byok";
   const isSmartMode = captureSettings.mode === "smart";
   const isManualMode = captureSettings.mode === "manual";
+  const archiveMode = activeCaptureStatus?.mode;
+  const canArchiveByMode = archiveMode === "smart" || archiveMode === "manual";
+  const canArchiveNow =
+    canArchiveByMode &&
+    activeCaptureStatus?.supported === true &&
+    activeCaptureStatus?.available === true &&
+    activeCaptureStatus?.reason === "ok" &&
+    archiveStatus !== "loading";
+
+  const refreshActiveCaptureStatus = useCallback(async () => {
+    try {
+      const status = await getActiveCaptureStatus();
+      setActiveCaptureStatus(status);
+    } catch (error) {
+      setActiveCaptureStatus((prev) => ({
+        mode: prev?.mode ?? captureSettings.mode,
+        supported: false,
+        available: false,
+        reason: "content_unreachable",
+      }));
+    }
+  }, [captureSettings.mode]);
 
   useEffect(() => {
     getLlmSettings()
@@ -148,6 +239,25 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
         setCaptureMessage(getErrorMessage(error));
       });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (cancelled) return;
+      await refreshActiveCaptureStatus();
+    };
+
+    void run();
+    const intervalId = window.setInterval(() => {
+      void run();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [refreshActiveCaptureStatus]);
 
   const setMode = (custom: boolean) => {
     setLlmSettingsState((prev) =>
@@ -237,9 +347,38 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
       setBlacklistInput(normalized.smartConfig.blacklistKeywords.join(", "));
       setCaptureStatus("ready");
       setCaptureMessage("Capture settings saved.");
+      await refreshActiveCaptureStatus();
     } catch (error) {
       setCaptureStatus("error");
       setCaptureMessage(getErrorMessage(error));
+    }
+  };
+
+  const handleArchiveActiveThread = async () => {
+    setArchiveStatus("loading");
+    setArchiveMessage(null);
+
+    try {
+      const result = await forceArchiveTransient();
+      if (result.saved) {
+        setArchiveStatus("ready");
+        setArchiveSummary({
+          reason: result.decision.reason,
+          messageCount: result.decision.messageCount,
+          time: Date.now(),
+        });
+        setArchiveMessage(
+          `Saved (${result.decision.reason}) · ${result.decision.messageCount} messages`
+        );
+      } else {
+        setArchiveStatus("error");
+        setArchiveMessage(mapArchiveErrorMessage(result.decision.reason));
+      }
+    } catch (error) {
+      setArchiveStatus("error");
+      setArchiveMessage(mapArchiveErrorMessage(error));
+    } finally {
+      await refreshActiveCaptureStatus();
     }
   };
 
@@ -489,10 +628,38 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
 
               {isManualMode && (
                 <p className="rounded-md border border-border-subtle bg-bg-surface-hover px-3 py-2 text-[12px] leading-[1.45] text-text-secondary">
-                  Manual mode configuration is saved now. Interception and manual archive
-                  enforcement activate in the next rollout step.
+                  Manual mode blocks automatic capture writes. Use the archive action
+                  below to persist the active thread snapshot.
                 </p>
               )}
+
+              <p className="text-[11px] text-text-tertiary">
+                Capture now waits for a stable conversation URL ID before writing to
+                local storage.
+              </p>
+
+              <div className="grid gap-1 rounded-md border border-border-subtle bg-bg-surface-hover px-3 py-2 text-[11px] text-text-secondary">
+                <p>
+                  Active thread status: {formatCaptureStatusReason(activeCaptureStatus?.reason)}
+                </p>
+                <p>
+                  Snapshot:{" "}
+                  {activeCaptureStatus?.available
+                    ? `${activeCaptureStatus.messageCount ?? 0} messages · ${
+                        activeCaptureStatus.turnCount ?? 0
+                      } turns`
+                    : "Unavailable"}
+                </p>
+                <p>
+                  Last update: {formatStatusTimestamp(activeCaptureStatus?.updatedAt)}
+                </p>
+                {activeCaptureStatus?.lastDecision && (
+                  <p>
+                    Last decision: {activeCaptureStatus.lastDecision.reason} ·{" "}
+                    {activeCaptureStatus.lastDecision.messageCount} messages
+                  </p>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-bg-surface-hover p-3">
                 <div>
@@ -500,19 +667,51 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
                     Archive Active Thread Now
                   </p>
                   <p className="mt-0.5 text-[11px] text-text-tertiary">
-                    Will be enabled in next step (transient flow).
+                    Manual archive is available in Smart/Manual mode with active
+                    thread snapshot.
                   </p>
                 </div>
                 <button
                   type="button"
-                  disabled
-                  aria-disabled="true"
-                  className="inline-flex items-center gap-1 rounded-md border border-border-default bg-transparent px-3 py-1.5 text-[12px] font-medium text-text-tertiary opacity-60"
+                  onClick={handleArchiveActiveThread}
+                  disabled={!canArchiveNow}
+                  aria-disabled={!canArchiveNow}
+                  className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors duration-200 ${
+                    canArchiveNow
+                      ? "border-border-default bg-transparent text-text-primary hover:bg-bg-surface"
+                      : "border-border-default bg-transparent text-text-tertiary opacity-60"
+                  }`}
                 >
-                  <Archive className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Archive Active Thread Now
+                  {archiveStatus === "loading" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Archive className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  )}
+                  {archiveStatus === "loading"
+                    ? "Archiving..."
+                    : "Archive Active Thread Now"}
                 </button>
               </div>
+
+              {(archiveMessage || archiveSummary) && (
+                <div className="rounded-md border border-border-subtle bg-bg-surface-hover px-3 py-2 text-[11px] text-text-secondary">
+                  {archiveMessage && (
+                    <p
+                      className={
+                        archiveStatus === "error" ? "text-danger" : "text-text-secondary"
+                      }
+                    >
+                      {archiveMessage}
+                    </p>
+                  )}
+                  {archiveSummary && (
+                    <p className="mt-0.5 text-text-tertiary">
+                      Saved at {formatStatusTimestamp(archiveSummary.time)} ·{" "}
+                      {archiveSummary.reason} · {archiveSummary.messageCount} messages
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="mt-1 flex flex-wrap items-center justify-end gap-3">
                 <button

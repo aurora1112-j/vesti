@@ -1,11 +1,20 @@
 ﻿import type { IParser, ParsedMessage } from "../parser/IParser";
 import type { ConversationDraft } from "../../messaging/protocol";
+import type { CaptureDecisionMeta } from "../../types";
 import { logger } from "../../utils/logger";
+
+interface CaptureResult {
+  saved: boolean;
+  newMessages: number;
+  conversationId?: number;
+  decision: CaptureDecisionMeta;
+}
 
 export type CaptureSender = (payload: {
   conversation: ConversationDraft;
   messages: ParsedMessage[];
-}) => Promise<void>;
+  forceFlag?: boolean;
+}) => Promise<CaptureResult>;
 
 export class CapturePipeline {
   private parser: IParser;
@@ -25,12 +34,14 @@ export class CapturePipeline {
       if (messages.length === 0) return;
 
       const now = Date.now();
+      const sessionUUID = this.parser.getSessionUUID();
       const conversation: ConversationDraft = {
-        uuid: this.parser.getSessionUUID(),
+        uuid: sessionUUID ?? "",
         platform,
         title: this.parser.getConversationTitle(),
         snippet: messages[0]?.textContent.slice(0, 100) || "",
         url: window.location.href,
+        source_created_at: this.parser.getSourceCreatedAt(),
         created_at: now,
         updated_at: now,
         message_count: messages.length,
@@ -39,15 +50,24 @@ export class CapturePipeline {
         tags: [],
       };
 
-      await this.sender({ conversation, messages });
-      window.dispatchEvent(new CustomEvent("vesti:capture"));
-      if (chrome?.runtime?.sendMessage) {
+      const result = await this.sender({ conversation, messages });
+      window.dispatchEvent(
+        new CustomEvent("vesti:capture", {
+          detail: result,
+        })
+      );
+
+      if (result.saved && chrome?.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
           void chrome.runtime.lastError;
         });
       }
-      logger.success("capture", "Captured conversation", {
+
+      const logMethod = result.saved ? logger.success : logger.info;
+      logMethod("capture", "Capture processed", {
         platform,
+        saved: result.saved,
+        reason: result.decision.reason,
         messageCount: messages.length,
       });
     } catch (error) {

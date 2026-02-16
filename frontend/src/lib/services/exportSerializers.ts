@@ -66,6 +66,10 @@ function toLocalDateTime(value: number): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
+function getDisplayCreatedAt(conversation: Conversation): number {
+  return conversation.source_created_at ?? conversation.created_at;
+}
+
 function buildTimestampTag(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -106,7 +110,7 @@ function buildArchiveHeaderMeta(conversations: Conversation[]): ArchiveHeaderMet
     };
   }
 
-  const startTs = Math.min(...conversations.map((item) => item.created_at));
+  const startTs = Math.min(...conversations.map((item) => getDisplayCreatedAt(item)));
   const endTs = Math.max(...conversations.map((item) => item.updated_at));
   const startDate = toLocalDate(startTs);
   const endDate = toLocalDate(endTs);
@@ -162,7 +166,7 @@ function pushThreadHeader(
   lines.push("");
   lines.push(`* **Source URL:** ${conversation.url}`);
   lines.push(`* **Platform:** ${conversation.platform}`);
-  lines.push(`* **Created At:** ${toLocalDateTime(conversation.created_at)}`);
+  lines.push(`* **Created At:** ${toLocalDateTime(getDisplayCreatedAt(conversation))}`);
   lines.push(`* **Message Count:** ${messageCount}`);
   lines.push("");
 }
@@ -200,6 +204,8 @@ export function buildExportJsonV1(dataset: ExportDataset): ExportPayload {
       conversations: dataset.conversations.map((item) => ({
         ...item,
         created_at_iso: toIso(item.created_at),
+        source_created_at_iso:
+          item.source_created_at !== null ? toIso(item.source_created_at) : null,
         updated_at_iso: toIso(item.updated_at),
       })),
       messages: dataset.messages.map((item) => ({

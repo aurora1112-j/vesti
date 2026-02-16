@@ -31,6 +31,16 @@ function sanitizeIncomingMessages(messages: ParsedMessage[]): ParsedMessage[] {
   return messages.filter((message) => normalizeText(message.textContent).length > 0);
 }
 
+function resolveSourceCreatedAt(
+  existingSourceCreatedAt: number | null,
+  incomingSourceCreatedAt: number | null
+): number | null {
+  if (existingSourceCreatedAt !== null) {
+    return existingSourceCreatedAt;
+  }
+  return incomingSourceCreatedAt;
+}
+
 export async function deduplicateAndSave(
   conversation: ConversationDraft,
   messages: ParsedMessage[]
@@ -44,8 +54,8 @@ export async function deduplicateAndSave(
 
   return db.transaction("rw", db.conversations, db.messages, async () => {
     const existing = await db.conversations
-      .where("uuid")
-      .equals(conversation.uuid)
+      .where("[platform+uuid]")
+      .equals([conversation.platform, conversation.uuid])
       .first();
 
     if (existing && existing.id !== undefined) {
@@ -74,10 +84,16 @@ export async function deduplicateAndSave(
       await db.messages.bulkAdd(inserts);
 
       // Keep user-renamed titles stable across recaptures.
+      const mergedSourceCreatedAt = resolveSourceCreatedAt(
+        existing.source_created_at ?? null,
+        conversation.source_created_at
+      );
+
       await db.conversations.update(existing.id, {
         updated_at: conversation.updated_at,
         message_count: cleanMessages.length,
         snippet: cleanMessages[0]?.textContent.slice(0, 100) ?? conversation.snippet,
+        source_created_at: mergedSourceCreatedAt,
       } as Partial<ConversationRecord>);
 
       return {

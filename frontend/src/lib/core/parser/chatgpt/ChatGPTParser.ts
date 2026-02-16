@@ -1,6 +1,7 @@
 import type { IParser, ParsedMessage } from "../IParser";
 import type { Platform } from "../../../types";
 import {
+  extractEarliestTimeFromSelectors,
   normalizeCandidateNodes,
   queryAllUnique,
   queryAllWithinUnique,
@@ -50,6 +51,7 @@ const SELECTORS = {
     /^chatgpt can make mistakes\.?/i,
     /^upgrade plan$/i,
   ],
+  sourceTimes: ["main time[datetime]", "article time[datetime]"],
 };
 
 type MessageRole = "user" | "ai";
@@ -119,10 +121,14 @@ export class ChatGPTParser implements IParser {
     return queryFirst(SELECTORS.generating) !== null;
   }
 
-  getSessionUUID(): string {
+  getSessionUUID(): string | null {
     const match = window.location.pathname.match(/\/c\/([a-zA-Z0-9-]+)/);
     if (match && match[1]) return match[1];
-    return `chatgpt-${Date.now()}`;
+    return null;
+  }
+
+  getSourceCreatedAt(): number | null {
+    return extractEarliestTimeFromSelectors(SELECTORS.sourceTimes);
   }
 
   private collectMessageCandidates(): Element[] {

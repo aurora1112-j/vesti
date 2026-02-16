@@ -30,6 +30,10 @@ function toLocalDateTime(value: number): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
+function getDisplayCreatedAt(conversation: Conversation): number {
+  return conversation.source_created_at ?? conversation.created_at;
+}
+
 function buildConversationCopyText(
   conversation: Conversation,
   messages: Message[]
@@ -38,7 +42,7 @@ function buildConversationCopyText(
   lines.push(`# ${conversation.title || "Untitled Conversation"}`);
   lines.push(`Platform: ${conversation.platform}`);
   lines.push(`Source URL: ${conversation.url || "N/A"}`);
-  lines.push(`Created At: ${toLocalDateTime(conversation.created_at)}`);
+  lines.push(`Created At: ${toLocalDateTime(getDisplayCreatedAt(conversation))}`);
   lines.push(`Updated At: ${toLocalDateTime(conversation.updated_at)}`);
   lines.push(`Message Count: ${messages.length}`);
   lines.push("");

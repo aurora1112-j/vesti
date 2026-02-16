@@ -140,3 +140,24 @@ export function safeTextContent(el: Element | null): string {
   }
   return "";
 }
+
+export function extractEarliestTimeFromSelectors(selectors: string[]): number | null {
+  const nodes = queryAllUnique(selectors);
+  let earliest: number | null = null;
+
+  for (const node of nodes) {
+    const rawDateTime =
+      node.getAttribute("datetime") ??
+      (node instanceof HTMLTimeElement ? node.dateTime : null);
+    if (!rawDateTime) continue;
+
+    const parsed = Date.parse(rawDateTime);
+    if (!Number.isFinite(parsed)) continue;
+
+    if (earliest === null || parsed < earliest) {
+      earliest = parsed;
+    }
+  }
+
+  return earliest;
+}

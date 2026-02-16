@@ -12,6 +12,7 @@ export interface Conversation {
   title: string;
   snippet: string;
   url: string;
+  source_created_at: number | null;
   created_at: number;
   updated_at: number;
   message_count: number;
@@ -67,6 +68,61 @@ export interface CaptureSettings {
     minTurns: number;
     blacklistKeywords: string[];
   };
+}
+
+export type CaptureDecision = "committed" | "held" | "rejected";
+
+export type CaptureDecisionReason =
+  | "missing_conversation_id"
+  | "force_archive"
+  | "mode_mirror"
+  | "mode_manual_hold"
+  | "smart_below_min_turns"
+  | "smart_keyword_blocked"
+  | "smart_pass"
+  | "empty_payload"
+  | "storage_limit_blocked"
+  | "persist_failed";
+
+export interface CaptureDecisionMeta {
+  mode: CaptureMode;
+  decision: CaptureDecision;
+  reason: CaptureDecisionReason;
+  messageCount: number;
+  turnCount: number;
+  blacklistHit: boolean;
+  forceFlag: boolean;
+  intercepted: boolean;
+  occurredAt: number;
+}
+
+export type ActiveCaptureStatusReason =
+  | "ok"
+  | "mode_mirror"
+  | "unsupported_tab"
+  | "no_transient"
+  | "content_unreachable";
+
+export interface ActiveCaptureStatus {
+  mode: CaptureMode;
+  supported: boolean;
+  available: boolean;
+  reason: ActiveCaptureStatusReason;
+  platform?: Platform;
+  sessionUUID?: string;
+  transientKey?: string;
+  messageCount?: number;
+  turnCount?: number;
+  lastDecision?: CaptureDecisionMeta;
+  updatedAt?: number;
+}
+
+export interface ForceArchiveTransientResult {
+  forced: true;
+  saved: boolean;
+  newMessages: number;
+  conversationId?: number;
+  decision: CaptureDecisionMeta;
 }
 
 export type PageId = "timeline" | "insights" | "data" | "settings";
