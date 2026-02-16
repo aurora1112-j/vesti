@@ -1,4 +1,5 @@
 import type { ConversationDraft, ParsedMessage } from "../../messaging/protocol";
+import { countAiTurns } from "../../capture/turn-metrics";
 import { db } from "../../db/schema";
 import type { ConversationRecord, MessageRecord } from "../../db/schema";
 import { enforceStorageWriteGuard } from "../../db/storageLimits";
@@ -51,6 +52,7 @@ export async function deduplicateAndSave(
   }
 
   await enforceStorageWriteGuard();
+  const turnCount = countAiTurns(cleanMessages);
 
   return db.transaction("rw", db.conversations, db.messages, async () => {
     const existing = await db.conversations
@@ -92,6 +94,7 @@ export async function deduplicateAndSave(
       await db.conversations.update(existing.id, {
         updated_at: conversation.updated_at,
         message_count: cleanMessages.length,
+        turn_count: turnCount,
         snippet: cleanMessages[0]?.textContent.slice(0, 100) ?? conversation.snippet,
         source_created_at: mergedSourceCreatedAt,
       } as Partial<ConversationRecord>);
@@ -106,6 +109,7 @@ export async function deduplicateAndSave(
     const record: ConversationRecord = {
       ...conversation,
       message_count: cleanMessages.length,
+      turn_count: turnCount,
       snippet: cleanMessages[0]?.textContent.slice(0, 100) ?? conversation.snippet,
     };
 

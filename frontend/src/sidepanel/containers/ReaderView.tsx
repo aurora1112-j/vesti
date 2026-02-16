@@ -56,7 +56,7 @@ export function ReaderView({ conversation, onBack, refreshToken }: ReaderViewPro
 
         <span className="flex items-center gap-1 text-vesti-xs text-text-tertiary">
           <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.75} />
-          {conversation.message_count}
+          {conversation.message_count} messages
         </span>
       </header>
 

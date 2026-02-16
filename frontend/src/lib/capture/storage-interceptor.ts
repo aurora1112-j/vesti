@@ -1,6 +1,7 @@
 import { deduplicateAndSave } from "../core/middleware/deduplicate";
 import type { ConversationDraft, ParsedMessage } from "../messaging/protocol";
 import { getCaptureSettings } from "../services/captureSettingsService";
+import { countAiTurns } from "./turn-metrics";
 import type {
   CaptureDecisionMeta,
   CaptureDecisionReason,
@@ -33,7 +34,7 @@ function decideCapture(
   settings: CaptureSettings
 ): CaptureDecisionMeta {
   const messageCount = payload.messages.length;
-  const turnCount = Math.floor(messageCount / 2);
+  const turnCount = countAiTurns(payload.messages);
   const occurredAt = Date.now();
   const forceFlag = payload.forceFlag === true;
 
@@ -174,7 +175,18 @@ export async function interceptAndPersistCapture(
   const settings = await getCaptureSettings();
   const decision = decideCapture(payload, settings);
 
-  logger.info("capture", "Capture gate decision", decision);
+  logger.info("capture", "Capture gate decision", {
+    platform: payload.conversation.platform,
+    sessionUUID: payload.conversation.uuid || null,
+    mode: decision.mode,
+    decision: decision.decision,
+    reason: decision.reason,
+    messageCount: decision.messageCount,
+    turnCount: decision.turnCount,
+    blacklistHit: decision.blacklistHit,
+    forceFlag: decision.forceFlag,
+    intercepted: decision.intercepted,
+  });
 
   if (decision.decision !== "committed") {
     return {
@@ -201,6 +213,8 @@ export async function interceptAndPersistCapture(
         : "persist_failed";
 
     logger.warn("capture", "Capture persistence rejected", {
+      platform: payload.conversation.platform,
+      sessionUUID: payload.conversation.uuid || null,
       reason,
       error: err?.message ?? String(error),
     });

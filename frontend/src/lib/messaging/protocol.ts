@@ -35,6 +35,7 @@ export interface ConversationDraft {
   created_at: number;
   updated_at: number;
   message_count: number;
+  turn_count: number;
   is_archived: boolean;
   is_trash: boolean;
   tags: string[];

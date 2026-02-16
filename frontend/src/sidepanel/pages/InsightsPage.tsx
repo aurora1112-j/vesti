@@ -12,6 +12,7 @@ import {
   getConversationSummary,
   getWeeklyReport,
 } from "~lib/services/storageService";
+import { resolveTurnCount } from "~lib/capture/turn-metrics";
 import {
   toChatSummaryData,
   toWeeklySummaryData,
@@ -140,6 +141,9 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
     : null;
 
   const weeklyData = weeklyReport ? toWeeklySummaryData(weeklyReport) : null;
+  const turnCount = conversation
+    ? resolveTurnCount(conversation.turn_count, conversation.message_count)
+    : 0;
 
   return (
     <div className="vesti-shell flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-app">
@@ -168,7 +172,7 @@ export function InsightsPage({ conversation, refreshToken }: InsightsPageProps) 
                       {conversation.title}
                     </p>
                     <p className="text-[13px] text-text-tertiary">
-                      {conversation.message_count} turns
+                      {conversation.message_count} messages · {turnCount} turns
                     </p>
                   </div>
                   <PlatformTag platform={conversation.platform} />

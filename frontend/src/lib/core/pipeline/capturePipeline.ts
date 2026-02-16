@@ -1,4 +1,5 @@
 ﻿import type { IParser, ParsedMessage } from "../parser/IParser";
+import { countAiTurns } from "../../capture/turn-metrics";
 import type { ConversationDraft } from "../../messaging/protocol";
 import type { CaptureDecisionMeta } from "../../types";
 import { logger } from "../../utils/logger";
@@ -33,6 +34,7 @@ export class CapturePipeline {
       const messages = this.parser.getMessages();
       if (messages.length === 0) return;
 
+      const turnCount = countAiTurns(messages);
       const now = Date.now();
       const sessionUUID = this.parser.getSessionUUID();
       const conversation: ConversationDraft = {
@@ -45,6 +47,7 @@ export class CapturePipeline {
         created_at: now,
         updated_at: now,
         message_count: messages.length,
+        turn_count: turnCount,
         is_archived: false,
         is_trash: false,
         tags: [],
@@ -66,9 +69,13 @@ export class CapturePipeline {
       const logMethod = result.saved ? logger.success : logger.info;
       logMethod("capture", "Capture processed", {
         platform,
+        sessionUUID: conversation.uuid || null,
+        mode: result.decision.mode,
+        decision: result.decision.decision,
         saved: result.saved,
         reason: result.decision.reason,
-        messageCount: messages.length,
+        messageCount: result.decision.messageCount,
+        turnCount: result.decision.turnCount,
       });
     } catch (error) {
       logger.error("capture", "Capture failed", error as Error);

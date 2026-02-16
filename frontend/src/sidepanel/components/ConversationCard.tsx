@@ -14,6 +14,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
+import { resolveTurnCount } from "~lib/capture/turn-metrics";
 import type { Conversation } from "~lib/types";
 import { PlatformTag } from "./PlatformTag";
 
@@ -139,6 +140,10 @@ export function ConversationCard({
   const skipBlurSaveRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const hasSourceUrl = conversation.url.trim().length > 0;
+  const turnCount = resolveTurnCount(
+    conversation.turn_count,
+    conversation.message_count
+  );
 
   useEffect(() => {
     return () => {
@@ -349,7 +354,7 @@ export function ConversationCard({
           <div className="mt-2 flex items-center justify-between">
             <span className="flex items-center gap-1 text-vesti-xs text-text-tertiary">
               <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {conversation.message_count} turns
+              {conversation.message_count} messages · {turnCount} turns
             </span>
 
             <div className="flex items-center gap-1.5">

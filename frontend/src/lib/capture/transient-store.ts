@@ -1,5 +1,6 @@
 import type { ConversationDraft, ParsedMessage } from "../messaging/protocol";
 import type { CaptureDecisionMeta, Platform } from "../types";
+import { countAiTurns } from "./turn-metrics";
 
 export interface TransientCapturePayload {
   conversation: ConversationDraft;
@@ -73,7 +74,7 @@ export function createTransientCaptureStore() {
         sessionUUID,
         transientKey,
         messageCount: messages.length,
-        turnCount: Math.floor(messages.length / 2),
+        turnCount: countAiTurns(messages),
         lastDecision: state.lastDecision,
         updatedAt: state.updatedAt,
       };
