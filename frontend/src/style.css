@@ -56,21 +56,29 @@
     --warning: 36 90% 43%;
     --danger: 0 55% 51%;
 
-    --chatgpt-bg: 220 14% 96%;
-    --chatgpt-text: 0 0% 10%;
+    --chatgpt-bg: 165 82% 35%;
+    --chatgpt-text: 0 0% 100%;
     --chatgpt-border: 0 0% 0% / 0;
 
-    --claude-bg: 29 80% 85%;
+    --claude-bg: 15 52% 58%;
     --claude-text: 0 0% 10%;
     --claude-border: 0 0% 0% / 0;
 
-    --gemini-bg: 225 68% 54%;
-    --gemini-text: 0 0% 100%;
+    --gemini-bg: 262 71% 73%;
+    --gemini-text: 0 0% 10%;
     --gemini-border: 0 0% 0% / 0;
 
-    --deepseek-bg: 226 57% 21%;
+    --deepseek-bg: 233 91% 50%;
     --deepseek-text: 0 0% 100%;
     --deepseek-border: 0 0% 0% / 0;
+
+    --qwen-bg: 242 80% 65%;
+    --qwen-text: 0 0% 100%;
+    --qwen-border: 0 0% 0% / 0;
+
+    --doubao-bg: 218 100% 56%;
+    --doubao-text: 0 0% 100%;
+    --doubao-border: 0 0% 0% / 0;
 
     --capsule-bg: 0 0% 10% / 0.88;
 

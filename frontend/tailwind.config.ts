@@ -46,6 +46,12 @@ const config: Config = {
         "deepseek-bg": "hsl(var(--deepseek-bg))",
         "deepseek-text": "hsl(var(--deepseek-text))",
         "deepseek-border": "hsl(var(--deepseek-border))",
+        "qwen-bg": "hsl(var(--qwen-bg))",
+        "qwen-text": "hsl(var(--qwen-text))",
+        "qwen-border": "hsl(var(--qwen-border))",
+        "doubao-bg": "hsl(var(--doubao-bg))",
+        "doubao-text": "hsl(var(--doubao-text))",
+        "doubao-border": "hsl(var(--doubao-border))",
         "capsule-bg": "hsl(var(--capsule-bg))",
         card: {
           DEFAULT: "hsl(var(--card))",

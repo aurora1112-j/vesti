@@ -17,6 +17,14 @@ const PLATFORM_STYLES: Record<Platform, { bg: string; text: string }> = {
     bg: "bg-deepseek-bg",
     text: "text-deepseek-text",
   },
+  Qwen: {
+    bg: "bg-qwen-bg",
+    text: "text-qwen-text",
+  },
+  Doubao: {
+    bg: "bg-doubao-bg",
+    text: "text-doubao-text",
+  },
 };
 
 interface PlatformTagProps {

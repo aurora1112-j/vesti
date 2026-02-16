@@ -85,7 +85,7 @@ function formatCaptureStatusReason(reason?: ActiveCaptureStatus["reason"]): stri
     case "mode_mirror":
       return "Mirror mode does not need manual archive.";
     case "unsupported_tab":
-      return "Open a ChatGPT or Claude thread in the active tab.";
+      return "Open a ChatGPT, Claude, Gemini, DeepSeek, Doubao, or Qwen thread in the active tab.";
     case "no_transient":
       return "No active thread snapshot detected yet.";
     case "content_unreachable":
@@ -101,7 +101,7 @@ function mapArchiveErrorMessage(error: unknown): string {
     case "ARCHIVE_MODE_DISABLED":
       return "Manual archive is available only in Smart or Manual mode.";
     case "ACTIVE_TAB_UNSUPPORTED":
-      return "Active tab is unsupported. Open ChatGPT or Claude.";
+      return "Active tab is unsupported. Open ChatGPT, Claude, Gemini, DeepSeek, Doubao, or Qwen.";
     case "ACTIVE_TAB_UNAVAILABLE":
       return "No active tab found.";
     case "TRANSIENT_NOT_FOUND":
@@ -368,7 +368,7 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
           time: Date.now(),
         });
         setArchiveMessage(
-          `Saved (${result.decision.reason}) · ${result.decision.messageCount} messages`
+          `Saved (${result.decision.reason}) \u00b7 ${result.decision.messageCount} messages`
         );
       } else {
         setArchiveStatus("error");
@@ -645,9 +645,9 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
                 <p>
                   Snapshot:{" "}
                   {activeCaptureStatus?.available
-                    ? `${activeCaptureStatus.messageCount ?? 0} messages · ${
+                    ? `${activeCaptureStatus.messageCount ?? 0} messages \u00b7 ${
                         activeCaptureStatus.turnCount ?? 0
-                      } turns`
+                      } turns (AI replies)`
                     : "Unavailable"}
                 </p>
                 <p>
@@ -655,7 +655,7 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
                 </p>
                 {activeCaptureStatus?.lastDecision && (
                   <p>
-                    Last decision: {activeCaptureStatus.lastDecision.reason} ·{" "}
+                    Last decision: {activeCaptureStatus.lastDecision.reason} {"\u00b7"}{" "}
                     {activeCaptureStatus.lastDecision.messageCount} messages
                   </p>
                 )}
@@ -706,8 +706,8 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
                   )}
                   {archiveSummary && (
                     <p className="mt-0.5 text-text-tertiary">
-                      Saved at {formatStatusTimestamp(archiveSummary.time)} ·{" "}
-                      {archiveSummary.reason} · {archiveSummary.messageCount} messages
+                      Saved at {formatStatusTimestamp(archiveSummary.time)} {"\u00b7"}{" "}
+                      {archiveSummary.reason} {"\u00b7"} {archiveSummary.messageCount} messages
                     </p>
                   )}
                 </div>

@@ -2,7 +2,15 @@
 import { LOGO_BASE64 } from "../lib/ui/logo";
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"],
+  matches: [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://www.doubao.com/*",
+    "https://chat.qwen.ai/*",
+  ],
   run_at: "document_idle",
 };
 

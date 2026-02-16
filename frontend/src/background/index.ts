@@ -82,6 +82,10 @@ const SUPPORTED_CAPTURE_HOSTS = new Set([
   "chatgpt.com",
   "chat.openai.com",
   "claude.ai",
+  "gemini.google.com",
+  "chat.deepseek.com",
+  "www.doubao.com",
+  "chat.qwen.ai",
 ]);
 
 function resolvePlatformFromUrl(url: string): Platform | undefined {
@@ -92,6 +96,18 @@ function resolvePlatformFromUrl(url: string): Platform | undefined {
     }
     if (host.includes("claude.ai")) {
       return "Claude";
+    }
+    if (host.includes("gemini.google.com")) {
+      return "Gemini";
+    }
+    if (host.includes("chat.deepseek.com")) {
+      return "DeepSeek";
+    }
+    if (host.includes("www.doubao.com")) {
+      return "Doubao";
+    }
+    if (host.includes("chat.qwen.ai")) {
+      return "Qwen";
     }
   } catch {
     return undefined;

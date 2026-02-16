@@ -3,7 +3,13 @@
 // All interface definitions for Vesti (kept in sync with frontend)
 // ============================================================
 
-export type Platform = "ChatGPT" | "Claude" | "Gemini" | "DeepSeek";
+export type Platform =
+  | "ChatGPT"
+  | "Claude"
+  | "Gemini"
+  | "DeepSeek"
+  | "Qwen"
+  | "Doubao";
 
 export interface Conversation {
   id: number;
@@ -16,6 +22,7 @@ export interface Conversation {
   created_at: number;
   updated_at: number;
   message_count: number;
+  turn_count: number;
   is_archived: boolean;
   is_trash: boolean;
   tags: string[];

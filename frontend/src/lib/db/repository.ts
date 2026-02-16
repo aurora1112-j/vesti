@@ -32,7 +32,19 @@ function toConversation(record: ConversationRecord): Conversation {
   if (record.id === undefined) {
     throw new Error("Conversation record missing id");
   }
-  return record as Conversation;
+  const messageCount =
+    typeof record.message_count === "number" && Number.isFinite(record.message_count)
+      ? Math.max(0, Math.floor(record.message_count))
+      : 0;
+  const turnCount =
+    typeof record.turn_count === "number" && Number.isFinite(record.turn_count)
+      ? Math.max(0, Math.floor(record.turn_count))
+      : Math.floor(messageCount / 2);
+
+  return {
+    ...(record as Conversation),
+    turn_count: turnCount,
+  };
 }
 
 function toMessage(record: MessageRecord): Message {
@@ -118,6 +130,8 @@ function initPlatformDistribution(): Record<Platform, number> {
     Claude: 0,
     Gemini: 0,
     DeepSeek: 0,
+    Qwen: 0,
+    Doubao: 0,
   };
 }
 
