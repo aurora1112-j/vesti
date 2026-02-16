@@ -16,6 +16,13 @@ Rollout is locked to two phases:
 
 Each phase has independent implementation, QA, and release gate.
 
+Current execution scope:
+- Phase 1 (Gemini + DeepSeek) is complete on current baseline.
+- This iteration executes **Phase 2 only** (Doubao + Qwen).
+- It stays aligned with v1.2 strict identity policy:
+  - no stable platform session ID => `held/missing_conversation_id`
+  - force archive does not bypass missing ID.
+
 ---
 
 ## 2. Scope and Boundaries
@@ -62,6 +69,20 @@ Deliverable:
 Deliverable:
 - Production-ready parser + observer integration for both platforms.
 
+## 3.3 Phase 2 execution profile (locked)
+
+- Domain scope stays strict:
+  - `https://www.doubao.com/*`
+  - `https://chat.qwen.ai/*`
+- UI platform theme is unified to six Metro colors:
+  - ChatGPT `#10A37F`
+  - Claude `#CC785C`
+  - Gemini `#AD89EB`
+  - DeepSeek `#0D28F3`
+  - Qwen `#615CED`
+  - Doubao `#1E6FFF`
+- Phase2 reuses v1.2 capture governance and Step4 manual archive chain without protocol changes.
+
 ---
 
 ## 4. Platform Onboarding Contract (Mandatory Template)
@@ -104,7 +125,8 @@ Each parse cycle must log:
 
 Each parser must provide stable `sessionUUID` extraction:
 - Prefer URL conversation ID.
-- If unavailable, deterministic fallback scoped to current page session.
+- If unavailable, return `null` (no temporary fallback ID).
+- Gatekeeper blocks persistence with `missing_conversation_id` until ID stabilizes.
 
 ---
 

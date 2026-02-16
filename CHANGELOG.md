@@ -11,16 +11,33 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 ## [Unreleased]
 
 ### Added
-- N/A
+- Gemini/DeepSeek Phase1 capture entrypoints (`frontend/src/contents/gemini.ts`, `frontend/src/contents/deepseek.ts`) with transient status + force-archive handlers.
+- Formal Gemini/DeepSeek parser modules with selector+anchor strategies, noise cleaning, role inference, parse stats logging, strict session ID extraction, and `source_created_at` best-effort extraction.
+- Doubao/Qwen Phase2 capture entrypoints (`frontend/src/contents/doubao.ts`, `frontend/src/contents/qwen.ts`) with transient status + force-archive handlers.
+- Formal Doubao/Qwen parser modules with selector+anchor strategies, role inference fallbacks, strict session ID extraction, and parse stats logging.
 
 ### Changed
-- N/A
+- Extension host permissions now include `https://gemini.google.com/*` and `https://chat.deepseek.com/*`.
+- Extension host permissions now also include `https://www.doubao.com/*` and `https://chat.qwen.ai/*`.
+- Background capture host resolver now recognizes Gemini/DeepSeek for `GET_ACTIVE_CAPTURE_STATUS` and `FORCE_ARCHIVE_TRANSIENT`.
+- Background capture host resolver now recognizes Doubao/Qwen for `GET_ACTIVE_CAPTURE_STATUS` and `FORCE_ARCHIVE_TRANSIENT`.
+- Capture observability tightened: gate and pipeline logs now include platform/session + decision metadata.
+- Settings capture-status guidance now references all supported capture platforms (ChatGPT/Claude/Gemini/DeepSeek/Doubao/Qwen).
+- Added internal `turn_count` semantics (AI replies) to conversation capture/persistence and upgraded Smart `minTurns` evaluation to the same AI-turn metric.
+- Timeline/Insights counters now display `X messages · Y turns`; Reader header now labels count as messages.
+- Platform badge color tokens are now unified to six Metro theme colors (ChatGPT/Claude/Gemini/DeepSeek/Qwen/Doubao).
 
 ### Fixed
-- N/A
+- Gemini title extraction now prefers `[role='heading']`, removes `You said` prefix for title-only parsing, and falls back safely when generic headings are detected.
+- Corrected turns/message mismatch in sidepanel views and active capture status snapshots.
+- DeepSeek parser now supports `.ds-message`-based DOM (no `<main>` requirement), hybrid class role inference, and explicit `/a/chat/s/<id>` session path extraction.
 
 ### Docs
-- N/A
+- Updated `documents/capture_engine/v1_3_platform_expansion_spec.md` with strict-ID alignment for Phase1 execution.
+- Added `documents/capture_engine/v1_3_phase1_execution_log.md`.
+- Updated `documents/capture_engine/v1_3_platform_expansion_spec.md` with Phase2 execution profile and strict host scope.
+- Added `documents/capture_engine/v1_3_phase2_execution_log.md`.
+- Added `documents/capture_engine/v1_3_phase2_manual_sampling_checklist.md`.
 
 ### Chore
 - N/A
