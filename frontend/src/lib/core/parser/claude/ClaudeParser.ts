@@ -83,6 +83,9 @@ const SELECTORS = {
   sourceTimes: ["main time[datetime]", "article time[datetime]"],
 };
 
+const TITLE_PLATFORM_SUFFIX_PATTERN =
+  /\s*[-–—]\s*(ChatGPT|Claude|Gemini|DeepSeek|Qwen|Doubao)\s*$/i;
+
 type MessageRole = "user" | "ai";
 
 type ExtractionSource = "anchor" | "selector";
@@ -115,9 +118,13 @@ export class ClaudeParser implements IParser {
 
   getConversationTitle(): string {
     const titleEl = queryFirst(SELECTORS.title);
-    const title = safeTextContent(titleEl);
+    const title = this.cleanTitle(safeTextContent(titleEl));
     if (title) return title;
-    return document.title || "Untitled Conversation";
+
+    const fallbackTitle = this.cleanTitle(document.title || "");
+    if (fallbackTitle) return fallbackTitle;
+
+    return "Untitled Conversation";
   }
 
   getMessages(): ParsedMessage[] {
@@ -573,6 +580,13 @@ export class ClaudeParser implements IParser {
       .trim();
 
     return text;
+  }
+
+  private cleanTitle(rawTitle: string): string {
+    return rawTitle
+      .replace(/\s+/g, " ")
+      .replace(TITLE_PLATFORM_SUFFIX_PATTERN, "")
+      .trim();
   }
 
   private dedupeNearDuplicates(messages: ParsedMessage[]): ParsedMessage[] {

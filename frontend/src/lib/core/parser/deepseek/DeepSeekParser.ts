@@ -76,6 +76,9 @@ const SELECTORS = {
   sourceTimes: ["time[datetime]", "article time[datetime]"],
 };
 
+const TITLE_PLATFORM_SUFFIX_PATTERN =
+  /\s*[-–—]\s*(ChatGPT|Claude|Gemini|DeepSeek|Qwen|Doubao)\s*$/i;
+
 const SESSION_ID_QUERY_KEYS = [
   "conversation",
   "conversation_id",
@@ -137,9 +140,13 @@ export class DeepSeekParser implements IParser {
 
   getConversationTitle(): string {
     const titleEl = queryFirst(SELECTORS.title);
-    const title = safeTextContent(titleEl);
+    const title = this.cleanTitle(safeTextContent(titleEl));
     if (title) return title;
-    return document.title || "Untitled Conversation";
+
+    const fallbackTitle = this.cleanTitle(document.title || "");
+    if (fallbackTitle) return fallbackTitle;
+
+    return "Untitled Conversation";
   }
 
   getMessages(): ParsedMessage[] {
@@ -410,6 +417,13 @@ export class DeepSeekParser implements IParser {
     return rawText
       .replace(/\s+/g, " ")
       .replace(/^(copy|edit|retry)\s+/i, "")
+      .trim();
+  }
+
+  private cleanTitle(rawTitle: string): string {
+    return rawTitle
+      .replace(/\s+/g, " ")
+      .replace(TITLE_PLATFORM_SUFFIX_PATTERN, "")
       .trim();
   }
 
