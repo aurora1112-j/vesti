@@ -1,12 +1,12 @@
 import "~style.css";
 
-import { VestiDashboard } from "@vesti/ui";
+import { VestiDashboard as VestiDashboardShell } from "@vesti/ui";
 import { LOGO_BASE64 } from "~lib/ui/logo";
 import { getConversations, getTopics, runGardener } from "~lib/services/storageService";
 
-export default function VestiDashboard() {
+export default function VestiDashboardPage() {
   return (
-    <VestiDashboard
+    <VestiDashboardShell
       logoSrc={LOGO_BASE64}
       rootClassName="vesti-options"
       storage={{ getConversations, getTopics, runGardener }}
