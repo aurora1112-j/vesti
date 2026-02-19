@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;500;600&family=Noto+Serif+SC:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@400;600&family=Newsreader:opsz,wght@6..72,400;500;600&family=Noto+Serif+SC:wght@400;500;700&family=Nunito+Sans:wght@400;500;600&display=swap");
 
 @font-face {
   font-family: "Tiempos Headline";
@@ -111,6 +111,7 @@
 
     --font-serif: "Newsreader", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
     --font-vesti-serif: "Tiempos Headline", "Tiempos Text", "Tiempos", ui-serif, "Apple-System-UI-Serif", "BlinkMacSystemFont", serif;
+    --font-brand: "Lora", "Newsreader", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
     --font-ui: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --font-mono: "Cascadia Mono", "Consolas", "SF Mono", "Menlo", "Liberation Mono", monospace;
   }
@@ -130,6 +131,56 @@
 }
 
 @layer utilities {
+  .vesti-options {
+    --bg-primary: 0 0% 100%;
+    --bg-secondary: 48 24% 96%;
+    --bg-tertiary: 48 33% 97%;
+    --bg-sidebar: 48 24% 96%;
+
+    --surface-card: 48 25% 92%;
+    --surface-card-hover: 49 21% 90%;
+    --surface-card-active: 49 16% 87%;
+    --surface-ai-message: 48 20% 95%;
+
+    --text-primary: 0 0% 10%;
+    --text-secondary: 0 0% 42%;
+    --text-tertiary: 0 0% 61%;
+    --text-inverse: 0 0% 100%;
+
+    --accent-primary: 215 55% 44%;
+    --accent-primary-hover: 215 55% 40%;
+    --accent-primary-active: 215 55% 36%;
+    --accent-primary-light: 215 55% 44% / 0.08;
+    --accent-primary-muted: 215 55% 44% / 0.15;
+
+    --border-default: 48 16% 88%;
+    --border-subtle: 47 21% 92%;
+    --border-focus: 215 55% 44%;
+
+    --success: 141 51% 36%;
+    --warning: 37 91% 44%;
+    --danger: 0 57% 51%;
+
+    --chatgpt-bg: 125 39% 94%;
+    --chatgpt-text: 123 46% 34%;
+    --chatgpt-border: 122 37% 84%;
+    --claude-bg: 37 100% 94%;
+    --claude-text: 25 80% 42%;
+    --claude-border: 36 100% 85%;
+    --gemini-bg: 231 44% 94%;
+    --gemini-text: 232 50% 45%;
+    --gemini-border: 232 45% 84%;
+    --deepseek-bg: 205 87% 94%;
+    --deepseek-text: 212 80% 42%;
+    --deepseek-border: 207 89% 86%;
+
+    --font-ui: "Nunito Sans", -apple-system, "Segoe UI", sans-serif;
+    --font-serif: Georgia, "Times New Roman", serif;
+    --font-mono: "Cascadia Mono", "Courier New", monospace;
+    --font-brand: "Lora", Georgia, "Times New Roman", serif;
+    font-family: var(--font-ui);
+  }
+
   .vesti-shell {
     font-family: var(--font-ui);
   }
@@ -152,9 +203,8 @@
   }
 
   .vesti-brand-wordmark {
-    font-family: var(--font-vesti-serif);
+    font-family: var(--font-brand);
     font-weight: 600;
-    letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
