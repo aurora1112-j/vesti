@@ -1,0 +1,9 @@
+{
+  "name": "vesti-monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "vesti-web",
+    "packages/*"
+  ]
+}
