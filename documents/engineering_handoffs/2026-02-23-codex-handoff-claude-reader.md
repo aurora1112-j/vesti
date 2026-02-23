@@ -115,3 +115,47 @@ For this task, primary focus is:
 4. `git diff -- frontend/src/contents/capsule-ui.ts frontend/src/contents/capsule-ui.tsx`
 5. `pnpm -C frontend build`
 
+## 11) Update (2026-02-23) — Reader UI alignment + compact pass
+
+Status: implemented, accepted in manual UI review, committed and pushed.
+
+### A) Commit and push record
+
+- Branch: `feature/ui-minimalist-sidebar-compare`
+- Commit: `af280bd`
+- Message: `feat(reader): align quote rendering and compact visual rhythm`
+- Pushed to: `origin/feature/ui-minimalist-sidebar-compare`
+
+### B) Scope delivered in this pass
+
+1. Reader P0/P1 alignment:
+   - Restored blockquote structural rendering in reader AST pipeline.
+   - Added attribution detection/rendering (`— Author`) without changing AST schema.
+   - Fixed language-label leakage handling in parser + reader-side sanitation path.
+   - Applied warm user text tone and corrected code/maths visual specs.
+2. Chinese typography reliability:
+   - Reader text flow now uses strict CJK-friendly line break policy.
+   - Reduced line-start punctuation artifacts in narrow sidepanel width.
+3. 92% compact mode (no font-size change):
+   - Proportional tightening of letter spacing, line height, paragraph spacing, and paddings.
+   - Reader header also compacted via dedicated reader classes.
+   - Collapse parameters scaled from `120/94/40` to `110/86/37`.
+
+### C) Primary files touched in the shipped commit
+
+- `frontend/src/lib/core/parser/shared/astExtractor.ts`
+- `frontend/src/sidepanel/components/AstMessageRenderer.tsx`
+- `frontend/src/sidepanel/components/MessageBubble.tsx`
+- `frontend/src/sidepanel/containers/ReaderView.tsx`
+- `frontend/src/style.css`
+
+### D) Verification run
+
+- Build gate executed:
+  - `pnpm -C frontend build`
+  - Result: success (`plasmo build`)
+
+### E) Current working tree state after push
+
+- Clean (no uncommitted local modifications at handoff update time).
+
