@@ -36,9 +36,14 @@ export type WeeklySemanticIssueCode =
   | "RECURRING_NOT_QUESTIONLIKE"
   | "EMPTY_VALID_SUGGESTED_FOCUS";
 
+const HARD_WEEKLY_SEMANTIC_ISSUES: ReadonlySet<WeeklySemanticIssueCode> =
+  new Set<WeeklySemanticIssueCode>(["LOW_SIGNAL_HIGHLIGHT"]);
+
 export interface WeeklySemanticQuality {
   passed: boolean;
   issueCodes: WeeklySemanticIssueCode[];
+  hardIssueCodes: WeeklySemanticIssueCode[];
+  warningIssueCodes: WeeklySemanticIssueCode[];
   highlightsCount: number;
   recurringCount: number;
   unresolvedCount: number;
@@ -284,6 +289,83 @@ function normalizeCrossDomainEchoes(
   return normalized;
 }
 
+function buildEvidenceBackedWeeklyHighlights(
+  evidence: Array<{
+    conversation_id: number;
+    note: string;
+  }>,
+  totalConversations: number
+): string[] {
+  const highSignalEvidence = evidence
+    .filter((item) => item.note && !isLowSignalNarrativeItem(item.note))
+    .slice(0, 2)
+    .map((item) => `会话 #${item.conversation_id} 提供了可复用线索：${item.note}`);
+
+  if (highSignalEvidence.length > 0) {
+    return dedupePreserveOrder(highSignalEvidence).slice(0, 2);
+  }
+
+  if (evidence.length > 0) {
+    const fallbackEvidence = evidence
+      .slice(0, 2)
+      .map(
+        (item) => `会话 #${item.conversation_id} 在本周形成了可继续验证的阶段性进展。`
+      );
+    return dedupePreserveOrder(fallbackEvidence).slice(0, 2);
+  }
+
+  if (totalConversations > 0) {
+    return [
+      `本周汇总了 ${totalConversations} 条结构化会话，已形成可继续验证的阶段性结论。`,
+    ];
+  }
+
+  return [DEFAULT_WEEKLY_HIGHLIGHT];
+}
+
+function buildEvidenceBackedSuggestedFocus(
+  unresolvedThreads: string[],
+  evidence: Array<{
+    conversation_id: number;
+    note: string;
+  }>,
+  highlights: string[],
+  totalConversations: number
+): string[] {
+  if (unresolvedThreads.length > 0) {
+    return dedupePreserveOrder(
+      unresolvedThreads
+        .slice(0, 2)
+        .map((item) =>
+          `围绕“${cleanItem(item, 120)}”设计一个可验证的小实验，并记录结果。`
+        )
+    ).slice(0, 2);
+  }
+
+  const evidenceDerived = evidence
+    .filter((item) => item.note && !isLowSignalNarrativeItem(item.note))
+    .slice(0, 2)
+    .map(
+      (item) =>
+        `基于会话 #${item.conversation_id} 的线索，补齐验证标准并推进一次小范围试验。`
+    );
+  if (evidenceDerived.length > 0) {
+    return dedupePreserveOrder(evidenceDerived).slice(0, 2);
+  }
+
+  if (highlights.length > 0) {
+    return [
+      `围绕“${cleanItem(highlights[0], 120)}”拆解关键假设，并给出下周可执行验证步骤。`,
+    ];
+  }
+
+  if (totalConversations > 0) {
+    return ["下周先选择 1 个本周高信号话题，补齐验证标准并记录结果。"];
+  }
+
+  return [DEFAULT_WEEKLY_SUGGESTED_FOCUS];
+}
+
 export function normalizeConversationSummary(input: {
   topic_title: string;
   key_takeaways: string[];
@@ -341,6 +423,25 @@ type ConversationSummaryStep = ConversationSummaryV2["thinking_journey"][number]
 type ConversationSummaryInsight = ConversationSummaryV2["key_insights"][number];
 
 function normalizeSpeaker(value: string): "User" | "AI" {
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "ai" ||
+    normalized === "assistant" ||
+    normalized === "model" ||
+    normalized === "bot" ||
+    normalized === "agent"
+  ) {
+    return "AI";
+  }
+  if (
+    normalized === "user" ||
+    normalized === "human" ||
+    normalized === "you" ||
+    normalized === "me" ||
+    normalized === "requester"
+  ) {
+    return "User";
+  }
   return value === "AI" ? "AI" : "User";
 }
 
@@ -388,6 +489,261 @@ function toInsightItemFromLine(line: string, index: number): ConversationSummary
     term: `洞察${index + 1}`,
     definition: cleaned,
   };
+}
+
+function splitNarrativeString(value: string): string[] {
+  const normalized = value
+    .replace(/\r/g, "\n")
+    .replace(/[；;]/g, "\n")
+    .replace(/\n?\s*[-*•·]+\s+/g, "\n")
+    .replace(/\n?\s*\d+[.)、]\s+/g, "\n");
+  return normalized
+    .split("\n")
+    .map((item) => cleanItem(item))
+    .filter((item) => item.length > 0);
+}
+
+function coerceNarrativeList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => cleanItem(String(item))).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return splitNarrativeString(value);
+  }
+  return [];
+}
+
+function coerceMetaObservations(value: unknown): {
+  thinking_style: string;
+  emotional_tone: string;
+  depth_level: "superficial" | "moderate" | "deep";
+} {
+  const rawValue =
+    Array.isArray(value) && value.length > 0
+      ? value.find((item) => item && typeof item === "object") ?? value[0]
+      : value;
+  const obj =
+    rawValue && typeof rawValue === "object"
+      ? (rawValue as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+
+  const rawDepth =
+    typeof obj.depth_level === "string" ? obj.depth_level.trim().toLowerCase() : "";
+  const depth_level: "superficial" | "moderate" | "deep" =
+    rawDepth === "superficial" || rawDepth === "moderate" || rawDepth === "deep"
+      ? rawDepth
+      : "moderate";
+
+  return {
+    thinking_style:
+      typeof obj.thinking_style === "string"
+        ? cleanMeta(obj.thinking_style)
+        : "You narrow the scope step by step.",
+    emotional_tone:
+      typeof obj.emotional_tone === "string"
+        ? cleanMeta(obj.emotional_tone)
+        : "The tone stays cautious and curious.",
+    depth_level,
+  };
+}
+
+function coerceThinkingJourney(
+  value: unknown
+): Array<{
+  step: number;
+  speaker: "User" | "AI";
+  assertion: string;
+  real_world_anchor: string | null;
+}> {
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => {
+        if (!item || typeof item !== "object") return null;
+        const record = item as Record<string, unknown>;
+        const assertion =
+          typeof record.assertion === "string"
+            ? cleanItem(record.assertion, MAX_ASSERTION_LENGTH)
+            : "";
+        if (!assertion) return null;
+        const rawSpeaker =
+          typeof record.speaker === "string" ? record.speaker : "User";
+        const rawStep =
+          typeof record.step === "number" && Number.isFinite(record.step)
+            ? Math.max(1, Math.floor(record.step))
+            : index + 1;
+        const anchor =
+          typeof record.real_world_anchor === "string"
+            ? cleanItem(record.real_world_anchor, MAX_ANCHOR_LENGTH)
+            : null;
+        return {
+          step: rawStep,
+          speaker: normalizeSpeaker(rawSpeaker),
+          assertion,
+          real_world_anchor: anchor || null,
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          step: number;
+          speaker: "User" | "AI";
+          assertion: string;
+          real_world_anchor: string | null;
+        } => item !== null
+      );
+  }
+
+  if (typeof value === "string") {
+    const lines = splitNarrativeString(value);
+    return lines.slice(0, 10).map((line, index) => ({
+      step: index + 1,
+      speaker: index % 2 === 0 ? "User" : "AI",
+      assertion: cleanItem(line, MAX_ASSERTION_LENGTH),
+      real_world_anchor: null,
+    }));
+  }
+
+  return [];
+}
+
+function coerceKeyInsights(
+  value: unknown
+): Array<{ term: string; definition: string }> {
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item, index) => {
+        if (typeof item === "string") {
+          return toInsightItemFromLine(item, index);
+        }
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          const term =
+            typeof record.term === "string"
+              ? cleanItem(record.term, MAX_TERM_LENGTH)
+              : "";
+          const definition =
+            typeof record.definition === "string"
+              ? cleanItem(record.definition, MAX_DEFINITION_LENGTH)
+              : "";
+          if (term && definition) {
+            return { term, definition };
+          }
+        }
+        return null;
+      })
+      .filter((item): item is { term: string; definition: string } => item !== null);
+    return items.slice(0, 8);
+  }
+
+  if (typeof value === "string") {
+    return splitNarrativeString(value)
+      .slice(0, 8)
+      .map((line, index) => toInsightItemFromLine(line, index));
+  }
+
+  return [];
+}
+
+function coerceConversationSummaryV2Candidate(value: unknown): unknown {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const source = value as Record<string, unknown>;
+  const candidate: Record<string, unknown> = { ...source };
+
+  candidate.core_question =
+    typeof source.core_question === "string"
+      ? source.core_question
+      : "What is the core question you are trying to answer?";
+
+  const hasLegacyJourney =
+    source.thinking_journey &&
+    typeof source.thinking_journey === "object" &&
+    !Array.isArray(source.thinking_journey);
+
+  if (hasLegacyJourney) {
+    candidate.thinking_journey = source.thinking_journey;
+  } else {
+    candidate.thinking_journey = coerceThinkingJourney(source.thinking_journey);
+  }
+
+  if (hasLegacyJourney) {
+    if (Array.isArray(source.key_insights)) {
+      candidate.key_insights = source.key_insights
+        .map((item) => {
+          if (typeof item === "string") {
+            return cleanItem(item);
+          }
+          if (item && typeof item === "object") {
+            const record = item as Record<string, unknown>;
+            const term =
+              typeof record.term === "string"
+                ? cleanItem(record.term, MAX_TERM_LENGTH)
+                : "";
+            const definition =
+              typeof record.definition === "string"
+                ? cleanItem(record.definition, MAX_DEFINITION_LENGTH)
+                : "";
+            if (term && definition) {
+              return cleanItem(`${term}: ${definition}`);
+            }
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .slice(0, 8);
+    } else if (typeof source.key_insights === "string") {
+      candidate.key_insights = splitNarrativeString(source.key_insights).slice(0, 8);
+    } else {
+      candidate.key_insights = [];
+    }
+  } else {
+    candidate.key_insights = coerceKeyInsights(source.key_insights);
+  }
+  candidate.unresolved_threads = coerceNarrativeList(source.unresolved_threads);
+  candidate.actionable_next_steps = coerceNarrativeList(
+    source.actionable_next_steps
+  );
+  candidate.meta_observations = coerceMetaObservations(source.meta_observations);
+
+  return candidate;
+}
+
+function mapSummaryV2IssueCode(path: string): string {
+  if (path === "root") {
+    return "SUMMARY_V2_SCHEMA_ROOT_INVALID";
+  }
+  if (path.startsWith("core_question")) {
+    return "SUMMARY_V2_CORE_QUESTION_INVALID";
+  }
+  if (path.startsWith("thinking_journey")) {
+    if (path.includes(".speaker")) {
+      return "SUMMARY_V2_SPEAKER_INVALID";
+    }
+    return "SUMMARY_V2_THINKING_JOURNEY_INVALID";
+  }
+  if (path.startsWith("key_insights")) {
+    return "SUMMARY_V2_KEY_INSIGHTS_INVALID";
+  }
+  if (
+    path.startsWith("unresolved_threads") ||
+    path.startsWith("actionable_next_steps")
+  ) {
+    return "SUMMARY_V2_LIST_FIELDS_INVALID";
+  }
+  if (path.startsWith("meta_observations.depth_level")) {
+    return "SUMMARY_V2_DEPTH_LEVEL_INVALID";
+  }
+  if (path.startsWith("meta_observations")) {
+    return "SUMMARY_V2_META_OBSERVATIONS_INVALID";
+  }
+  return "SUMMARY_V2_SCHEMA_MISMATCH";
+}
+
+function summarizeIssuePaths(errors: z.ZodError): string[] {
+  return errors.issues.map((issue) => issue.path.join(".") || "root");
 }
 
 export function normalizeConversationSummaryV2Legacy(
@@ -631,20 +987,31 @@ export function normalizeWeeklyLiteReport(input: {
     };
   }
 
+  const effectiveHighlights =
+    highlights.length > 0
+      ? highlights
+      : buildEvidenceBackedWeeklyHighlights(evidence, totalConversations);
+  const effectiveSuggestedFocus =
+    suggestedFocus.length > 0
+      ? suggestedFocus
+      : buildEvidenceBackedSuggestedFocus(
+          unresolvedThreads,
+          evidence,
+          effectiveHighlights,
+          totalConversations
+        );
+
   return {
     time_range: {
       start: input.time_range.start.trim(),
       end: input.time_range.end.trim(),
       total_conversations: totalConversations,
     },
-    highlights: highlights.length > 0 ? highlights : [DEFAULT_WEEKLY_HIGHLIGHT],
+    highlights: effectiveHighlights,
     recurring_questions: recurringQuestions,
     cross_domain_echoes: crossDomainEchoes,
     unresolved_threads: unresolvedThreads,
-    suggested_focus:
-      suggestedFocus.length > 0
-        ? suggestedFocus
-        : [DEFAULT_WEEKLY_SUGGESTED_FOCUS],
+    suggested_focus: effectiveSuggestedFocus,
     evidence,
     insufficient_data: insufficientData,
   };
@@ -657,6 +1024,8 @@ export function validateWeeklySemanticQuality(
     return {
       passed: true,
       issueCodes: [],
+      hardIssueCodes: [],
+      warningIssueCodes: [],
       highlightsCount: report.highlights.length,
       recurringCount: report.recurring_questions.length,
       unresolvedCount: report.unresolved_threads.length,
@@ -670,14 +1039,20 @@ export function validateWeeklySemanticQuality(
   const unresolved = normalizeList(report.unresolved_threads, 6);
   const suggested = normalizeList(report.suggested_focus, 6);
 
-  if (
+  const isEmptyValidHighlight =
     highlights.length === 0 ||
-    (highlights.length === 1 && highlights[0] === DEFAULT_WEEKLY_HIGHLIGHT)
-  ) {
+    (highlights.length === 1 && highlights[0] === DEFAULT_WEEKLY_HIGHLIGHT);
+
+  if (isEmptyValidHighlight) {
     issueCodes.add("EMPTY_VALID_HIGHLIGHTS");
   }
-  if (highlights.some((item) => isLowSignalNarrativeItem(item))) {
-    issueCodes.add("LOW_SIGNAL_HIGHLIGHT");
+  if (!isEmptyValidHighlight) {
+    const hasHighSignalHighlight = highlights.some(
+      (item) => !isLowSignalNarrativeItem(item)
+    );
+    if (!hasHighSignalHighlight) {
+      issueCodes.add("LOW_SIGNAL_HIGHLIGHT");
+    }
   }
 
   if (recurring.some((item) => isLowSignalNarrativeItem(item))) {
@@ -701,9 +1076,19 @@ export function validateWeeklySemanticQuality(
     issueCodes.add("EMPTY_VALID_SUGGESTED_FOCUS");
   }
 
+  const allIssueCodes = [...issueCodes];
+  const hardIssueCodes = allIssueCodes.filter((code) =>
+    HARD_WEEKLY_SEMANTIC_ISSUES.has(code)
+  );
+  const warningIssueCodes = allIssueCodes.filter(
+    (code) => !HARD_WEEKLY_SEMANTIC_ISSUES.has(code)
+  );
+
   return {
-    passed: issueCodes.size === 0,
-    issueCodes: [...issueCodes],
+    passed: hardIssueCodes.length === 0,
+    issueCodes: allIssueCodes,
+    hardIssueCodes,
+    warningIssueCodes,
     highlightsCount: highlights.length,
     recurringCount: recurring.length,
     unresolvedCount: unresolved.length,
@@ -738,6 +1123,7 @@ export function parseConversationSummaryV2Object(value: unknown): {
 } | {
   success: false;
   errors: string[];
+  errorCodes: string[];
 } {
   const parsedNew = summaryV2SchemaNew.safeParse(value);
   if (parsedNew.success) {
@@ -755,6 +1141,31 @@ export function parseConversationSummaryV2Object(value: unknown): {
     };
   }
 
+  const coercedCandidate = coerceConversationSummaryV2Candidate(value);
+  const parsedCoercedNew = summaryV2SchemaNew.safeParse(coercedCandidate);
+  if (parsedCoercedNew.success) {
+    return {
+      success: true,
+      data: normalizeConversationSummaryV2(parsedCoercedNew.data),
+    };
+  }
+
+  const parsedCoercedLegacy = summaryV2SchemaLegacy.safeParse(coercedCandidate);
+  if (parsedCoercedLegacy.success) {
+    return {
+      success: true,
+      data: normalizeConversationSummaryV2Legacy(parsedCoercedLegacy.data),
+    };
+  }
+
+  const issuePaths = [
+    ...summarizeIssuePaths(parsedNew.error),
+    ...summarizeIssuePaths(parsedLegacy.error),
+    ...summarizeIssuePaths(parsedCoercedNew.error),
+    ...summarizeIssuePaths(parsedCoercedLegacy.error),
+  ];
+  const errorCodes = [...new Set(issuePaths.map((path) => mapSummaryV2IssueCode(path)))];
+
   return {
     success: false,
     errors: [
@@ -764,7 +1175,14 @@ export function parseConversationSummaryV2Object(value: unknown): {
       ...parsedLegacy.error.issues.map(
         (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`
       ),
+      ...parsedCoercedNew.error.issues.map(
+        (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`
+      ),
+      ...parsedCoercedLegacy.error.issues.map(
+        (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`
+      ),
     ],
+    errorCodes,
   };
 }
 

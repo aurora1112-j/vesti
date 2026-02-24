@@ -12,6 +12,13 @@ import type {
   WeeklyReportRecord,
   WeeklyReportV1,
 } from "../types";
+import type {
+  InsightPipelineProgressPayload,
+  InsightPipelineRoute,
+  InsightPipelineScope,
+  InsightPipelineStage,
+  InsightPipelineStatus,
+} from "../messaging/protocol";
 import {
   getConversationById,
   getSummary,
@@ -41,10 +48,15 @@ import {
 } from "./insightSchemas";
 import type { WeeklySemanticIssueCode } from "./insightSchemas";
 import { logger } from "../utils/logger";
-import { getEffectiveModelId } from "./llmConfig";
+import { getEffectiveModelId, getLlmAccessMode } from "./llmConfig";
 
 const SUMMARY_MAX_CHARS = 12000;
 const WEEKLY_MAX_CHARS = 12000;
+const SUMMARY_PIPELINE_TIME_BUDGET_MS = 45000;
+const SUMMARY_COMPACTION_SKIP_MAX_MESSAGES = 14;
+const SUMMARY_COMPACTION_SKIP_MAX_CHARS = 3600;
+const SUMMARY_LOCAL_SYNTHESIS_MAX_JOURNEY = 6;
+const SUMMARY_LOCAL_SYNTHESIS_MAX_ITEMS = 4;
 const WEEKLY_DEFAULT_INPUT_LIMIT = 8;
 const WEEKLY_CANDIDATE_LIMIT = 10;
 const WEEKLY_AUTO_SUMMARY_MAX_ATTEMPTS = 4;
@@ -65,10 +77,12 @@ type WeeklySchemaVersion = "weekly_report.v1" | "weekly_lite.v1";
 type SummaryStructured = ConversationSummaryV1 | ConversationSummaryV2;
 type WeeklyStructured = WeeklyReportV1 | WeeklyLiteReportV1;
 type SummaryPath = "compacted" | "direct";
+type WeeklyRangeModeLog = "last_7_days" | "last_full_week" | "custom";
 
 interface ParseResult<T, TVersion extends string> {
   data: T | null;
   errors: string[];
+  parseErrorCodes?: string[];
   schemaVersion?: TVersion;
 }
 
@@ -101,10 +115,18 @@ interface StructuredGenerationResult<T, TVersion extends string> {
   weeklyInputMode?: "summary_v2_only";
   weeklySemanticGatePassed?: boolean;
   weeklySemanticIssueCodes?: WeeklySemanticIssueCode[];
+  weeklySemanticHardIssueCodes?: WeeklySemanticIssueCode[];
+  weeklySemanticWarningIssueCodes?: WeeklySemanticIssueCode[];
   weeklySemanticRepairAttempt?: number;
   weeklyDegradedToInsufficient?: boolean;
   weeklyHighlightsAfterFilter?: number;
   weeklyRecurringAfterFilter?: number;
+  summaryLocalSynthesisUsed?: boolean;
+  summaryJsonRecoveredFromReasoning?: boolean;
+  summaryLlmCallCount?: number;
+  summaryParseErrorCodes?: string[];
+  summaryCompactionSkipped?: boolean;
+  summaryTotalLatencyMs?: number;
 }
 
 interface PromptUsageLog {
@@ -136,10 +158,18 @@ interface PromptUsageLog {
   weeklyInputMode?: "summary_v2_only";
   weeklySemanticGatePassed?: boolean;
   weeklySemanticIssueCodes?: WeeklySemanticIssueCode[];
+  weeklySemanticHardIssueCodes?: WeeklySemanticIssueCode[];
+  weeklySemanticWarningIssueCodes?: WeeklySemanticIssueCode[];
   weeklySemanticRepairAttempt?: number;
   weeklyDegradedToInsufficient?: boolean;
   weeklyHighlightsAfterFilter?: number;
   weeklyRecurringAfterFilter?: number;
+  summaryLocalSynthesisUsed?: boolean;
+  summaryJsonRecoveredFromReasoning?: boolean;
+  summaryLlmCallCount?: number;
+  summaryParseErrorCodes?: string[];
+  summaryCompactionSkipped?: boolean;
+  summaryTotalLatencyMs?: number;
   latencyMs: number;
   success: boolean;
 }
@@ -152,6 +182,85 @@ interface SummaryDensityValidation {
   nextStepsCount: number;
   evidenceScore: number;
   errors: string[];
+}
+
+interface SummaryGenerationHooks {
+  onStage?: (stage: "distilling_core_logic" | "curating_summary") => void;
+}
+
+interface WeeklyGenerationHooks {
+  onStage?: (stage: "aggregating_weekly_digest") => void;
+}
+
+interface PipelineProgressEmitter {
+  emit: (
+    stage: InsightPipelineStage,
+    status: InsightPipelineStatus,
+    meta?: {
+      attempt?: number;
+      promptVersion?: string;
+    }
+  ) => void;
+}
+
+function resolvePipelineRoute(settings: LlmConfig): InsightPipelineRoute {
+  return getLlmAccessMode(settings) === "demo_proxy" ? "proxy" : "modelscope";
+}
+
+function createPipelineProgressEmitter(params: {
+  scope: InsightPipelineScope;
+  targetId: string;
+  route: InsightPipelineRoute;
+  modelId: string;
+  promptVersion: string;
+}): PipelineProgressEmitter {
+  const startedAt = Date.now();
+  const pipelineId = `${params.scope}:${params.targetId}:${startedAt.toString(36)}:${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  let seq = 0;
+
+  const send = (payload: InsightPipelineProgressPayload) => {
+    if (typeof chrome === "undefined" || !chrome?.runtime?.sendMessage) return;
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "INSIGHT_PIPELINE_PROGRESS",
+          payload,
+        },
+        () => {
+          void chrome.runtime.lastError;
+        }
+      );
+    } catch (error) {
+      logger.warn("service", "Failed to emit pipeline progress event", {
+        pipelineId: payload.pipelineId,
+        stage: payload.stage,
+        error: (error as Error).message || "UNKNOWN_ERROR",
+      });
+    }
+  };
+
+  return {
+    emit(stage, status, meta) {
+      seq += 1;
+      send({
+        pipelineId,
+        scope: params.scope,
+        targetId: params.targetId,
+        stage,
+        status,
+        attempt: meta?.attempt ?? 1,
+        startedAt,
+        updatedAt: Date.now(),
+        route: params.route,
+        modelId: params.modelId,
+        promptVersion: meta?.promptVersion ?? params.promptVersion,
+        seq,
+      });
+    },
+  };
 }
 
 function logPromptUsage(entry: PromptUsageLog): void {
@@ -384,15 +493,84 @@ function buildWeeklyPromptWithGuardedBudget(basePrompt: string, maxChars: number
   return `${guardHead}\n\n${clippedBody}\n\n${guardTail}`;
 }
 
+function getPreviousNaturalWeekRangeLocal(referenceDate = new Date()): {
+  rangeStart: number;
+  rangeEnd: number;
+} {
+  const cursor = new Date(referenceDate);
+  const localDay = cursor.getDay();
+  const daysSinceMonday = (localDay + 6) % 7;
+
+  const currentWeekMonday = new Date(cursor);
+  currentWeekMonday.setHours(0, 0, 0, 0);
+  currentWeekMonday.setDate(currentWeekMonday.getDate() - daysSinceMonday);
+
+  const previousWeekMonday = new Date(currentWeekMonday);
+  previousWeekMonday.setDate(previousWeekMonday.getDate() - 7);
+
+  const previousWeekSunday = new Date(previousWeekMonday);
+  previousWeekSunday.setDate(previousWeekSunday.getDate() + 6);
+  previousWeekSunday.setHours(23, 59, 59, 999);
+
+  return {
+    rangeStart: previousWeekMonday.getTime(),
+    rangeEnd: previousWeekSunday.getTime(),
+  };
+}
+
+function getLastSevenDaysRangeLocal(referenceDate = new Date()): {
+  rangeStart: number;
+  rangeEnd: number;
+} {
+  const end = new Date(referenceDate);
+  end.setHours(23, 59, 59, 999);
+
+  const start = new Date(end);
+  start.setDate(start.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+
+  return {
+    rangeStart: start.getTime(),
+    rangeEnd: end.getTime(),
+  };
+}
+
+function inferWeeklyRangeMode(
+  rangeStart: number,
+  rangeEnd: number,
+  referenceDate = new Date()
+): WeeklyRangeModeLog {
+  const last7 = getLastSevenDaysRangeLocal(referenceDate);
+  if (rangeStart === last7.rangeStart && rangeEnd === last7.rangeEnd) {
+    return "last_7_days";
+  }
+
+  const lastFullWeek = getPreviousNaturalWeekRangeLocal(referenceDate);
+  if (
+    rangeStart === lastFullWeek.rangeStart &&
+    rangeEnd === lastFullWeek.rangeEnd
+  ) {
+    return "last_full_week";
+  }
+
+  return "custom";
+}
+
 function buildWeeklySemanticRepairPrompt(
   report: WeeklyLiteReportV1,
   issueCodes: WeeklySemanticIssueCode[]
 ): string {
-  return `婵炴垶鎸搁澶婎焽閻楀牊浜ゆ繛鍡楅叄閸?weekly_lite.v1 JSON 缂傚倷鐒﹂幐濠氭倵椤栫偛鐭楁い鏍ㄧ渤閹烘鍑犻柟鏉垮缁€澶娒归敐鍛棥妞ゆ洏鍨虹粙濠冨緞鎼达紕鐛╅梻浣瑰絻缁诲绮径瀣秶闁绘劦鍓涢崹濂告煏閸℃鈧粙顢氶浣衡攳妞ゆ梻鈷堝Σ濠氭煕濮橆剟顎楃憸鎶婂嫭缍囬柟鎯у暱濮?JSON闂?
-闁荤姴娴傞崢铏圭不閻斿吋鈷掓い鏇楀亾妞わ絼绮欓弫?${issueCodes.map((code) => `- ${code}`).join("\n") || "- UNKNOWN_ISSUE"}
+  const issueBlock =
+    issueCodes.map((code) => `- ${code}`).join("\n") || "- UNKNOWN_ISSUE";
 
-婵烇絽娴傞崰鏍囬懠顒佸暫濞达絽婀卞﹢鎾煥?1) highlights/recurring_questions/unresolved_threads/suggested_focus 闂婎偄娲ら幊姗€濡磋箛娑樺強妞ゆ牗姘ㄩ弳姘舵煛娴ｈ缍戠憸鎷屽皺閹风娀鎳￠妶鍥у綃闂佸憡鐟ｉ崕鑽ゆ?2) recurring_questions 闂婎偄娲ら幊姗€濡磋箛娑樺強妞ゆ牜鍋為敍鏍涢悧鍩亪鎳滄导鏉戠畱濞撴艾锕︾粈澶愭煠閺夊灝顨欑紒妤€顦靛浼搭敍濮橆厼鈧娊鎮归崶褏校闁绘牭绲跨划鐢稿箻閸涱垰鑰?3) 婵炴垶鎸哥粔瀵告閸楃儐鍤曢柡鍥╁仜瀵娊寮堕崼鐔稿碍闁告瑥妫涢幏鐘虫媴閻熸壆銈︽繛鎴炴煥椤戝懘藝婵犳碍鍎嶉柛鏇ㄤ簽閻ㄦ垿鎮楅崷顓炲壋缂?4) 婵烇絽娲︾换鍐偓?weekly_lite.v1 schema 闁诲海鎳撻張顒勫汲閿濆鏅悗瑙勫數oss_domain_echoes 闂佸搫鍟版慨楣冩儊婢舵劕绠叉い鏃囧Г椤ρ囧级閳哄倹鐓ユ繛?[]闂?5) 闂佸吋鐪归崕鐗堢┍婵犲洤绠掓い鏍ㄧ懅閻熸繈鎮洪幒鏃戝姕缂佽鲸绻堝畷妤佹媴缁涘鏅犻梺鍛婂灥缁绘﹢濡村澶嬫櫖閻忕偠鍋愮粙鑽ょ磼閸屾瑧鍔嶆い鎺撶〒閹风姴顓奸崱鎰ㄥ亾閸涱喚鈻旈幖瀛樼箚绾偓闂佹椿鍠曢悞锕傛偩椤愶附鍋嬮柛銉ｅ劗閸?
-閻熸粎澧楅幐鍛婃櫠?JSON闂?${JSON.stringify(report)}`;
+  return `涓嬫柟 weekly_lite.v1 JSON 鍙互瑙ｆ瀽锛屼絾璇箟璐ㄩ噺鏈揪鏍囥€傝涓ユ牸淇鍚庝粎杈撳嚭涓€涓?JSON 瀵硅薄銆?
+闂鍒楄〃:
+${issueBlock}
+
+淇瑙勫垯:
+1) highlights / recurring_questions / unresolved_threads / suggested_focus 鐨勬瘡鏉￠兘蹇呴』鏄畬鏁村彲璇荤煭鍙ワ紝绂佹鍗曞瓧銆佽瘝妗╁拰绗﹀彿娈嬬墖銆?2) recurring_questions 搴旇鏄€滈棶棰樺彞鈥濓紝浼樺厛淇濈暀甯﹂棶鎰忔垨鎺㈢储鎰忓浘鐨勮〃杈俱€?3) 鎵€鏈?claim 蹇呴』鏉ヨ嚜鐜版湁璇佹嵁锛岀姝㈡柊澧炴棤渚濇嵁浜嬪疄銆?4) 淇濇寔 weekly_lite.v1 瀛楁瀹屾暣锛屼笉寰楁柊澧?鍒犻櫎瀛楁锛沜ross_domain_echoes 鏃犺瘉鎹椂浣跨敤 []銆?5) 鑻ヤ慨澶嶅悗浠嶆棤娉曚繚璇佽川閲忥紝璇蜂繚鎸?insufficient_data=true锛屽苟纭繚闄?highlights 澶栧叾浣欏垪琛ㄤ负绌恒€?
+褰撳墠 JSON:
+${JSON.stringify(report)}`;
 }
 
 function buildWeeklyInsufficientReport(
@@ -517,6 +695,7 @@ function parseSummaryFromRaw(raw: string): ParseResult<SummaryStructured, Summar
       return {
         data: v2.data,
         errors: [],
+        parseErrorCodes: [],
         schemaVersion: "conversation_summary.v2",
       };
     }
@@ -526,6 +705,7 @@ function parseSummaryFromRaw(raw: string): ParseResult<SummaryStructured, Summar
       return {
         data: v1.data,
         errors: [],
+        parseErrorCodes: v2.errorCodes,
         schemaVersion: "conversation_summary.v1",
       };
     }
@@ -533,11 +713,13 @@ function parseSummaryFromRaw(raw: string): ParseResult<SummaryStructured, Summar
     return {
       data: null,
       errors: [...v2.errors, ...v1.errors],
+      parseErrorCodes: [...new Set([...(v2.errorCodes || []), "SUMMARY_V1_SCHEMA_MISMATCH"])],
     };
   } catch (error) {
     return {
       data: null,
       errors: [(error as Error).message || "INVALID_JSON_PAYLOAD"],
+      parseErrorCodes: ["SUMMARY_JSON_PARSE_FAILED"],
     };
   }
 }
@@ -580,6 +762,8 @@ interface WeeklyGenerationStageResult {
   report: WeeklyLiteReportV1 | null;
   parseErrors: string[];
   issueCodes: WeeklySemanticIssueCode[];
+  hardIssueCodes: WeeklySemanticIssueCode[];
+  warningIssueCodes: WeeklySemanticIssueCode[];
   semanticPassed: boolean;
 }
 
@@ -591,6 +775,8 @@ function evaluateWeeklyStage(
       report: null,
       parseErrors: parsed.errors,
       issueCodes: [],
+      hardIssueCodes: [],
+      warningIssueCodes: [],
       semanticPassed: false,
     };
   }
@@ -600,6 +786,8 @@ function evaluateWeeklyStage(
       report: null,
       parseErrors: [...parsed.errors, "WEEKLY_SCHEMA_NOT_LITE"],
       issueCodes: [],
+      hardIssueCodes: [],
+      warningIssueCodes: [],
       semanticPassed: false,
     };
   }
@@ -610,6 +798,8 @@ function evaluateWeeklyStage(
     report,
     parseErrors: parsed.errors,
     issueCodes: quality.issueCodes,
+    hardIssueCodes: quality.hardIssueCodes,
+    warningIssueCodes: quality.warningIssueCodes,
     semanticPassed: quality.passed,
   };
 }
@@ -642,13 +832,25 @@ function getWeeklySemanticScore(report: WeeklyLiteReportV1): number {
 interface CompactionExecution {
   used: boolean;
   failed: boolean;
+  skipped: boolean;
   content: string;
   charsIn: number;
   charsOut: number;
+  llmCallCount: number;
 }
 
 function countInputChars(messages: Message[]): number {
   return messages.reduce((sum, message) => sum + message.content_text.length, 0);
+}
+
+function shouldSkipSummaryCompaction(
+  conversation: Conversation,
+  messages: Message[]
+): boolean {
+  if (conversation.message_count <= SUMMARY_COMPACTION_SKIP_MAX_MESSAGES) {
+    return true;
+  }
+  return countInputChars(messages) <= SUMMARY_COMPACTION_SKIP_MAX_CHARS;
 }
 
 function buildSummaryPromptFromCompaction(
@@ -668,8 +870,13 @@ Constraints:
 1) Output JSON object only.
 2) Do not introduce facts absent from the compacted skeleton.
 3) If evidence is missing for a field, use [] or null.
-4) unresolved_threads and actionable_next_steps must be complete phrases, not fragments.
-5) When evidence is sufficient, target 2-4 items for unresolved_threads and actionable_next_steps; when sparse, 1 item or [] is acceptable.`;
+4) thinking_journey assertion must be 2-3 complete sentences per step.
+5) Each assertion should include: why this step appears now + what it opens next.
+6) real_world_anchor must be plain-language and understandable by non-technical readers.
+7) Keep [User]/[AI] speaker ownership aligned with the compacted skeleton.
+8) meta_observations should use natural user-facing phrases, not technical labels.
+9) unresolved_threads and actionable_next_steps must be complete phrases, not fragments.
+10) When evidence is sufficient, target 2-4 items for unresolved_threads and actionable_next_steps; when sparse, 1 item or [] is acceptable.`;
 }
 
 async function runCompaction(
@@ -723,9 +930,11 @@ async function runCompaction(
     return {
       used: true,
       failed: false,
+      skipped: false,
       content,
       charsIn,
       charsOut,
+      llmCallCount: 1,
     };
   } catch (error) {
     const reason = (error as Error).message || "COMPACTION_FAILED";
@@ -748,9 +957,11 @@ async function runCompaction(
     return {
       used: false,
       failed: true,
+      skipped: false,
       content: "",
       charsIn,
       charsOut: 0,
+      llmCallCount: 1,
     };
   }
 }
@@ -1020,17 +1231,218 @@ function buildWeeklySparseHighlight(substantiveCount: number): string {
   return `Only ${substantiveCount} valid structured conversations are available this week, so cross-topic aggregation is skipped.`;
 }
 
+function dedupeNarrativeItems(values: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(normalized);
+  }
+  return output;
+}
+
+function normalizeSynthesisLine(value: string, maxChars = 320): string {
+  return sanitizeSummaryText(value)
+    .replace(/\s+/g, " ")
+    .replace(/^\s*[-*+]+\s*/, "")
+    .trim()
+    .slice(0, maxChars);
+}
+
+function splitSynthesisLines(raw: string): string[] {
+  const normalized = sanitizeSummaryText(raw)
+    .replace(/<think>[\s\S]*?<\/think>/gi, " ")
+    .replace(/\r/g, "\n")
+    .replace(/[;]+/g, "\n")
+    .replace(/\n?\s*[-*+]+\s+/g, "\n")
+    .replace(/\n?\s*\d+[.)]\s+/g, "\n");
+  return dedupeNarrativeItems(
+    normalized
+      .split(/\n+/)
+      .map((line) => normalizeSynthesisLine(line))
+      .filter((line) => line.length >= 12 && !/^[\[\]{}":,]+$/.test(line))
+  );
+}
+function buildJourneySeedsFromMessages(messages: Message[]): Array<{
+  speaker: "User" | "AI";
+  assertion: string;
+}> {
+  return messages
+    .map((message) => ({
+      speaker: message.role === "ai" ? "AI" : "User",
+      assertion: normalizeSynthesisLine(message.content_text, 500),
+    }))
+    .filter((item) => item.assertion.length > 0);
+}
+
+function synthesizeDegradedSummaryV2FromRaw(params: {
+  conversation: Conversation;
+  messages: Message[];
+  rawCandidates: string[];
+}): ConversationSummaryV2 | null {
+  const rawLines = dedupeNarrativeItems(
+    params.rawCandidates.flatMap((raw) => splitSynthesisLines(raw))
+  );
+  const messageSeeds = buildJourneySeedsFromMessages(params.messages);
+
+  const candidateLines = dedupeNarrativeItems([
+    ...rawLines,
+    ...messageSeeds.map((item) => item.assertion),
+  ]);
+
+  if (candidateLines.length === 0) {
+    return null;
+  }
+
+  const coreQuestionSource =
+    messageSeeds.find((item) => item.speaker === "User")?.assertion ||
+    normalizeSynthesisLine(params.conversation.title, 160) ||
+    candidateLines[0];
+  const coreQuestion = coreQuestionSource.slice(0, 180);
+
+  const journey: ConversationSummaryV2["thinking_journey"] = [];
+  const seenJourney = new Set<string>();
+  const pushJourney = (speaker: "User" | "AI", assertion: string) => {
+    const normalized = normalizeSynthesisLine(assertion, 500);
+    if (!normalized) return;
+    const key = `${speaker}:${normalized.toLowerCase()}`;
+    if (seenJourney.has(key)) return;
+    seenJourney.add(key);
+    journey.push({
+      step: journey.length + 1,
+      speaker,
+      assertion: normalized,
+      real_world_anchor: null,
+    });
+  };
+
+  for (const seed of messageSeeds) {
+    pushJourney(seed.speaker, seed.assertion);
+    if (journey.length >= SUMMARY_LOCAL_SYNTHESIS_MAX_JOURNEY) {
+      break;
+    }
+  }
+  for (const line of candidateLines) {
+    if (journey.length >= SUMMARY_LOCAL_SYNTHESIS_MAX_JOURNEY) {
+      break;
+    }
+    const speaker = journey.length % 2 === 0 ? "User" : "AI";
+    pushJourney(speaker, line);
+  }
+
+  if (journey.length < 2) {
+    pushJourney("User", coreQuestion);
+    pushJourney("AI", candidateLines[1] || candidateLines[0] || coreQuestion);
+  }
+  if (journey.length < 2) {
+    return null;
+  }
+
+  const keyInsights: ConversationSummaryV2["key_insights"] = dedupeNarrativeItems(
+    candidateLines
+  )
+    .slice(0, SUMMARY_LOCAL_SYNTHESIS_MAX_ITEMS)
+    .map((line, index) => {
+      const split = line.match(/^(.*?)\s*:\s*(.+)$/);
+      if (split) {
+        return {
+          term: normalizeSynthesisLine(split[1], 120) || `Insight ${index + 1}`,
+          definition: normalizeSynthesisLine(split[2], 320) || line,
+        };
+      }
+      return {
+        term: `Insight ${index + 1}`,
+        definition: normalizeSynthesisLine(line, 320),
+      };
+    })
+    .filter((item) => item.definition.length > 0);
+
+  const unresolved = dedupeNarrativeItems(
+    candidateLines.filter((line) =>
+      /(unresolved|pending|unknown|open|unclear|tension|tradeoff|constraint|risk|question|issue)/i.test(
+        line
+      )
+    )
+  )
+    .slice(0, SUMMARY_LOCAL_SYNTHESIS_MAX_ITEMS)
+    .map((line) => normalizeSynthesisLine(line, 280));
+  const unresolvedThreads =
+    unresolved.length > 0
+      ? unresolved
+      : [normalizeSynthesisLine(`Still unresolved: ${candidateLines[0]}`, 280)];
+
+  const nextSteps = dedupeNarrativeItems(
+    candidateLines.filter((line) =>
+      /(next|step|todo|follow-up|should|plan|validate|action|implement|improve|fix)/i.test(
+        line
+      )
+    )
+  )
+    .slice(0, SUMMARY_LOCAL_SYNTHESIS_MAX_ITEMS)
+    .map((line) => normalizeSynthesisLine(line, 280));
+  const actionableNextSteps =
+    nextSteps.length > 0
+      ? nextSteps
+      : unresolvedThreads
+          .slice(0, SUMMARY_LOCAL_SYNTHESIS_MAX_ITEMS)
+          .map((item) => normalizeSynthesisLine(`Validate and close: ${item}`, 280));
+
+  const synthesized: ConversationSummaryV2 = {
+    core_question: coreQuestion || "What is the core question you are trying to answer?",
+    thinking_journey: journey.slice(0, SUMMARY_LOCAL_SYNTHESIS_MAX_JOURNEY),
+    key_insights:
+      keyInsights.length > 0
+        ? keyInsights
+        : [{ term: "Insight 1", definition: normalizeSynthesisLine(candidateLines[0], 320) }],
+    unresolved_threads: unresolvedThreads,
+    meta_observations: {
+      thinking_style: "You iteratively narrow hypotheses and test assumptions step by step.",
+      emotional_tone: "The tone stays analytical and cautious while probing constraints.",
+      depth_level: "moderate",
+    },
+    actionable_next_steps: actionableNextSteps,
+  };
+
+  const parsed = parseConversationSummaryV2Object(synthesized);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  return null;
+}
+
 async function generateStructuredSummary(
   settings: LlmConfig,
   conversation: Conversation,
-  messages: Message[]
+  messages: Message[],
+  hooks?: SummaryGenerationHooks
 ): Promise<
   StructuredGenerationResult<SummaryStructured, SummarySchemaVersion>
 > {
+  const summaryStartedAt = Date.now();
   const prompt = getPrompt("conversationSummary", { variant: "current" });
-  const compaction = await runCompaction(settings, conversation, messages);
-  const summaryPath: SummaryPath = compaction.used ? "compacted" : "direct";
   const dedupeErrors = (errors: string[]): string[] => [...new Set(errors)];
+  const parseErrorCodes = new Set<string>();
+
+  hooks?.onStage?.("distilling_core_logic");
+  const compactionSkipped = shouldSkipSummaryCompaction(conversation, messages);
+  const compaction = compactionSkipped
+    ? {
+        used: false,
+        failed: false,
+        skipped: true,
+        content: "",
+        charsIn: countInputChars(messages),
+        charsOut: 0,
+        llmCallCount: 0,
+      }
+    : await runCompaction(settings, conversation, messages);
+  const summaryPath: SummaryPath = compaction.used ? "compacted" : "direct";
+  let summaryLlmCallCount = compaction.llmCallCount;
+  let summaryJsonRecoveredFromReasoning = false;
 
   const payload = {
     conversationTitle: conversation.title,
@@ -1043,17 +1455,25 @@ async function generateStructuredSummary(
   const summaryPromptInput = compaction.used
     ? buildSummaryPromptFromCompaction(conversation, compaction.content)
     : prompt.userTemplate(payload);
+  hooks?.onStage?.("curating_summary");
+
+  const callStructuredInference = async (inputPrompt: string) => {
+    summaryLlmCallCount += 1;
+    const result = await callInference(settings, inputPrompt, {
+      responseFormat: "json_object",
+      systemPrompt: prompt.system,
+    });
+    if (result.contentSource === "reasoning_content") {
+      summaryJsonRecoveredFromReasoning = true;
+    }
+    return result;
+  };
 
   const firstAttemptStartedAt = Date.now();
-  const primaryPrompt = truncateForContext(
-    summaryPromptInput,
-    SUMMARY_MAX_CHARS
-  );
-  const first = await callInference(settings, primaryPrompt, {
-    responseFormat: "json_object",
-    systemPrompt: prompt.system,
-  });
+  const primaryPrompt = truncateForContext(summaryPromptInput, SUMMARY_MAX_CHARS);
+  const first = await callStructuredInference(primaryPrompt);
   const firstParsed = parseSummaryFromRaw(first.content);
+  (firstParsed.parseErrorCodes || []).forEach((code) => parseErrorCodes.add(code));
   const firstDensity = validateSummaryDensity(
     firstParsed.data,
     firstParsed.schemaVersion,
@@ -1086,6 +1506,12 @@ async function generateStructuredSummary(
     unresolvedCount: firstDensity.unresolvedCount,
     nextStepsCount: firstDensity.nextStepsCount,
     evidenceScore: firstDensity.evidenceScore,
+    summaryLocalSynthesisUsed: false,
+    summaryJsonRecoveredFromReasoning,
+    summaryLlmCallCount,
+    summaryParseErrorCodes: [...parseErrorCodes],
+    summaryCompactionSkipped: compaction.skipped,
+    summaryTotalLatencyMs: Date.now() - summaryStartedAt,
     latencyMs: Date.now() - firstAttemptStartedAt,
     success: !!firstParsed.data && firstDensity.passed,
   });
@@ -1114,6 +1540,12 @@ async function generateStructuredSummary(
       unresolvedCount: firstDensity.unresolvedCount,
       nextStepsCount: firstDensity.nextStepsCount,
       evidenceScore: firstDensity.evidenceScore,
+      summaryLocalSynthesisUsed: false,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
     };
   }
 
@@ -1126,53 +1558,104 @@ async function generateStructuredSummary(
       ? buildSummaryDensityRepairPrompt(firstParsed.data, firstDensity)
       : buildRepairPrompt("summary", first.content, firstValidationErrors);
 
-  const secondAttemptStartedAt = Date.now();
-  const repairPrompt = truncateForContext(
-    secondPromptInput,
-    SUMMARY_MAX_CHARS
-  );
-  const second = await callInference(settings, repairPrompt, {
-    responseFormat: "json_object",
-    systemPrompt: prompt.system,
-  });
-  const secondParsed = parseSummaryFromRaw(second.content);
-  const secondDensity = validateSummaryDensity(
-    secondParsed.data,
-    secondParsed.schemaVersion,
-    messages.length
-  );
-  const secondValidationErrors = dedupeErrors([
-    ...secondParsed.errors,
-    ...secondDensity.errors,
-  ]);
+  let second: Awaited<ReturnType<typeof callInference>> | null = null;
+  let secondParsed: ParseResult<SummaryStructured, SummarySchemaVersion> = {
+    data: null,
+    errors: [],
+    parseErrorCodes: [],
+  };
+  let secondDensity = createDefaultDensityValidation();
+  let secondValidationErrors: string[] = [];
 
-  logPromptUsage({
-    promptType: "conversationSummary",
-    promptVersion: prompt.version,
-    mode: second.mode,
-    attempt: 2,
-    validationErrors: secondValidationErrors,
-    schemaVersion: secondParsed.schemaVersion,
-    inputCount: messages.length,
-    route: second.route,
-    fallbackStage:
-      secondParsed.data && secondDensity.passed ? "none" : "fallback_text",
-    compactionUsed: compaction.used,
-    compactionFailed: compaction.failed,
-    compactionCharsIn: compaction.charsIn,
-    compactionCharsOut: compaction.charsOut,
-    summaryPath,
-    densityGateTriggered:
-      firstDensity.triggered || secondDensity.triggered,
-    densityGatePassed: secondDensity.passed,
-    densityGateDegraded:
-      !!secondParsed.data && !!secondParsed.schemaVersion && !secondDensity.passed,
-    unresolvedCount: secondDensity.unresolvedCount,
-    nextStepsCount: secondDensity.nextStepsCount,
-    evidenceScore: secondDensity.evidenceScore,
-    latencyMs: Date.now() - secondAttemptStartedAt,
-    success: !!secondParsed.data && secondDensity.passed,
-  });
+  const timeElapsedBeforeSecond = Date.now() - summaryStartedAt;
+  const shouldRunSecondAttempt = timeElapsedBeforeSecond < SUMMARY_PIPELINE_TIME_BUDGET_MS;
+
+  if (shouldRunSecondAttempt) {
+    const secondAttemptStartedAt = Date.now();
+    const repairPrompt = truncateForContext(secondPromptInput, SUMMARY_MAX_CHARS);
+    second = await callStructuredInference(repairPrompt);
+    secondParsed = parseSummaryFromRaw(second.content);
+    (secondParsed.parseErrorCodes || []).forEach((code) => parseErrorCodes.add(code));
+    secondDensity = validateSummaryDensity(
+      secondParsed.data,
+      secondParsed.schemaVersion,
+      messages.length
+    );
+    secondValidationErrors = dedupeErrors([
+      ...secondParsed.errors,
+      ...secondDensity.errors,
+    ]);
+
+    logPromptUsage({
+      promptType: "conversationSummary",
+      promptVersion: prompt.version,
+      mode: second.mode,
+      attempt: 2,
+      validationErrors: secondValidationErrors,
+      schemaVersion: secondParsed.schemaVersion,
+      inputCount: messages.length,
+      route: second.route,
+      fallbackStage:
+        secondParsed.data && secondDensity.passed ? "none" : "repair_json",
+      compactionUsed: compaction.used,
+      compactionFailed: compaction.failed,
+      compactionCharsIn: compaction.charsIn,
+      compactionCharsOut: compaction.charsOut,
+      summaryPath,
+      densityGateTriggered:
+        firstDensity.triggered || secondDensity.triggered,
+      densityGatePassed: secondDensity.passed,
+      densityGateDegraded:
+        !!secondParsed.data && !!secondParsed.schemaVersion && !secondDensity.passed,
+      unresolvedCount: secondDensity.unresolvedCount,
+      nextStepsCount: secondDensity.nextStepsCount,
+      evidenceScore: secondDensity.evidenceScore,
+      summaryLocalSynthesisUsed: false,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
+      latencyMs: Date.now() - secondAttemptStartedAt,
+      success: !!secondParsed.data && secondDensity.passed,
+    });
+  } else {
+    parseErrorCodes.add("SUMMARY_TIME_BUDGET_EXCEEDED");
+    secondValidationErrors = dedupeErrors([
+      ...firstValidationErrors,
+      "SUMMARY_TIME_BUDGET_EXCEEDED",
+    ]);
+    logPromptUsage({
+      promptType: "conversationSummary",
+      promptVersion: prompt.version,
+      mode: first.mode,
+      attempt: 2,
+      validationErrors: secondValidationErrors,
+      schemaVersion: firstParsed.schemaVersion,
+      inputCount: messages.length,
+      route: first.route,
+      fallbackStage: "repair_json",
+      compactionUsed: compaction.used,
+      compactionFailed: compaction.failed,
+      compactionCharsIn: compaction.charsIn,
+      compactionCharsOut: compaction.charsOut,
+      summaryPath,
+      densityGateTriggered: firstDensity.triggered,
+      densityGatePassed: false,
+      densityGateDegraded: false,
+      unresolvedCount: firstDensity.unresolvedCount,
+      nextStepsCount: firstDensity.nextStepsCount,
+      evidenceScore: firstDensity.evidenceScore,
+      summaryLocalSynthesisUsed: false,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
+      latencyMs: 0,
+      success: false,
+    });
+  }
 
   if (secondParsed.data && secondParsed.schemaVersion && secondDensity.passed) {
     return {
@@ -1198,6 +1681,12 @@ async function generateStructuredSummary(
       unresolvedCount: secondDensity.unresolvedCount,
       nextStepsCount: secondDensity.nextStepsCount,
       evidenceScore: secondDensity.evidenceScore,
+      summaryLocalSynthesisUsed: false,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
     };
   }
 
@@ -1267,32 +1756,115 @@ async function generateStructuredSummary(
       unresolvedCount: selectedDensity.unresolvedCount,
       nextStepsCount: selectedDensity.nextStepsCount,
       evidenceScore: selectedDensity.evidenceScore,
+      summaryLocalSynthesisUsed: false,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
     };
   }
 
-  const fallbackStartedAt = Date.now();
-  const fallbackPrompt = truncateForContext(
-    prompt.fallbackTemplate(payload),
-    SUMMARY_MAX_CHARS
-  );
-  const fallbackResponse = await callInference(settings, fallbackPrompt, {
-    systemPrompt: prompt.fallbackSystem ?? prompt.system,
+  const synthesized = synthesizeDegradedSummaryV2FromRaw({
+    conversation,
+    messages,
+    rawCandidates: [
+      first.content,
+      second?.content || "",
+    ],
   });
-  const fallbackContent =
-    sanitizeSummaryText(fallbackResponse.content) ||
-    "Summary generation failed. Please retry.";
+
+  if (synthesized) {
+    const synthDensity = validateSummaryDensity(
+      synthesized,
+      "conversation_summary.v2",
+      messages.length
+    );
+    const synthValidationErrors = dedupeErrors([
+      ...firstValidationErrors,
+      ...secondValidationErrors,
+      "SUMMARY_LOCAL_SYNTHESIS_USED",
+    ]);
+
+    logPromptUsage({
+      promptType: "conversationSummary",
+      promptVersion: prompt.version,
+      mode: second?.mode ?? first.mode,
+      attempt: second ? 2 : 1,
+      validationErrors: synthValidationErrors,
+      schemaVersion: "conversation_summary.v2",
+      inputCount: messages.length,
+      route: second?.route ?? first.route,
+      fallbackStage: "repair_json",
+      compactionUsed: compaction.used,
+      compactionFailed: compaction.failed,
+      compactionCharsIn: compaction.charsIn,
+      compactionCharsOut: compaction.charsOut,
+      summaryPath,
+      densityGateTriggered: firstDensity.triggered || secondDensity.triggered,
+      densityGatePassed: synthDensity.passed,
+      densityGateDegraded: true,
+      unresolvedCount: synthDensity.unresolvedCount,
+      nextStepsCount: synthDensity.nextStepsCount,
+      evidenceScore: synthDensity.evidenceScore,
+      summaryLocalSynthesisUsed: true,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
+      latencyMs: 0,
+      success: true,
+    });
+
+    return {
+      promptType: "conversationSummary",
+      promptVersion: prompt.version,
+      structured: synthesized,
+      content: renderSummaryText(synthesized, "conversation_summary.v2"),
+      format: "structured_v1",
+      status: "ok",
+      schemaVersion: "conversation_summary.v2",
+      mode: second?.mode ?? first.mode,
+      attempt: second ? 2 : 1,
+      validationErrors: synthValidationErrors,
+      fallbackStage: "repair_json",
+      compactionUsed: compaction.used,
+      compactionFailed: compaction.failed,
+      compactionCharsIn: compaction.charsIn,
+      compactionCharsOut: compaction.charsOut,
+      summaryPath,
+      densityGateTriggered: firstDensity.triggered || secondDensity.triggered,
+      densityGatePassed: synthDensity.passed,
+      densityGateDegraded: true,
+      unresolvedCount: synthDensity.unresolvedCount,
+      nextStepsCount: synthDensity.nextStepsCount,
+      evidenceScore: synthDensity.evidenceScore,
+      summaryLocalSynthesisUsed: true,
+      summaryJsonRecoveredFromReasoning,
+      summaryLlmCallCount,
+      summaryParseErrorCodes: [...parseErrorCodes],
+      summaryCompactionSkipped: compaction.skipped,
+      summaryTotalLatencyMs: Date.now() - summaryStartedAt,
+    };
+  }
+
+  const fallbackContent = sanitizeSummaryText(second?.content || first.content);
+  const terminalValidationErrors = dedupeErrors([
+    ...firstValidationErrors,
+    ...secondValidationErrors,
+    "SUMMARY_NO_STRUCTURED_OUTPUT",
+  ]);
+  parseErrorCodes.add("SUMMARY_NO_STRUCTURED_OUTPUT");
 
   logPromptUsage({
     promptType: "conversationSummary",
     promptVersion: prompt.version,
     mode: "fallback_text",
-    attempt: 3,
-    validationErrors: dedupeErrors([
-      ...firstValidationErrors,
-      ...secondValidationErrors,
-    ]),
+    attempt: second ? 3 : 2,
+    validationErrors: terminalValidationErrors,
     inputCount: messages.length,
-    route: fallbackResponse.route,
+    route: second?.route ?? first.route,
     fallbackStage: "fallback_text",
     compactionUsed: compaction.used,
     compactionFailed: compaction.failed,
@@ -1314,7 +1886,13 @@ async function generateStructuredSummary(
       firstDensity.evidenceScore,
       secondDensity.evidenceScore
     ),
-    latencyMs: Date.now() - fallbackStartedAt,
+    summaryLocalSynthesisUsed: false,
+    summaryJsonRecoveredFromReasoning,
+    summaryLlmCallCount,
+    summaryParseErrorCodes: [...parseErrorCodes],
+    summaryCompactionSkipped: compaction.skipped,
+    summaryTotalLatencyMs: Date.now() - summaryStartedAt,
+    latencyMs: 0,
     format: "fallback_plain_text",
     status: "fallback",
     success: false,
@@ -1324,15 +1902,12 @@ async function generateStructuredSummary(
     promptType: "conversationSummary",
     promptVersion: prompt.version,
     structured: null,
-    content: fallbackContent,
+    content: fallbackContent || "Summary generation failed. Please retry.",
     format: "fallback_plain_text",
     status: "fallback",
     mode: "fallback_text",
-    attempt: 3,
-    validationErrors: dedupeErrors([
-      ...firstValidationErrors,
-      ...secondValidationErrors,
-    ]),
+    attempt: second ? 3 : 2,
+    validationErrors: terminalValidationErrors,
     fallbackStage: "fallback_text",
     compactionUsed: compaction.used,
     compactionFailed: compaction.failed,
@@ -1354,6 +1929,12 @@ async function generateStructuredSummary(
       firstDensity.evidenceScore,
       secondDensity.evidenceScore
     ),
+    summaryLocalSynthesisUsed: false,
+    summaryJsonRecoveredFromReasoning,
+    summaryLlmCallCount,
+    summaryParseErrorCodes: [...parseErrorCodes],
+    summaryCompactionSkipped: compaction.skipped,
+    summaryTotalLatencyMs: Date.now() - summaryStartedAt,
   };
 }
 
@@ -1361,13 +1942,19 @@ async function generateStructuredWeekly(
   settings: LlmConfig,
   conversations: Conversation[],
   rangeStart: number,
-  rangeEnd: number
+  rangeEnd: number,
+  hooks?: WeeklyGenerationHooks
 ): Promise<StructuredGenerationResult<WeeklyStructured, WeeklySchemaVersion>> {
+  hooks?.onStage?.("aggregating_weekly_digest");
   const prompt = getPrompt("weeklyDigest", { variant: "current" });
   const weeklyInputMode: "summary_v2_only" = "summary_v2_only";
+  const weeklyRangeMode = inferWeeklyRangeMode(rangeStart, rangeEnd);
   const dedupeErrors = (errors: string[]): string[] => [...new Set(errors)];
   const buildStageValidationErrors = (stage: WeeklyGenerationStageResult): string[] =>
-    dedupeErrors([...stage.parseErrors, ...toWeeklySemanticErrors(stage.issueCodes)]);
+    dedupeErrors([
+      ...stage.parseErrors,
+      ...toWeeklySemanticErrors(stage.hardIssueCodes),
+    ]);
 
   if (conversations.length === 0) {
     const emptyReport = buildWeeklyInsufficientReport(
@@ -1395,6 +1982,8 @@ async function generateStructuredWeekly(
       weeklyInputMode,
       weeklySemanticGatePassed: true,
       weeklySemanticIssueCodes: [],
+      weeklySemanticHardIssueCodes: [],
+      weeklySemanticWarningIssueCodes: [],
       weeklySemanticRepairAttempt: 0,
       weeklyDegradedToInsufficient: false,
       weeklyHighlightsAfterFilter: emptyReport.highlights.length,
@@ -1420,6 +2009,7 @@ async function generateStructuredWeekly(
   logger.info("service", "Weekly input assembled", {
     candidateCount: conversations.length,
     selectedConversationCount: weeklyInput.selectedConversations.length,
+    weekly_range_mode: weeklyRangeMode,
     weekly_sub3_triggered: sub3Triggered,
     weekly_substantive_count: weeklyInput.substantiveCount,
     weekly_structured_count: weeklyInput.structuredCount,
@@ -1452,6 +2042,8 @@ async function generateStructuredWeekly(
       weeklyInputMode,
       weeklySemanticGatePassed: true,
       weeklySemanticIssueCodes: [],
+      weeklySemanticHardIssueCodes: [],
+      weeklySemanticWarningIssueCodes: [],
       weeklySemanticRepairAttempt: 0,
       weeklyDegradedToInsufficient: false,
       weeklyHighlightsAfterFilter: sparseReport.highlights.length,
@@ -1478,6 +2070,8 @@ async function generateStructuredWeekly(
       weeklyInputMode,
       weeklySemanticGatePassed: true,
       weeklySemanticIssueCodes: [],
+      weeklySemanticHardIssueCodes: [],
+      weeklySemanticWarningIssueCodes: [],
       weeklySemanticRepairAttempt: 0,
       weeklyDegradedToInsufficient: false,
       weeklyHighlightsAfterFilter: sparseReport.highlights.length,
@@ -1489,16 +2083,22 @@ async function generateStructuredWeekly(
   let bestMode: GenerationMode = "prompt_json";
   let bestAttempt = 1;
   let bestIssueCodes: WeeklySemanticIssueCode[] = [];
+  let bestHardIssueCodes: WeeklySemanticIssueCode[] = [];
+  let bestWarningIssueCodes: WeeklySemanticIssueCode[] = [];
 
   let latestRaw = "";
   let latestStage: WeeklyGenerationStageResult = {
     report: null,
     parseErrors: [],
     issueCodes: [],
+    hardIssueCodes: [],
+    warningIssueCodes: [],
     semanticPassed: false,
   };
   let latestValidationErrors: string[] = [];
   let latestIssueCodes: WeeklySemanticIssueCode[] = [];
+  let latestHardIssueCodes: WeeklySemanticIssueCode[] = [];
+  let latestWarningIssueCodes: WeeklySemanticIssueCode[] = [];
   let latestMode: GenerationMode = "prompt_json";
   let semanticRepairAttempt = 0;
 
@@ -1519,6 +2119,8 @@ async function generateStructuredWeekly(
   latestStage = firstStage;
   latestValidationErrors = firstValidationErrors;
   latestIssueCodes = firstStage.issueCodes;
+  latestHardIssueCodes = firstStage.hardIssueCodes;
+  latestWarningIssueCodes = firstStage.warningIssueCodes;
   latestMode = first.mode;
 
   if (firstStage.report) {
@@ -1526,6 +2128,8 @@ async function generateStructuredWeekly(
     bestMode = first.mode;
     bestAttempt = 1;
     bestIssueCodes = firstStage.issueCodes;
+    bestHardIssueCodes = firstStage.hardIssueCodes;
+    bestWarningIssueCodes = firstStage.warningIssueCodes;
   }
 
   logPromptUsage({
@@ -1544,6 +2148,8 @@ async function generateStructuredWeekly(
     weeklyInputMode,
     weeklySemanticGatePassed: firstStage.semanticPassed,
     weeklySemanticIssueCodes: firstStage.issueCodes,
+    weeklySemanticHardIssueCodes: firstStage.hardIssueCodes,
+    weeklySemanticWarningIssueCodes: firstStage.warningIssueCodes,
     weeklySemanticRepairAttempt: 0,
     weeklyDegradedToInsufficient: false,
     weeklyHighlightsAfterFilter: firstStage.report?.highlights.length ?? 0,
@@ -1570,7 +2176,9 @@ async function generateStructuredWeekly(
       weeklyStructuredCount: weeklyInput.structuredCount,
       weeklyInputMode,
       weeklySemanticGatePassed: true,
-      weeklySemanticIssueCodes: [],
+      weeklySemanticIssueCodes: firstStage.issueCodes,
+      weeklySemanticHardIssueCodes: firstStage.hardIssueCodes,
+      weeklySemanticWarningIssueCodes: firstStage.warningIssueCodes,
       weeklySemanticRepairAttempt: 0,
       weeklyDegradedToInsufficient: false,
       weeklyHighlightsAfterFilter: firstStage.report.highlights.length,
@@ -1587,7 +2195,7 @@ async function generateStructuredWeekly(
     const attempt = repairRound + 1;
     const repairStartedAt = Date.now();
     const useSemanticRepair =
-      !!latestStage.report && latestStage.issueCodes.length > 0;
+      !!latestStage.report && latestStage.hardIssueCodes.length > 0;
     const repairPromptInput = useSemanticRepair
       ? buildWeeklySemanticRepairPrompt(latestStage.report!, latestStage.issueCodes)
       : buildRepairPrompt("weekly", latestRaw, latestValidationErrors);
@@ -1607,6 +2215,8 @@ async function generateStructuredWeekly(
     latestStage = repairedStage;
     latestValidationErrors = repairedValidationErrors;
     latestIssueCodes = repairedStage.issueCodes;
+    latestHardIssueCodes = repairedStage.hardIssueCodes;
+    latestWarningIssueCodes = repairedStage.warningIssueCodes;
     latestMode = repaired.mode;
 
     if (repairedStage.report) {
@@ -1617,6 +2227,8 @@ async function generateStructuredWeekly(
         bestMode = repaired.mode;
         bestAttempt = attempt;
         bestIssueCodes = repairedStage.issueCodes;
+        bestHardIssueCodes = repairedStage.hardIssueCodes;
+        bestWarningIssueCodes = repairedStage.warningIssueCodes;
       }
     }
 
@@ -1636,6 +2248,8 @@ async function generateStructuredWeekly(
       weeklyInputMode,
       weeklySemanticGatePassed: repairedStage.semanticPassed,
       weeklySemanticIssueCodes: repairedStage.issueCodes,
+      weeklySemanticHardIssueCodes: repairedStage.hardIssueCodes,
+      weeklySemanticWarningIssueCodes: repairedStage.warningIssueCodes,
       weeklySemanticRepairAttempt: repairRound,
       weeklyDegradedToInsufficient: false,
       weeklyHighlightsAfterFilter: repairedStage.report?.highlights.length ?? 0,
@@ -1663,7 +2277,9 @@ async function generateStructuredWeekly(
         weeklyStructuredCount: weeklyInput.structuredCount,
         weeklyInputMode,
         weeklySemanticGatePassed: true,
-        weeklySemanticIssueCodes: [],
+        weeklySemanticIssueCodes: repairedStage.issueCodes,
+        weeklySemanticHardIssueCodes: repairedStage.hardIssueCodes,
+        weeklySemanticWarningIssueCodes: repairedStage.warningIssueCodes,
         weeklySemanticRepairAttempt: repairRound,
         weeklyDegradedToInsufficient: false,
         weeklyHighlightsAfterFilter: repairedStage.report.highlights.length,
@@ -1686,9 +2302,15 @@ async function generateStructuredWeekly(
   const degradedIssueCodes = latestIssueCodes.length
     ? latestIssueCodes
     : bestIssueCodes;
+  const degradedHardIssueCodes = latestHardIssueCodes.length
+    ? latestHardIssueCodes
+    : bestHardIssueCodes;
+  const degradedWarningIssueCodes = latestWarningIssueCodes.length
+    ? latestWarningIssueCodes
+    : bestWarningIssueCodes;
   const degradedValidationErrors = dedupeErrors([
     ...latestValidationErrors,
-    ...toWeeklySemanticErrors(degradedIssueCodes),
+    ...toWeeklySemanticErrors(degradedHardIssueCodes),
     "WEEKLY_SEMANTIC_GATE_DEGRADED_TO_INSUFFICIENT",
   ]);
 
@@ -1707,6 +2329,8 @@ async function generateStructuredWeekly(
     weeklyInputMode,
     weeklySemanticGatePassed: false,
     weeklySemanticIssueCodes: degradedIssueCodes,
+    weeklySemanticHardIssueCodes: degradedHardIssueCodes,
+    weeklySemanticWarningIssueCodes: degradedWarningIssueCodes,
     weeklySemanticRepairAttempt: semanticRepairAttempt,
     weeklyDegradedToInsufficient: true,
     weeklyHighlightsAfterFilter: degradedReport.highlights.length,
@@ -1735,6 +2359,8 @@ async function generateStructuredWeekly(
     weeklyInputMode,
     weeklySemanticGatePassed: false,
     weeklySemanticIssueCodes: degradedIssueCodes,
+    weeklySemanticHardIssueCodes: degradedHardIssueCodes,
+    weeklySemanticWarningIssueCodes: degradedWarningIssueCodes,
     weeklySemanticRepairAttempt: semanticRepairAttempt,
     weeklyDegradedToInsufficient: true,
     weeklyHighlightsAfterFilter: degradedReport.highlights.length,
@@ -1756,52 +2382,99 @@ export async function generateConversationSummary(
     throw new Error("CONVERSATION_MESSAGES_EMPTY");
   }
 
-  const previous = await getSummary(conversationId);
-  const generated = await generateStructuredSummary(settings, conversation, messages);
-
-  logger.info("service", "Summary generation result", {
-    promptType: generated.promptType,
-    promptVersion: generated.promptVersion,
-    schemaVersion: generated.schemaVersion,
-    mode: generated.mode,
-    attempt: generated.attempt,
-    validationErrors: generated.validationErrors,
-    format: generated.format,
-    status: generated.status,
-    fallbackStage: generated.fallbackStage ?? "none",
-    compactionUsed: generated.compactionUsed ?? false,
-    compactionFailed: generated.compactionFailed ?? false,
-    compactionCharsIn: generated.compactionCharsIn ?? 0,
-    compactionCharsOut: generated.compactionCharsOut ?? 0,
-    summaryPath: generated.summaryPath ?? "direct",
-    density_gate_triggered: generated.densityGateTriggered ?? false,
-    density_gate_passed: generated.densityGatePassed ?? true,
-    density_gate_degraded: generated.densityGateDegraded ?? false,
-    unresolved_count: generated.unresolvedCount ?? 0,
-    next_steps_count: generated.nextStepsCount ?? 0,
-    evidence_score: generated.evidenceScore ?? 0,
+  const pipelineEmitter = createPipelineProgressEmitter({
+    scope: "summary",
+    targetId: String(conversationId),
+    route: resolvePipelineRoute(settings),
+    modelId: getEffectiveModelId(settings),
+    promptVersion: getPrompt("conversationSummary", { variant: "current" }).version,
   });
+  pipelineEmitter.emit("initiating_pipeline", "in_progress");
 
-  if (previous?.status === "fallback" && generated.status === "fallback") {
-    logger.warn("service", "Summary hit consecutive fallback", {
-      conversationId,
+  try {
+    const previous = await getSummary(conversationId);
+    const generated = await generateStructuredSummary(settings, conversation, messages, {
+      onStage: (stage) => {
+        pipelineEmitter.emit(stage, "in_progress");
+      },
+    });
+    pipelineEmitter.emit("persisting_result", "in_progress", {
+      attempt: generated.attempt,
+      promptVersion: generated.promptVersion,
+    });
+
+    logger.info("service", "Summary generation result", {
+      promptType: generated.promptType,
       promptVersion: generated.promptVersion,
       schemaVersion: generated.schemaVersion,
+      mode: generated.mode,
+      attempt: generated.attempt,
       validationErrors: generated.validationErrors,
+      format: generated.format,
+      status: generated.status,
+      fallbackStage: generated.fallbackStage ?? "none",
+      compactionUsed: generated.compactionUsed ?? false,
+      compactionFailed: generated.compactionFailed ?? false,
+      compactionCharsIn: generated.compactionCharsIn ?? 0,
+      compactionCharsOut: generated.compactionCharsOut ?? 0,
+      summaryPath: generated.summaryPath ?? "direct",
+      density_gate_triggered: generated.densityGateTriggered ?? false,
+      density_gate_passed: generated.densityGatePassed ?? true,
+      density_gate_degraded: generated.densityGateDegraded ?? false,
+      unresolved_count: generated.unresolvedCount ?? 0,
+      next_steps_count: generated.nextStepsCount ?? 0,
+      evidence_score: generated.evidenceScore ?? 0,
+      summary_json_recovered_from_reasoning:
+        generated.summaryJsonRecoveredFromReasoning ?? false,
+      summary_local_synthesis_used: generated.summaryLocalSynthesisUsed ?? false,
+      summary_llm_call_count: generated.summaryLlmCallCount ?? 0,
+      summary_parse_error_codes: generated.summaryParseErrorCodes ?? [],
+      summary_compaction_skipped: generated.summaryCompactionSkipped ?? false,
+      summary_total_latency_ms: generated.summaryTotalLatencyMs ?? 0,
     });
-  }
 
-  return saveSummary({
-    conversationId: conversation.id,
-    content: generated.content,
-    structured: generated.structured,
-    format: generated.format,
-    status: generated.status,
-    schemaVersion: generated.schemaVersion,
-    modelId: getEffectiveModelId(settings),
-    createdAt: Date.now(),
-    sourceUpdatedAt: conversation.updated_at,
-  });
+    if (previous?.status === "fallback" && generated.status === "fallback") {
+      logger.warn("service", "Summary hit consecutive fallback", {
+        conversationId,
+        promptVersion: generated.promptVersion,
+        schemaVersion: generated.schemaVersion,
+        validationErrors: generated.validationErrors,
+        summary_parse_error_codes: generated.summaryParseErrorCodes ?? [],
+        summary_llm_call_count: generated.summaryLlmCallCount ?? 0,
+        summary_json_recovered_from_reasoning:
+          generated.summaryJsonRecoveredFromReasoning ?? false,
+      });
+    }
+
+    const saved = await saveSummary({
+      conversationId: conversation.id,
+      content: generated.content,
+      structured: generated.structured,
+      format: generated.format,
+      status: generated.status,
+      schemaVersion: generated.schemaVersion,
+      modelId: getEffectiveModelId(settings),
+      createdAt: Date.now(),
+      sourceUpdatedAt: conversation.updated_at,
+    });
+
+    if (generated.status === "fallback") {
+      pipelineEmitter.emit("degraded_fallback", "degraded_fallback", {
+        attempt: generated.attempt,
+        promptVersion: generated.promptVersion,
+      });
+    } else {
+      pipelineEmitter.emit("completed", "completed", {
+        attempt: generated.attempt,
+        promptVersion: generated.promptVersion,
+      });
+    }
+
+    return saved;
+  } catch (error) {
+    pipelineEmitter.emit("degraded_fallback", "degraded_fallback");
+    throw error;
+  }
 }
 
 export async function generateWeeklyReport(
@@ -1809,61 +2482,107 @@ export async function generateWeeklyReport(
   rangeStart: number,
   rangeEnd: number
 ): Promise<WeeklyReportRecord> {
-  const conversations = await listConversationsByRange(rangeStart, rangeEnd);
-  const sourceHash = buildWeeklySourceHash(conversations, rangeStart, rangeEnd);
-  const previous = await getWeeklyReport(rangeStart, rangeEnd);
-
-  const generated = await generateStructuredWeekly(
-    settings,
-    conversations,
-    rangeStart,
-    rangeEnd
-  );
-
-  logger.info("service", "Weekly generation result", {
-    promptType: generated.promptType,
-    promptVersion: generated.promptVersion,
-    schemaVersion: generated.schemaVersion,
-    mode: generated.mode,
-    attempt: generated.attempt,
-    validationErrors: generated.validationErrors,
-    format: generated.format,
-    status: generated.status,
-    fallbackStage: generated.fallbackStage ?? "none",
-    weekly_sub3_triggered: generated.weeklySub3Triggered ?? false,
-    weekly_substantive_count: generated.weeklySubstantiveCount ?? 0,
-    weekly_structured_count: generated.weeklyStructuredCount ?? 0,
-    weekly_auto_summary_mode: "full_compaction",
-    weekly_input_mode: generated.weeklyInputMode ?? "summary_v2_only",
-    weekly_semantic_gate_passed: generated.weeklySemanticGatePassed ?? true,
-    weekly_semantic_issue_codes: generated.weeklySemanticIssueCodes ?? [],
-    weekly_semantic_repair_attempt: generated.weeklySemanticRepairAttempt ?? 0,
-    weekly_degraded_to_insufficient:
-      generated.weeklyDegradedToInsufficient ?? false,
-    weekly_highlights_after_filter: generated.weeklyHighlightsAfterFilter ?? 0,
-    weekly_recurring_after_filter: generated.weeklyRecurringAfterFilter ?? 0,
+  const targetId = `${rangeStart}:${rangeEnd}`;
+  const pipelineEmitter = createPipelineProgressEmitter({
+    scope: "weekly",
+    targetId,
+    route: resolvePipelineRoute(settings),
+    modelId: getEffectiveModelId(settings),
+    promptVersion: getPrompt("weeklyDigest", { variant: "current" }).version,
   });
+  pipelineEmitter.emit("initiating_pipeline", "in_progress");
 
-  if (previous?.status === "fallback" && generated.status === "fallback") {
-    logger.warn("service", "Weekly report hit consecutive fallback", {
+  try {
+    const conversations = await listConversationsByRange(rangeStart, rangeEnd);
+    const sourceHash = buildWeeklySourceHash(conversations, rangeStart, rangeEnd);
+    const previous = await getWeeklyReport(rangeStart, rangeEnd);
+
+    const generated = await generateStructuredWeekly(
+      settings,
+      conversations,
       rangeStart,
       rangeEnd,
+      {
+        onStage: (stage) => {
+          pipelineEmitter.emit(stage, "in_progress");
+        },
+      }
+    );
+    const weeklyRangeMode = inferWeeklyRangeMode(rangeStart, rangeEnd);
+    pipelineEmitter.emit("persisting_result", "in_progress", {
+      attempt: generated.attempt,
+      promptVersion: generated.promptVersion,
+    });
+
+    logger.info("service", "Weekly generation result", {
+      promptType: generated.promptType,
       promptVersion: generated.promptVersion,
       schemaVersion: generated.schemaVersion,
+      mode: generated.mode,
+      attempt: generated.attempt,
       validationErrors: generated.validationErrors,
+      format: generated.format,
+      status: generated.status,
+      fallbackStage: generated.fallbackStage ?? "none",
+      weekly_range_mode: weeklyRangeMode,
+      weekly_sub3_triggered: generated.weeklySub3Triggered ?? false,
+      weekly_substantive_count: generated.weeklySubstantiveCount ?? 0,
+      weekly_structured_count: generated.weeklyStructuredCount ?? 0,
+      weekly_auto_summary_mode: "full_compaction",
+      weekly_input_mode: generated.weeklyInputMode ?? "summary_v2_only",
+      weekly_semantic_gate_passed: generated.weeklySemanticGatePassed ?? true,
+      weekly_semantic_issue_codes: generated.weeklySemanticIssueCodes ?? [],
+      weekly_semantic_hard_issue_codes:
+        generated.weeklySemanticHardIssueCodes ?? [],
+      weekly_semantic_warning_issue_codes:
+        generated.weeklySemanticWarningIssueCodes ?? [],
+      weekly_semantic_repair_attempt: generated.weeklySemanticRepairAttempt ?? 0,
+      weekly_degraded_to_insufficient:
+        generated.weeklyDegradedToInsufficient ?? false,
+      weekly_highlights_after_filter: generated.weeklyHighlightsAfterFilter ?? 0,
+      weekly_recurring_after_filter: generated.weeklyRecurringAfterFilter ?? 0,
     });
-  }
 
-  return saveWeeklyReport({
-    rangeStart,
-    rangeEnd,
-    content: generated.content,
-    structured: generated.structured,
-    format: generated.format,
-    status: generated.status,
-    schemaVersion: generated.schemaVersion,
-    modelId: getEffectiveModelId(settings),
-    createdAt: Date.now(),
-    sourceHash,
-  });
+    if (previous?.status === "fallback" && generated.status === "fallback") {
+      logger.warn("service", "Weekly report hit consecutive fallback", {
+        rangeStart,
+        rangeEnd,
+        promptVersion: generated.promptVersion,
+        schemaVersion: generated.schemaVersion,
+        validationErrors: generated.validationErrors,
+      });
+    }
+
+    const saved = await saveWeeklyReport({
+      rangeStart,
+      rangeEnd,
+      content: generated.content,
+      structured: generated.structured,
+      format: generated.format,
+      status: generated.status,
+      schemaVersion: generated.schemaVersion,
+      modelId: getEffectiveModelId(settings),
+      createdAt: Date.now(),
+      sourceHash,
+    });
+
+    if (generated.status === "fallback") {
+      pipelineEmitter.emit("degraded_fallback", "degraded_fallback", {
+        attempt: generated.attempt,
+        promptVersion: generated.promptVersion,
+      });
+    } else {
+      pipelineEmitter.emit("completed", "completed", {
+        attempt: generated.attempt,
+        promptVersion: generated.promptVersion,
+      });
+    }
+
+    return saved;
+  } catch (error) {
+    pipelineEmitter.emit("degraded_fallback", "degraded_fallback");
+    throw error;
+  }
 }
+
+
