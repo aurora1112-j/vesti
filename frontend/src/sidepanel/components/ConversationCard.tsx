@@ -410,7 +410,7 @@ export function ConversationCard({
                   <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-44 max-h-64 overflow-y-auto">
                 <DropdownMenuItem
                   onClick={(event) => {
                     event.stopPropagation();
