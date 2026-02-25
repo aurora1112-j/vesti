@@ -76,3 +76,29 @@ export interface Note {
   updated_at: number;
   tags: string[];
 }
+
+export interface ChatSummaryData {
+  meta: {
+    title: string;
+    generated_at: string;
+    tags: string[];
+    fallback: boolean;
+    range_label?: string;
+  };
+  core_question: string;
+  thinking_journey: Array<{
+    step: number;
+    speaker: "User" | "AI";
+    assertion: string;
+    real_world_anchor: string | null;
+  }>;
+  key_insights: Array<{ term: string; definition: string }>;
+  unresolved_threads: string[];
+  meta_observations: {
+    thinking_style: string;
+    emotional_tone: string;
+    depth_level: "superficial" | "moderate" | "deep";
+  };
+  actionable_next_steps: string[];
+  plain_text?: string;
+}

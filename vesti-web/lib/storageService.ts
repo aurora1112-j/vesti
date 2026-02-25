@@ -2,10 +2,12 @@ import type {
   Conversation,
   GardenerResult,
   Message,
+  Note,
   Platform,
   RelatedConversation,
   RagResponse,
   Topic,
+  ChatSummaryData,
 } from './types';
 
 type ConversationFilters = {
@@ -87,6 +89,41 @@ type RequestMessage =
       payload: { conversationId: number };
     }
   | {
+      type: 'GET_NOTES';
+      target?: 'offscreen';
+      requestId?: string;
+    }
+  | {
+      type: 'CREATE_NOTE';
+      target?: 'offscreen';
+      requestId?: string;
+      payload: { title: string; content: string; linked_conversation_ids: number[] };
+    }
+  | {
+      type: 'UPDATE_NOTE';
+      target?: 'offscreen';
+      requestId?: string;
+      payload: { id: number; changes: { title?: string; content?: string } };
+    }
+  | {
+      type: 'DELETE_NOTE';
+      target?: 'offscreen';
+      requestId?: string;
+      payload: { id: number };
+    }
+  | {
+      type: 'GET_CONVERSATION_SUMMARY';
+      target?: 'offscreen';
+      requestId?: string;
+      payload: { conversationId: number };
+    }
+  | {
+      type: 'GENERATE_CONVERSATION_SUMMARY';
+      target?: 'offscreen';
+      requestId?: string;
+      payload: { conversationId: number };
+    }
+  | {
       type: 'DELETE_CONVERSATION';
       target?: 'offscreen';
       requestId?: string;
@@ -112,9 +149,158 @@ type ResponseDataMap = {
   REMOVE_FOLDER_TAG: { updated: number };
   ASK_KNOWLEDGE_BASE: RagResponse;
   GET_MESSAGES: Message[];
+  GET_NOTES: Note[];
+  CREATE_NOTE: { note: Note };
+  UPDATE_NOTE: { note: Note };
+  DELETE_NOTE: { deleted: boolean };
+  GET_CONVERSATION_SUMMARY: ChatSummaryData | null;
+  GENERATE_CONVERSATION_SUMMARY: ChatSummaryData;
   DELETE_CONVERSATION: { deleted: boolean };
   UPDATE_CONVERSATION_TITLE: { updated: boolean; conversation: Conversation };
 };
+
+type ConversationSummaryV2Payload = {
+  core_question: string;
+  thinking_journey: Array<{
+    step: number;
+    speaker: "User" | "AI";
+    assertion: string;
+    real_world_anchor: string | null;
+  }>;
+  key_insights: Array<{
+    term: string;
+    definition: string;
+  }>;
+  unresolved_threads: string[];
+  meta_observations: {
+    thinking_style: string;
+    emotional_tone: string;
+    depth_level: "superficial" | "moderate" | "deep";
+  };
+  actionable_next_steps: string[];
+};
+
+type SummaryRecordPayload = {
+  content: string;
+  structured?: ConversationSummaryV2Payload | null;
+  status?: "ok" | "fallback";
+  createdAt: number;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const normalizeSpeaker = (value: unknown): "User" | "AI" =>
+  value === "User" || value === "AI" ? value : "AI";
+
+const normalizeDepthLevel = (
+  value: unknown
+): "superficial" | "moderate" | "deep" => {
+  if (value === "superficial" || value === "moderate" || value === "deep") {
+    return value;
+  }
+  return "moderate";
+};
+
+const isConversationSummaryV2 = (
+  value: unknown
+): value is ConversationSummaryV2Payload => {
+  if (!isRecord(value)) return false;
+  if (typeof value.core_question !== "string") return false;
+  if (!Array.isArray(value.thinking_journey)) return false;
+  if (!Array.isArray(value.key_insights)) return false;
+  if (!Array.isArray(value.unresolved_threads)) return false;
+  if (!isRecord(value.meta_observations)) return false;
+  if (!Array.isArray(value.actionable_next_steps)) return false;
+  return true;
+};
+
+function toChatSummaryData(
+  record: SummaryRecordPayload | null
+): ChatSummaryData | null {
+  if (!record) return null;
+  const generatedAt =
+    typeof record.createdAt === "number"
+      ? new Date(record.createdAt).toISOString()
+      : new Date().toISOString();
+  const fallbackText = typeof record.content === "string" ? record.content.trim() : "";
+  const fallbackTitle = fallbackText.split("\n")[0] || "Summary";
+
+  if (!isConversationSummaryV2(record.structured)) {
+    return {
+      meta: {
+        title: fallbackTitle,
+        generated_at: generatedAt,
+        tags: [],
+        fallback: true,
+      },
+      core_question: fallbackText || "Summary",
+      thinking_journey: [],
+      key_insights: [],
+      unresolved_threads: [],
+      meta_observations: {
+        thinking_style: "",
+        emotional_tone: "",
+        depth_level: "moderate",
+      },
+      actionable_next_steps: [],
+      plain_text: fallbackText,
+    };
+  }
+
+  const structured = record.structured;
+  const journey = structured.thinking_journey
+    .filter((item) => isRecord(item))
+    .map((item, index) => ({
+      step: typeof item.step === "number" ? item.step : index + 1,
+      speaker: normalizeSpeaker(item.speaker),
+      assertion: typeof item.assertion === "string" ? item.assertion : "",
+      real_world_anchor:
+        typeof item.real_world_anchor === "string" || item.real_world_anchor === null
+          ? item.real_world_anchor
+          : null,
+    }))
+    .filter((item) => item.assertion.length > 0);
+
+  const insights = structured.key_insights
+    .filter((item) => isRecord(item))
+    .map((item) => ({
+      term: typeof item.term === "string" ? item.term : "",
+      definition: typeof item.definition === "string" ? item.definition : "",
+    }))
+    .filter((item) => item.term.length > 0 || item.definition.length > 0);
+
+  const unresolved = structured.unresolved_threads.filter(
+    (item): item is string => typeof item === "string"
+  );
+  const nextSteps = structured.actionable_next_steps.filter(
+    (item): item is string => typeof item === "string"
+  );
+
+  return {
+    meta: {
+      title: structured.core_question || fallbackTitle,
+      generated_at: generatedAt,
+      tags: [],
+      fallback: record.status === "fallback",
+    },
+    core_question: structured.core_question,
+    thinking_journey: journey,
+    key_insights: insights,
+    unresolved_threads: unresolved,
+    meta_observations: {
+      thinking_style:
+        structured.meta_observations?.thinking_style ??
+        "",
+      emotional_tone:
+        structured.meta_observations?.emotional_tone ??
+        "",
+      depth_level: normalizeDepthLevel(structured.meta_observations?.depth_level),
+    },
+    actionable_next_steps: nextSteps,
+    plain_text: fallbackText,
+  };
+}
 
 type ResponseMessage<T extends keyof ResponseDataMap = keyof ResponseDataMap> =
   | {
@@ -367,4 +553,69 @@ export async function updateConversationTitle(
   }
 
   return result.conversation;
+}
+
+export async function getNotes(): Promise<Note[]> {
+  const data = (await sendRequest({
+    type: 'GET_NOTES',
+    target: 'offscreen',
+  })) as Note[];
+  return data.map((note) => ({ ...note, tags: note.tags ?? [] }));
+}
+
+export async function saveNote(
+  data: Omit<Note, 'id' | 'created_at' | 'updated_at'>
+): Promise<Note> {
+  const result = (await sendRequest({
+    type: 'CREATE_NOTE',
+    target: 'offscreen',
+    payload: data,
+  })) as { note: Note };
+  return { ...result.note, tags: result.note.tags ?? [] };
+}
+
+export async function updateNote(
+  id: number,
+  changes: { title?: string; content?: string }
+): Promise<Note> {
+  const result = (await sendRequest({
+    type: 'UPDATE_NOTE',
+    target: 'offscreen',
+    payload: { id, changes },
+  })) as { note: Note };
+  return { ...result.note, tags: result.note.tags ?? [] };
+}
+
+export async function deleteNote(id: number): Promise<void> {
+  await sendRequest({
+    type: 'DELETE_NOTE',
+    target: 'offscreen',
+    payload: { id },
+  });
+}
+
+export async function getSummary(
+  conversationId: number
+): Promise<ChatSummaryData | null> {
+  const raw = (await sendRequest({
+    type: 'GET_CONVERSATION_SUMMARY',
+    target: 'offscreen',
+    payload: { conversationId },
+  }, LONG_RUNNING_TIMEOUT_MS)) as unknown as SummaryRecordPayload | null;
+  return toChatSummaryData(raw);
+}
+
+export async function generateSummary(
+  conversationId: number
+): Promise<ChatSummaryData> {
+  const raw = (await sendRequest({
+    type: 'GENERATE_CONVERSATION_SUMMARY',
+    target: 'offscreen',
+    payload: { conversationId },
+  }, LONG_RUNNING_TIMEOUT_MS)) as unknown as SummaryRecordPayload;
+  const data = toChatSummaryData(raw);
+  if (!data) {
+    throw new Error('SUMMARY_GENERATION_FAILED');
+  }
+  return data;
 }

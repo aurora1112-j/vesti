@@ -27,6 +27,14 @@ export interface VectorRecord {
   text_hash: string;
   embedding: Float32Array;
 }
+export interface NoteRecord {
+  id?: number;
+  title: string;
+  content: string;
+  created_at: number;
+  updated_at: number;
+  linked_conversation_ids: number[];
+}
 
 export class MemoryHubDB extends Dexie {
   conversations!: Table<ConversationRecord, number>;
@@ -35,6 +43,7 @@ export class MemoryHubDB extends Dexie {
   weekly_reports!: Table<WeeklyReportRecordRecord, number>;
   topics!: Table<TopicRecord, number>;
   vectors!: Table<VectorRecord, number>;
+  notes!: Dexie.Table<NoteRecord, number>;
 
   constructor() {
     super("MemoryHubDB");
@@ -181,6 +190,20 @@ export class MemoryHubDB extends Dexie {
         topics:
           "++id, parent_id, name, created_at, updated_at, [parent_id+name]",
         vectors: "++id, conversation_id, text_hash",
+      })
+      .upgrade(() => undefined);
+    this.version(8)
+      .stores({
+        conversations:
+          "++id, platform, title, created_at, updated_at, uuid, source_created_at, turn_count, topic_id, is_starred, [platform+created_at], [platform+uuid], [topic_id+updated_at]",
+        messages:
+          "++id, conversation_id, role, created_at, [conversation_id+created_at]",
+        summaries: "++id, conversationId, createdAt",
+        weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
+        topics:
+          "++id, parent_id, name, created_at, updated_at, [parent_id+name]",
+        vectors: "++id, conversation_id, text_hash",
+        notes: "++id, created_at, updated_at",
       })
       .upgrade(() => undefined);
   }

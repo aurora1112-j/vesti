@@ -1,4 +1,18 @@
-<<<<<<< Updated upstream
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/lora/400.css";
+@import "@fontsource/lora/600.css";
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/500.css";
+@import "@fontsource/newsreader/600.css";
+@import "@fontsource/noto-serif-sc/400.css";
+@import "@fontsource/noto-serif-sc/500.css";
+@import "@fontsource/noto-serif-sc/700.css";
+@import "@fontsource/nunito-sans/400.css";
+@import "@fontsource/nunito-sans/500.css";
+@import "@fontsource/nunito-sans/600.css";
+
 @font-face {
   font-family: "Vesti Sans UI";
   src: url("../public/fonts/Lexend-UI-400.woff2") format("woff2");
@@ -52,22 +66,6 @@
   font-display: swap;
   unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF, U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF;
 }
-=======
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/lora/400.css";
-@import "@fontsource/lora/600.css";
-@import "@fontsource/newsreader/400.css";
-@import "@fontsource/newsreader/500.css";
-@import "@fontsource/newsreader/600.css";
-@import "@fontsource/noto-serif-sc/400.css";
-@import "@fontsource/noto-serif-sc/500.css";
-@import "@fontsource/noto-serif-sc/700.css";
-@import "@fontsource/nunito-sans/400.css";
-@import "@fontsource/nunito-sans/500.css";
-@import "@fontsource/nunito-sans/600.css";
->>>>>>> Stashed changes
 
 @font-face {
   font-family: "Tiempos Headline";

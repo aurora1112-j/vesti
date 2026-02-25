@@ -5,12 +5,16 @@ import { interceptAndPersistCapture } from "../lib/capture/storage-interceptor";
 import {
   listConversations,
   listMessages,
+  listNotes,
   getTopics,
   createTopic,
   updateConversationTopic,
   updateConversation,
   searchConversationIdsByText,
   deleteConversation,
+  createNote,
+  updateNote,
+  deleteNote,
   updateConversationTitle,
   renameTagAcrossConversations,
   moveTagAcrossConversations,
@@ -133,6 +137,22 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
       case "GET_MESSAGES": {
         const data = await listMessages(message.payload.conversationId);
         return { ok: true, type: messageType, data };
+      }
+      case "GET_NOTES": {
+        const data = await listNotes();
+        return { ok: true, type: messageType, data };
+      }
+      case "CREATE_NOTE": {
+        const note = await createNote(message.payload);
+        return { ok: true, type: messageType, data: { note } };
+      }
+      case "UPDATE_NOTE": {
+        const note = await updateNote(message.payload.id, message.payload.changes);
+        return { ok: true, type: messageType, data: { note } };
+      }
+      case "DELETE_NOTE": {
+        await deleteNote(message.payload.id);
+        return { ok: true, type: messageType, data: { deleted: true } };
       }
       case "SEARCH_CONVERSATION_IDS_BY_TEXT": {
         const data = await searchConversationIdsByText(message.payload.query);

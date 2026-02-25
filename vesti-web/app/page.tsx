@@ -15,6 +15,12 @@ import {
   moveFolderTag,
   removeFolderTag,
   askKnowledgeBase,
+  getNotes,
+  saveNote,
+  updateNote,
+  deleteNote,
+  getSummary,
+  generateSummary,
 } from '@/lib/storageService';
 
 export default function VestiDashboardPage() {
@@ -35,6 +41,12 @@ export default function VestiDashboardPage() {
         moveFolderTag,
         removeFolderTag,
         askKnowledgeBase,
+        getNotes,
+        saveNote,
+        updateNote,
+        deleteNote,
+        getSummary,
+        generateSummary,
       }}
     />
   );

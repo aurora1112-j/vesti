@@ -4,6 +4,7 @@ import type {
   ExportFormat,
   ExportPayload,
   Message,
+  Note,
   Topic,
   DashboardStats,
   Platform,
@@ -25,6 +26,7 @@ import { enforceStorageWriteGuard, getStorageUsageSnapshot } from "./storageLimi
 import type {
   ConversationRecord,
   MessageRecord,
+  NoteRecord,
   SummaryRecordRecord,
   TopicRecord,
   WeeklyReportRecordRecord,
@@ -724,4 +726,56 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     platformDistribution: distribution,
     heatmapData,
   };
+}
+
+function toNote(record: NoteRecord & { id: number }): Note {
+  return {
+    id: record.id,
+    title: record.title,
+    content: record.content,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    linked_conversation_ids: record.linked_conversation_ids ?? [],
+  };
+}
+
+export async function listNotes(): Promise<Note[]> {
+  const records = await db.notes.orderBy("updated_at").reverse().toArray();
+  return records
+    .filter((record): record is NoteRecord & { id: number } => record.id !== undefined)
+    .map(toNote);
+}
+
+export async function createNote(
+  data: Omit<Note, "id" | "created_at" | "updated_at">
+): Promise<Note> {
+  const now = Date.now();
+  const id = await db.notes.add({
+    title: data.title,
+    content: data.content,
+    linked_conversation_ids: data.linked_conversation_ids,
+    created_at: now,
+    updated_at: now,
+  });
+  const record = await db.notes.get(id);
+  if (!record || record.id === undefined) {
+    throw new Error("Failed to create note");
+  }
+  return toNote(record as NoteRecord & { id: number });
+}
+
+export async function updateNote(
+  id: number,
+  changes: Partial<Pick<Note, "title" | "content">>
+): Promise<Note> {
+  await db.notes.update(id, { ...changes, updated_at: Date.now() });
+  const record = await db.notes.get(id);
+  if (!record || record.id === undefined) {
+    throw new Error("Note not found");
+  }
+  return toNote(record as NoteRecord & { id: number });
+}
+
+export async function deleteNote(id: number): Promise<void> {
+  await db.notes.delete(id);
 }

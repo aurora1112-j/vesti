@@ -86,6 +86,15 @@ export interface Message {
   created_at: number;
 }
 
+export interface Note {
+  id: number;
+  title: string;
+  content: string;
+  created_at: number;
+  updated_at: number;
+  linked_conversation_ids: number[];
+}
+
 export interface DashboardStats {
   totalConversations: number;
   totalTokens: number;

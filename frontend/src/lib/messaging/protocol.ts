@@ -16,6 +16,7 @@ import type {
   WeeklyReportRecord,
   RelatedConversation,
   RagResponse,
+  Note,
 } from "../types";
 import type { AstRoot, AstVersion } from "../types/ast";
 
@@ -194,6 +195,33 @@ export type RequestMessage =
       payload: { conversationId: number };
     }
   | {
+      type: "GET_NOTES";
+      target: "offscreen";
+      via?: "background";
+      requestId?: string;
+    }
+  | {
+      type: "CREATE_NOTE";
+      target: "offscreen";
+      via?: "background";
+      requestId?: string;
+      payload: { title: string; content: string; linked_conversation_ids: number[] };
+    }
+  | {
+      type: "UPDATE_NOTE";
+      target: "offscreen";
+      via?: "background";
+      requestId?: string;
+      payload: { id: number; changes: { title?: string; content?: string } };
+    }
+  | {
+      type: "DELETE_NOTE";
+      target: "offscreen";
+      via?: "background";
+      requestId?: string;
+      payload: { id: number };
+    }
+  | {
       type: "SEARCH_CONVERSATION_IDS_BY_TEXT";
       target?: "offscreen";
       via?: "background";
@@ -322,6 +350,10 @@ export type ResponseDataMap = {
   REMOVE_FOLDER_TAG: { updated: number };
   ASK_KNOWLEDGE_BASE: RagResponse;
   GET_MESSAGES: Message[];
+  GET_NOTES: Note[];
+  CREATE_NOTE: { note: Note };
+  UPDATE_NOTE: { note: Note };
+  DELETE_NOTE: { deleted: boolean };
   SEARCH_CONVERSATION_IDS_BY_TEXT: number[];
   DELETE_CONVERSATION: { deleted: boolean };
   UPDATE_CONVERSATION_TITLE: { updated: boolean; conversation: Conversation };
