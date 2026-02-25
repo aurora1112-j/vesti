@@ -22,6 +22,9 @@ import {
   saveNote,
   updateNote,
   deleteNote,
+  getStorageUsage,
+  exportData,
+  clearAllData,
 } from "~lib/services/storageService";
 
 export default function VestiDashboardPage() {
@@ -49,6 +52,9 @@ export default function VestiDashboardPage() {
         saveNote,
         updateNote,
         deleteNote,
+        getStorageUsage,
+        exportData,
+        clearAllData,
       }}
     />
   );

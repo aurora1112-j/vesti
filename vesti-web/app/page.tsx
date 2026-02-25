@@ -21,6 +21,9 @@ import {
   deleteNote,
   getSummary,
   generateSummary,
+  getStorageUsage,
+  exportData,
+  clearAllData,
 } from '@/lib/storageService';
 
 export default function VestiDashboardPage() {
@@ -47,6 +50,9 @@ export default function VestiDashboardPage() {
         deleteNote,
         getSummary,
         generateSummary,
+        getStorageUsage,
+        exportData,
+        clearAllData,
       }}
     />
   );

@@ -64,6 +64,20 @@ export interface Message {
   created_at: number;
 }
 
+export type AsyncStatus = "idle" | "loading" | "ready" | "error";
+export type ExportFormat = "json" | "txt" | "md";
+export type StorageUsageStatus = "ok" | "warning" | "blocked";
+
+export interface StorageUsageSnapshot {
+  originUsed: number;
+  originQuota: number | null;
+  localUsed: number;
+  unlimitedStorageEnabled: boolean;
+  softLimit: number;
+  hardLimit: number;
+  status: StorageUsageStatus;
+}
+
 export type ConversationFilters = {
   platform?: Platform;
   search?: string;
@@ -109,6 +123,11 @@ export type StorageApi = {
     changes: Partial<Pick<Note, "title" | "content">>
   ) => Promise<Note>;
   deleteNote?: (id: number) => Promise<void>;
+  getStorageUsage?: () => Promise<StorageUsageSnapshot>;
+  exportData?: (
+    format: ExportFormat
+  ) => Promise<{ blob: Blob; filename: string; mime: string }>;
+  clearAllData?: () => Promise<void>;
 };
 
 export interface ArtifactMetaData {

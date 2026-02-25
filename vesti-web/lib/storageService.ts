@@ -1,12 +1,14 @@
 import type {
   ChatSummaryData,
   Conversation,
+  ExportFormat,
   GardenerResult,
   Message,
   Note,
   Platform,
   RelatedConversation,
   RagResponse,
+  StorageUsageSnapshot,
   SummaryRecord,
   Topic,
 } from './types';
@@ -58,6 +60,12 @@ type RequestMessage =
       target?: 'offscreen';
       requestId?: string;
       payload: { conversationId: number; limit?: number };
+    }
+  | {
+      type: 'GET_ALL_EDGES';
+      target?: 'offscreen';
+      requestId?: string;
+      payload?: { threshold?: number };
     }
   | {
       type: 'RENAME_FOLDER_TAG';
@@ -125,6 +133,22 @@ type RequestMessage =
       payload: { conversationId: number };
     }
   | {
+      type: 'GET_STORAGE_USAGE';
+      target?: 'offscreen';
+      requestId?: string;
+    }
+  | {
+      type: 'EXPORT_DATA';
+      target?: 'offscreen';
+      requestId?: string;
+      payload: { format: ExportFormat };
+    }
+  | {
+      type: 'CLEAR_ALL_DATA';
+      target?: 'offscreen';
+      requestId?: string;
+    }
+  | {
       type: 'DELETE_CONVERSATION';
       target?: 'offscreen';
       requestId?: string;
@@ -145,6 +169,7 @@ type ResponseDataMap = {
   UPDATE_CONVERSATION: { updated: boolean; conversation: Conversation };
   RUN_GARDENER: { updated: boolean; conversation: Conversation; result: GardenerResult };
   GET_RELATED_CONVERSATIONS: RelatedConversation[];
+  GET_ALL_EDGES: Array<{ source: number; target: number; weight: number }>;
   RENAME_FOLDER_TAG: { updated: number };
   MOVE_FOLDER_TAG: { updated: number };
   REMOVE_FOLDER_TAG: { updated: number };
@@ -156,6 +181,9 @@ type ResponseDataMap = {
   DELETE_NOTE: { deleted: boolean };
   GET_CONVERSATION_SUMMARY: SummaryRecord | null;
   GENERATE_CONVERSATION_SUMMARY: SummaryRecord;
+  GET_STORAGE_USAGE: StorageUsageSnapshot;
+  EXPORT_DATA: { content: string; filename: string; mime: string };
+  CLEAR_ALL_DATA: { cleared: boolean };
   DELETE_CONVERSATION: { deleted: boolean };
   UPDATE_CONVERSATION_TITLE: { updated: boolean; conversation: Conversation };
 };
@@ -439,6 +467,16 @@ export async function getRelatedConversations(
   }, LONG_RUNNING_TIMEOUT_MS) as Promise<RelatedConversation[]>;
 }
 
+export async function getAllEdges(
+  threshold = 0.3
+): Promise<Array<{ source: number; target: number; weight: number }>> {
+  return sendRequest({
+    type: 'GET_ALL_EDGES',
+    target: 'offscreen',
+    payload: { threshold },
+  }, LONG_RUNNING_TIMEOUT_MS) as Promise<Array<{ source: number; target: number; weight: number }>>;
+}
+
 export async function renameFolderTag(
   from: string,
   to: string
@@ -558,7 +596,7 @@ export async function getNotes(): Promise<Note[]> {
 }
 
 export async function saveNote(
-  data: Omit<Note, 'id' | 'created_at' | 'updated_at'>
+  data: { title: string; content: string; linked_conversation_ids: number[] }
 ): Promise<Note> {
   const result = (await sendRequest({
     type: 'CREATE_NOTE',
@@ -612,4 +650,34 @@ export async function generateSummary(
     throw new Error('SUMMARY_GENERATION_FAILED');
   }
   return data;
+}
+
+export async function getStorageUsage(): Promise<StorageUsageSnapshot> {
+  return sendRequest({
+    type: 'GET_STORAGE_USAGE',
+    target: 'offscreen',
+  }) as Promise<StorageUsageSnapshot>;
+}
+
+export async function exportData(
+  format: ExportFormat
+): Promise<{ blob: Blob; filename: string; mime: string }> {
+  const result = (await sendRequest({
+    type: 'EXPORT_DATA',
+    target: 'offscreen',
+    payload: { format },
+  })) as { content: string; filename: string; mime: string };
+
+  return {
+    blob: new Blob([result.content], { type: result.mime }),
+    filename: result.filename,
+    mime: result.mime,
+  };
+}
+
+export async function clearAllData(): Promise<void> {
+  await sendRequest({
+    type: 'CLEAR_ALL_DATA',
+    target: 'offscreen',
+  });
 }

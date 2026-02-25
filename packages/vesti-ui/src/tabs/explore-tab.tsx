@@ -13,10 +13,9 @@ const sampleQuestions = [
 ];
 
 const SEARCH_STAGES = [
-  { label: "Understanding your question...", progress: 22 },
-  { label: "Searching relevant conversations...", progress: 48 },
-  { label: "Cross-checking related evidence...", progress: 72 },
-  { label: "Drafting final answer...", progress: 88 },
+  "Understanding query...",
+  "Searching conversations...",
+  "Synthesizing answer...",
 ];
 
 type ExploreTabProps = {
@@ -146,14 +145,8 @@ export function ExploreTab({ askKnowledgeBase, onOpenConversation }: ExploreTabP
                     <div className="flex items-center gap-2 text-text-primary">
                       <Loader2 className="h-4 w-4 animate-spin text-accent-primary" />
                       <span className="text-[14px] font-sans font-medium">
-                        {activeSearchStage.label}
+                        {activeSearchStage}
                       </span>
-                    </div>
-                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-bg-secondary">
-                      <div
-                        className="h-full rounded-full bg-accent-primary transition-all duration-500 ease-out"
-                        style={{ width: `${activeSearchStage.progress}%` }}
-                      />
                     </div>
                     <div className="mt-4 space-y-2">
                       <div className="h-3 w-[92%] animate-pulse rounded bg-bg-secondary" />

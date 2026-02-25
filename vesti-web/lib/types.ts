@@ -36,8 +36,11 @@ export interface Conversation {
   snippet: string;
   tags: string[];
   topic_id: number | null;
+  created_at: number;
   updated_at: number;
   is_starred: boolean;
+  is_archived?: boolean;
+  is_trash?: boolean;
   has_note?: boolean;
 }
 
@@ -75,6 +78,19 @@ export interface Note {
   created_at: number;
   updated_at: number;
   tags: string[];
+}
+
+export type ExportFormat = 'json' | 'txt' | 'md';
+export type StorageUsageStatus = 'ok' | 'warning' | 'blocked';
+
+export interface StorageUsageSnapshot {
+  originUsed: number;
+  originQuota: number | null;
+  localUsed: number;
+  unlimitedStorageEnabled: boolean;
+  softLimit: number;
+  hardLimit: number;
+  status: StorageUsageStatus;
 }
 
 export interface ChatSummaryData {
