@@ -1306,8 +1306,10 @@ export function LibraryTab({
 
               {/* 展开后的完整消息流 */}
               <div
-                className={`transition-all duration-300 ease-in-out ${
-                  isConversationExpanded ? "opacity-100 mt-6" : "max-h-0 opacity-0"
+                className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                  isConversationExpanded
+                    ? "opacity-100 mt-6"
+                    : "max-h-0 opacity-0 pointer-events-none"
                 }`}
               >
                 <div
