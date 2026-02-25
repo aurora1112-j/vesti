@@ -1460,7 +1460,9 @@ export function LibraryTab({
                             ...summaryData.thinking_journey.map(
                               (item) =>
                                 `**Step ${item.step} · ${item.speaker}**: ${item.assertion}${
-                                  item.real_world_anchor ? `\n> ${item.real_world_anchor}` : ""
+                                  item.real_world_anchor
+                                    ? `\n  _Example: ${item.real_world_anchor}_`
+                                    : ""
                                 }`
                             ),
                             "",
