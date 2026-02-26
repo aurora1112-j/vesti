@@ -1,0 +1,62 @@
+name: extension-package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package-extension:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install frontend deps
+        run: pnpm -C frontend install --frozen-lockfile
+
+      - name: Build and package (CI official path)
+        env:
+          NO_UPDATE_NOTIFIER: "1"
+          PLASMO_DISABLE_VERSION_CHECK: "1"
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: pnpm -C frontend package:ci
+
+      - name: Verify package artifact
+        run: |
+          test -f frontend/build/chrome-mv3-prod.zip
+          test -s frontend/build/chrome-mv3-prod.zip
+          test -f frontend/build/chrome-mv3-prod/manifest.json
+          size_bytes=$(stat -c%s frontend/build/chrome-mv3-prod.zip)
+          max_bytes=26214400
+          if [ "$size_bytes" -gt "$max_bytes" ]; then
+            echo "Artifact exceeds 25MB budget: ${size_bytes} bytes"
+            exit 1
+          fi
+
+      - name: Collect metadata
+        run: |
+          mkdir -p release-artifacts
+          cp frontend/build/chrome-mv3-prod.zip release-artifacts/
+          cp frontend/build/chrome-mv3-prod/manifest.json release-artifacts/manifest.snapshot.json
+          (cd frontend/build/chrome-mv3-prod && find . -type f | sort) > release-artifacts/chrome-mv3-prod.filelist.txt
+          sha256sum release-artifacts/chrome-mv3-prod.zip > release-artifacts/chrome-mv3-prod.zip.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-package-${{ github.ref_name }}
+          path: release-artifacts/**
+          if-no-files-found: error
