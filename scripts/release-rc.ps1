@@ -9,7 +9,9 @@
 
   [switch]$SkipVersionCheck,
 
-  [switch]$SkipPackage
+  [switch]$SkipPackage,
+
+  [switch]$AllowLocalPackage
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,12 +52,16 @@ if ($LASTEXITCODE -eq 0 -and $tagExists) {
 }
 
 if (-not $SkipPackage) {
+  if (-not $AllowLocalPackage) {
+    throw "Local packaging is disabled by policy. Use -SkipPackage and package via CI workflow '.github/workflows/extension-package.yml'. If you must override, pass -AllowLocalPackage explicitly."
+  }
+
   pnpm -C frontend build
   if ($LASTEXITCODE -ne 0) {
     throw 'Build failed.'
   }
 
-  pnpm -C frontend package
+  pnpm -C frontend package:ci
   if ($LASTEXITCODE -ne 0) {
     throw 'Package failed.'
   }
