@@ -99,37 +99,7 @@ https://github.com/user-attachments/assets/c860092c-9ab1-4773-8b8c-063e22912672
 心迹当前的能力覆盖从数据捕获到知识沉淀的完整链路，分布在两个协同工作的产品层次上：作为 Chrome 扩展运行的**捕获与洞察引擎**，以及作为独立 Web 视图运行的**知识管理平台**。
 ### 🔗 浏览器浮窗 - 扩展程序侧边栏 - 独立知识库视图：咬合衔接管线
 
-<blockquote>
-  <p>🎨 <b>心迹 (Vesti) 采用渐进式披露设计，实现从轻量捕获到深度管理的无缝流转：</b><br><br>
-  <b>页面常驻（悬浮胶囊-折叠态）</b>在 AI 对话页边缘静默指示捕获状态，实现零干扰；点击小球进入<b>当前控制（悬浮胶囊-展开态）</b>，即可查看状态详情或快捷归档；随后可一键呼出<b>全局浏览（浏览器侧边栏）</b>，支持跨平台检索与当前对话摘要；最后，通过侧边栏 Insights 面板的探索外链，平滑过渡至<b>深度洞察（独立 Dashboard）</b>的 Web 平台，解锁 RAG 问答、思维图谱与策展笔记等高级知识管理功能。</p>
-</blockquote>
 
-<table border="0" width="100%" cellspacing="0" cellpadding="10">
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <img src=".github/assets/pipeline-1.png" alt="Vesti Capsule Folded" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-      <br>
-      <sub><b>1. 页面常驻 </b> (悬浮胶囊-折叠态)</sub>
-    </td>
-    <td width="50%" align="center" valign="top">
-      <img src=".github/assets/pipeline-2.png" alt="Vesti Capsule Expanded" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-      <br>
-      <sub><b>2. 当前控制 </b> (悬浮胶囊-展开态)</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <img src=".github/assets/pipeline-3.png" alt="Vesti Sidebar" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-      <br>
-      <sub><b>3. 全局浏览 </b> (浏览器侧边栏)</sub>
-    </td>
-    <td width="50%" align="center" valign="top">
-      <img src=".github/assets/pipeline-4.png" alt="Vesti Web Dashboard" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-      <br>
-      <sub><b>4. 深度洞察 </b> (独立 Dashboard)</sub>
-    </td>
-  </tr>
-</table>
 
 ### 捕获与洞察引擎（Chrome 扩展）
 
@@ -348,6 +318,37 @@ pnpm build
 ## 📖 使用指南
 
 ### 渐进式披露：四层交互管线
+<blockquote>
+  <p>🎨 <b>心迹 (Vesti) 采用渐进式披露设计，实现从轻量捕获到深度管理的无缝流转：</b><br><br>
+  <b>页面常驻（悬浮胶囊-折叠态）</b>在 AI 对话页边缘静默指示捕获状态，实现零干扰；点击小球进入<b>当前控制（悬浮胶囊-展开态）</b>，即可查看状态详情或快捷归档；随后可一键呼出<b>全局浏览（浏览器侧边栏）</b>，支持跨平台检索与当前对话摘要；最后，通过侧边栏 Insights 面板的探索外链，平滑过渡至<b>深度洞察（独立 Dashboard）</b>的 Web 平台，解锁 RAG 问答、思维图谱与策展笔记等高级知识管理功能。</p>
+</blockquote>
+
+<table border="0" width="100%" cellspacing="0" cellpadding="10">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/pipeline-1.png" alt="Vesti Capsule Folded" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>1. 页面常驻 </b> (悬浮胶囊-折叠态)</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/pipeline-2.png" alt="Vesti Capsule Expanded" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>2. 当前控制 </b> (悬浮胶囊-展开态)</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/pipeline-3.png" alt="Vesti Sidebar" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>3. 全局浏览 </b> (浏览器侧边栏)</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/pipeline-4.png" alt="Vesti Web Dashboard" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>4. 深度洞察 </b> (独立 Dashboard)</sub>
+    </td>
+  </tr>
+</table>
 
 心迹采用**渐进式披露**的设计哲学，将从轻量感知到深度管理的完整链路，分布在四个咬合衔接的界面层次中。你不需要在安装时做任何配置决策，每一层都是上一层的自然延伸。
 
@@ -395,6 +396,27 @@ pnpm build
 ---
 
 ### 浏览与搜索
+### 🌙 明暗双态下的全景时间线与沉浸式阅读
+
+<blockquote>
+  <p>🎨 <b>心迹 (Vesti) 在侧边栏提供跨越生态壁垒的统一对话管理体验：</b><br><br>
+  无缝兼容全网主流大模型平台，并自动适应宿主环境的明暗双主题。在视觉呈现上，深度践行“新古典主义”审美与 Warm Paper 设计哲学，通过精致的衬线体排版与长文本智能折叠（渐进式披露）机制，将喧嚣杂乱的网页问答转化为纯粹的沉浸式阅读体验，助你在低视觉噪音中专注回溯思维轨迹。</p>
+</blockquote>
+
+<table border="0" width="100%" cellspacing="0" cellpadding="10">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/threads-1.png" alt="Vesti Dark Mode Timeline" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>全平台阵列与全局时间轴 (Unified Timeline)</b><br>突破生态壁垒，静默捕获各平台的交互记录。完美适配暗黑模式，将散落的思维碎片在侧边栏收束为统一的、可追溯的时间线。</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src=".github/assets/threads-2.png" alt="Vesti Light Mode Conversation Detail" width="100%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      <br>
+      <sub><b>新古典审美下的沉浸阅读 (Immersive Reading)</b><br>将对话转化为纯粹的阅读体验。以精致的衬线体排版结合长消息智能折叠机制，在明亮模式下依然保持克制、温润的信息密度。</sub>
+    </td>
+  </tr>
+</table>
 
 点击浏览器工具栏上的心迹图标，或通过胶囊"Open Dock"呼出侧边栏。默认页面是**时间轴视图**，显示所有捕获的对话按时间倒序排列。将鼠标悬停在卡片上，会展开显示对话的前100字预览，以及编辑、打开原页面、删除等快捷操作。点击卡片进入详情视图，显示完整的对话历史。
 
