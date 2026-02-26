@@ -5,6 +5,8 @@ import type {
   ExportFormat,
   ExportPayload,
   Message,
+  Note,
+  Topic,
   DashboardStats,
   Platform,
   InsightFormat,
@@ -25,7 +27,9 @@ import { enforceStorageWriteGuard, getStorageUsageSnapshot } from "./storageLimi
 import type {
   ConversationRecord,
   MessageRecord,
+  NoteRecord,
   SummaryRecordRecord,
+  TopicRecord,
   WeeklyReportRecordRecord,
 } from "./schema";
 
@@ -48,6 +52,16 @@ function toConversation(record: ConversationRecord): Conversation {
   };
 }
 
+function toTopic(record: TopicRecord): Topic {
+  if (record.id === undefined) {
+    throw new Error("Topic record missing id");
+  }
+  return {
+    ...record,
+    id: record.id,
+  };
+}
+
 function toMessage(record: MessageRecord): Message {
   if (record.id === undefined) {
     throw new Error("Message record missing id");
@@ -60,7 +74,7 @@ function toMessage(record: MessageRecord): Message {
 
   return {
     ...(record as Message),
-    content_ast: record.content_ast ?? null,
+    content_ast: (record.content_ast ?? null) as Message["content_ast"],
     content_ast_version: record.content_ast_version ?? null,
     degraded_nodes_count: degradedNodesCount,
   };
@@ -128,6 +142,24 @@ function toWeeklyReport(record: WeeklyReportRecordRecord): WeeklyReportRecord {
   };
 }
 
+function normalizeTag(tag: string): string {
+  return tag.replace(/\s+/g, " ").trim();
+}
+
+function dedupeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const tag of tags) {
+    const normalized = normalizeTag(tag);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(normalized);
+  }
+  return output;
+}
+
 function dayKey(ts: number): string {
   const d = new Date(ts);
   const yyyy = d.getFullYear();
@@ -188,6 +220,283 @@ export async function listConversations(
 export async function getConversationById(id: number): Promise<Conversation | null> {
   const record = await db.conversations.get(id);
   return record ? toConversation(record) : null;
+}
+
+export async function getTopics(): Promise<Topic[]> {
+  const [topicRecords, conversations] = await Promise.all([
+    db.topics.toArray(),
+    db.conversations.toArray(),
+  ]);
+
+  const directCounts = new Map<number, number>();
+  for (const convo of conversations) {
+    if (convo.is_archived || convo.is_trash) continue;
+    const topicId = convo.topic_id ?? null;
+    if (topicId === null) continue;
+    directCounts.set(topicId, (directCounts.get(topicId) ?? 0) + 1);
+  }
+
+  const nodeById = new Map<number, Topic>();
+  for (const record of topicRecords) {
+    if (record.id === undefined) {
+      continue;
+    }
+    nodeById.set(record.id, {
+      ...toTopic(record),
+      count: directCounts.get(record.id) ?? 0,
+      children: [],
+    });
+  }
+
+  const roots: Topic[] = [];
+  for (const node of nodeById.values()) {
+    const parentId = node.parent_id;
+    if (parentId !== null && nodeById.has(parentId)) {
+      nodeById.get(parentId)!.children!.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  const sortByName = (items: Topic[]) => {
+    items.sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  const aggregateCounts = (node: Topic): number => {
+    if (!node.children || node.children.length === 0) {
+      return node.count ?? 0;
+    }
+    sortByName(node.children);
+    const childTotal = node.children.reduce(
+      (sum, child) => sum + aggregateCounts(child),
+      0
+    );
+    node.count = (node.count ?? 0) + childTotal;
+    return node.count ?? 0;
+  };
+
+  sortByName(roots);
+  roots.forEach((root) => aggregateCounts(root));
+
+  return roots;
+}
+
+export async function createTopic(payload: {
+  name: string;
+  parent_id?: number | null;
+}): Promise<Topic> {
+  const normalizedName = payload.name.trim();
+  if (!normalizedName) {
+    throw new Error("TOPIC_NAME_EMPTY");
+  }
+
+  const parentId = payload.parent_id ?? null;
+  if (parentId !== null) {
+    const parent = await db.topics.get(parentId);
+    if (!parent) {
+      throw new Error("PARENT_TOPIC_NOT_FOUND");
+    }
+  }
+
+  const existing =
+    parentId === null
+      ? await db.topics
+          .where("name")
+          .equals(normalizedName)
+          .and((record) => record.parent_id === null)
+          .first()
+      : await db.topics
+          .where("[parent_id+name]")
+          .equals([parentId, normalizedName])
+          .first();
+  if (existing) {
+    throw new Error("TOPIC_ALREADY_EXISTS");
+  }
+
+  await enforceStorageWriteGuard();
+  const now = Date.now();
+  const id = await db.topics.add({
+    name: normalizedName,
+    parent_id: parentId,
+    created_at: now,
+    updated_at: now,
+  });
+
+  return {
+    id,
+    name: normalizedName,
+    parent_id: parentId,
+    created_at: now,
+    updated_at: now,
+    count: 0,
+    children: [],
+  };
+}
+
+export async function updateConversationTopic(
+  id: number,
+  topic_id: number | null
+): Promise<Conversation> {
+  const existing = await db.conversations.get(id);
+  if (!existing) {
+    throw new Error("CONVERSATION_NOT_FOUND");
+  }
+  if (existing.id === undefined) {
+    throw new Error("Conversation record missing id");
+  }
+
+  if (topic_id !== null) {
+    const topic = await db.topics.get(topic_id);
+    if (!topic) {
+      throw new Error("TOPIC_NOT_FOUND");
+    }
+  }
+
+  const updatedAt = Date.now();
+  await db.conversations.update(id, {
+    topic_id,
+    updated_at: updatedAt,
+  });
+
+  return toConversation({
+    ...existing,
+    topic_id,
+    updated_at: updatedAt,
+    id: existing.id,
+  });
+}
+
+export async function updateConversation(
+  id: number,
+  changes: { topic_id?: number | null; is_starred?: boolean; tags?: string[] }
+): Promise<{ updated: boolean; conversation: Conversation }> {
+  const existing = await db.conversations.get(id);
+  if (!existing) {
+    throw new Error("CONVERSATION_NOT_FOUND");
+  }
+  if (existing.id === undefined) {
+    throw new Error("Conversation record missing id");
+  }
+
+  const updates: Partial<ConversationRecord> = {};
+  let updated = false;
+
+  if (changes.topic_id !== undefined && changes.topic_id !== existing.topic_id) {
+    if (changes.topic_id !== null) {
+      const topic = await db.topics.get(changes.topic_id);
+      if (!topic) {
+        throw new Error("TOPIC_NOT_FOUND");
+      }
+    }
+    updates.topic_id = changes.topic_id ?? null;
+    updated = true;
+  }
+
+  if (
+    changes.is_starred !== undefined &&
+    changes.is_starred !== existing.is_starred
+  ) {
+    updates.is_starred = changes.is_starred;
+    updated = true;
+  }
+
+  if (changes.tags !== undefined) {
+    const nextTags = dedupeTags(changes.tags).slice(0, 6);
+    const current = existing.tags ?? [];
+    const same =
+      nextTags.length === current.length &&
+      nextTags.every((tag, index) => tag === current[index]);
+    if (!same) {
+      updates.tags = nextTags;
+      updated = true;
+    }
+  }
+
+  if (!updated) {
+    return { updated: false, conversation: toConversation(existing) };
+  }
+
+  updates.updated_at = Date.now();
+  await db.conversations.update(existing.id, updates);
+
+  return {
+    updated: true,
+    conversation: toConversation({ ...existing, ...updates, id: existing.id }),
+  };
+}
+
+export async function applyGardenerResult(
+  id: number,
+  changes: { topic_id?: number | null; tags?: string[] }
+): Promise<{ updated: boolean; conversation: Conversation }> {
+  return updateConversation(id, changes);
+}
+
+export async function replaceTagAcrossConversations(
+  from: string,
+  to?: string | null
+): Promise<number> {
+  const normalizedFrom = from.trim();
+  if (!normalizedFrom) {
+    throw new Error("TAG_EMPTY");
+  }
+
+  const normalizedTo =
+    typeof to === "string" ? to.trim() : to === null ? null : undefined;
+  if (to !== undefined && to !== null && !normalizedTo) {
+    throw new Error("TAG_EMPTY");
+  }
+
+  if (normalizedTo && normalizedTo.toLowerCase() === normalizedFrom.toLowerCase()) {
+    return 0;
+  }
+
+  await enforceStorageWriteGuard();
+  const now = Date.now();
+  let updated = 0;
+
+  await db.conversations.toCollection().modify((record: Partial<ConversationRecord>) => {
+    const tags = Array.isArray(record.tags) ? record.tags : [];
+    if (!tags.includes(normalizedFrom)) {
+      return;
+    }
+
+    let nextTags = tags.filter((tag) => tag !== normalizedFrom);
+    if (normalizedTo) {
+      nextTags = dedupeTags([...nextTags, normalizedTo]).slice(0, 6);
+    }
+
+    const same =
+      nextTags.length === tags.length &&
+      nextTags.every((tag, index) => tag === tags[index]);
+    if (same) {
+      return;
+    }
+
+    record.tags = nextTags;
+    record.updated_at = now;
+    updated += 1;
+  });
+
+  return updated;
+}
+
+export async function renameTagAcrossConversations(
+  from: string,
+  to: string
+): Promise<number> {
+  return replaceTagAcrossConversations(from, to);
+}
+
+export async function moveTagAcrossConversations(
+  from: string,
+  to: string
+): Promise<number> {
+  return replaceTagAcrossConversations(from, to);
+}
+
+export async function removeTagFromConversations(tag: string): Promise<number> {
+  return replaceTagAcrossConversations(tag, null);
 }
 
 export async function listConversationsByRange(
@@ -457,4 +766,56 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     platformDistribution: distribution,
     heatmapData,
   };
+}
+
+function toNote(record: NoteRecord & { id: number }): Note {
+  return {
+    id: record.id,
+    title: record.title,
+    content: record.content,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    linked_conversation_ids: record.linked_conversation_ids ?? [],
+  };
+}
+
+export async function listNotes(): Promise<Note[]> {
+  const records = await db.notes.orderBy("updated_at").reverse().toArray();
+  return records
+    .filter((record): record is NoteRecord & { id: number } => record.id !== undefined)
+    .map(toNote);
+}
+
+export async function createNote(
+  data: Omit<Note, "id" | "created_at" | "updated_at">
+): Promise<Note> {
+  const now = Date.now();
+  const id = await db.notes.add({
+    title: data.title,
+    content: data.content,
+    linked_conversation_ids: data.linked_conversation_ids,
+    created_at: now,
+    updated_at: now,
+  });
+  const record = await db.notes.get(id);
+  if (!record || record.id === undefined) {
+    throw new Error("Failed to create note");
+  }
+  return toNote(record as NoteRecord & { id: number });
+}
+
+export async function updateNote(
+  id: number,
+  changes: Partial<Pick<Note, "title" | "content">>
+): Promise<Note> {
+  await db.notes.update(id, { ...changes, updated_at: Date.now() });
+  const record = await db.notes.get(id);
+  if (!record || record.id === undefined) {
+    throw new Error("Note not found");
+  }
+  return toNote(record as NoteRecord & { id: number });
+}
+
+export async function deleteNote(id: number): Promise<void> {
+  await db.notes.delete(id);
 }

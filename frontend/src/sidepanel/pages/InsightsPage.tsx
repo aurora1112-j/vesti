@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
+  Compass,
+  ExternalLink,
   FileText,
   Loader2,
   Network,
-  Pause,
-  Play
 } from "lucide-react";
 import type {
   AsyncStatus,
@@ -497,7 +497,8 @@ export function InsightsPage({
     useState<ThreadPipelineTimingState | null>(null);
 
   const [threadSummaryOpen, setThreadSummaryOpen] = useState(true);
-  const [weeklyDigestOpen, setWeeklyDigestOpen] = useState(!WEEKLY_DIGEST_SOON);
+  const [weeklyDigestOpen, setWeeklyDigestOpen] = useState(true);
+  const [discoveryOpen, setDiscoveryOpen] = useState(true);
 
   const weeklyStableRef = useRef<WeeklyStableUiState>("idle");
   const weeklyUiStateRef = useRef<WeeklyDigestUiState>("idle");
@@ -989,7 +990,7 @@ export function InsightsPage({
     setWeeklyPausedAccumulatedMs(0);
     setWeeklyPhase("ready_to_compile");
 
-    if (result.ok) {
+    if (result.ok === true) {
       setWeeklyReport(result.data);
       const nextData = toWeeklySummaryData(result.data);
       const nextStableState = toWeeklyStableState(nextData);
@@ -999,7 +1000,9 @@ export function InsightsPage({
       return;
     }
 
-    const nextError = getErrorMessage(result.error);
+    const nextError = getErrorMessage(
+      result.ok === false ? result.error : "UNKNOWN_ERROR"
+    );
     setWeeklyError(nextError);
 
     if (weeklyHasReportRef.current) {
@@ -1742,6 +1745,11 @@ export function InsightsPage({
     return renderWeeklyIdle();
   };
 
+  function openDashboard(tab: "explore" | "network") {
+    const url = chrome.runtime.getURL(`options.html?tab=${tab}`);
+    chrome.tabs.create({ url });
+  }
+
   return (
     <div className="vesti-shell flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-app">
       <header className="border-b border-border-subtle px-4 py-3">
@@ -1787,10 +1795,57 @@ export function InsightsPage({
         <InsightsAccordionItem
           title="Explore & Network"
           description="Knowledge graph and thread connections"
+          open={discoveryOpen}
+          onToggle={() => setDiscoveryOpen((prev) => !prev)}
           icon={<Network className="h-4 w-4" strokeWidth={1.5} />}
-          disabled
-          soonTag="Soon"
-        />
+        >
+          <div className="flex flex-col gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => openDashboard("explore")}
+              className="flex items-center justify-between w-full px-3 py-2.5
+                   rounded-md bg-bg-surface-card hover:bg-bg-surface-card-hover
+                   transition-colors duration-150 group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Compass className="w-4 h-4 text-text-secondary" strokeWidth={1.75} />
+                <div className="text-left">
+                  <p className="text-[13px] font-medium text-text-primary">Explore</p>
+                  <p className="text-[11px] text-text-tertiary">
+                    Browse and search your knowledge base
+                  </p>
+                </div>
+              </div>
+              <ExternalLink
+                className="w-3.5 h-3.5 text-text-tertiary
+                                 group-hover:text-accent-primary transition-colors"
+                strokeWidth={1.75}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => openDashboard("network")}
+              className="flex items-center justify-between w-full px-3 py-2.5
+                   rounded-md bg-bg-surface-card hover:bg-bg-surface-card-hover
+                   transition-colors duration-150 group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Network className="w-4 h-4 text-text-secondary" strokeWidth={1.75} />
+                <div className="text-left">
+                  <p className="text-[13px] font-medium text-text-primary">Network</p>
+                  <p className="text-[11px] text-text-tertiary">
+                    Visualize connections between conversations
+                  </p>
+                </div>
+              </div>
+              <ExternalLink
+                className="w-3.5 h-3.5 text-text-tertiary
+                                 group-hover:text-accent-primary transition-colors"
+                strokeWidth={1.75}
+              />
+            </button>
+          </div>
+        </InsightsAccordionItem>
       </div>
     </div>
   );

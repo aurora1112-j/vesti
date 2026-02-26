@@ -1,0 +1,13 @@
+{
+  "name": "vesti-monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "vesti-web",
+    "packages/*"
+  ],
+  "dependencies": {
+    "react-markdown": "^7.1.2",
+    "remark-gfm": "^2.0.0"
+  }
+}

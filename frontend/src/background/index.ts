@@ -4,10 +4,21 @@ import type { RequestMessage, ResponseMessage } from "../lib/messaging/protocol"
 import { interceptAndPersistCapture } from "../lib/capture/storage-interceptor";
 import {
   listConversations,
+  getTopics,
+  createTopic,
+  updateConversationTopic,
+  updateConversation,
   listMessages,
+  listNotes,
   searchConversationIdsByText,
   deleteConversation,
+  createNote,
+  updateNote,
+  deleteNote,
   updateConversationTitle,
+  renameTagAcrossConversations,
+  moveTagAcrossConversations,
+  removeTagFromConversations,
   getDashboardStats,
   getDataOverview,
   getStorageUsage,
@@ -17,6 +28,13 @@ import {
   getSummary,
   getWeeklyReport,
 } from "../lib/db/repository";
+import { runGardener } from "../lib/services/gardenerService";
+import {
+  findRelatedConversations,
+  findAllEdges,
+  vectorizeAllConversations,
+  askKnowledgeBase,
+} from "../lib/services/searchService";
 import { getLlmSettings, setLlmSettings } from "../lib/services/llmSettingsService";
 import { callInference } from "../lib/services/llmService";
 import {
@@ -33,6 +51,36 @@ import type {
 } from "../lib/types";
 import { logger } from "../lib/utils/logger";
 import { getLlmAccessMode, normalizeLlmSettings } from "../lib/services/llmConfig";
+
+let isVectorizing = false;
+let rerunVectorizationRequested = false;
+
+async function runVectorizationTask(reason: string): Promise<boolean> {
+  if (isVectorizing) {
+    rerunVectorizationRequested = true;
+    return false;
+  }
+  isVectorizing = true;
+  try {
+    const created = await vectorizeAllConversations();
+    logger.info("vectorize", "Vectorization task completed", {
+      reason,
+      created,
+    });
+  } catch (error) {
+    logger.warn("vectorize", "Vectorization task failed", {
+      reason,
+      error: (error as Error)?.message ?? String(error),
+    });
+  } finally {
+    isVectorizing = false;
+    if (rerunVectorizationRequested) {
+      rerunVectorizationRequested = false;
+      void runVectorizationTask("rerun");
+    }
+  }
+  return true;
+}
 
 function requireSettings(settings: LlmConfig | null): LlmConfig {
   if (!settings) {
@@ -260,8 +308,12 @@ async function handleBackgroundRequest(
           throw new Error((error as Error).message || "FORCE_ARCHIVE_FAILED");
         }
 
-        if (!response?.ok) {
-          throw new Error(response?.error || "FORCE_ARCHIVE_FAILED");
+        if (!response || response.ok === false) {
+          const errorMessage =
+            response && response.ok === false
+              ? response.error
+              : "FORCE_ARCHIVE_FAILED";
+          throw new Error(errorMessage || "FORCE_ARCHIVE_FAILED");
         }
 
         const data: ForceArchiveTransientResult = {
@@ -273,6 +325,10 @@ async function handleBackgroundRequest(
         };
 
         return { ok: true, type: messageType, data };
+      }
+      case "RUN_VECTORIZATION": {
+        void runVectorizationTask("message");
+        return { ok: true, type: messageType, data: { queued: true } };
       }
       default:
         return {
@@ -303,9 +359,87 @@ async function handleOffscreenRequest(message: RequestMessage): Promise<Response
         const data = await listConversations(message.payload);
         return { ok: true, type: messageType, data };
       }
+      case "GET_TOPICS": {
+        const data = await getTopics();
+        return { ok: true, type: messageType, data };
+      }
+      case "CREATE_TOPIC": {
+        const topic = await createTopic(message.payload);
+        return { ok: true, type: messageType, data: { topic } };
+      }
+      case "UPDATE_CONVERSATION_TOPIC": {
+        const conversation = await updateConversationTopic(
+          message.payload.id,
+          message.payload.topic_id
+        );
+        return { ok: true, type: messageType, data: { updated: true, conversation } };
+      }
+      case "UPDATE_CONVERSATION": {
+        const data = await updateConversation(
+          message.payload.id,
+          message.payload.changes
+        );
+        return { ok: true, type: messageType, data };
+      }
+      case "RUN_GARDENER": {
+        const data = await runGardener(message.payload.conversationId);
+        return { ok: true, type: messageType, data };
+      }
+      case "GET_RELATED_CONVERSATIONS": {
+        const data = await findRelatedConversations(
+          message.payload.conversationId,
+          message.payload.limit
+        );
+        return { ok: true, type: messageType, data };
+      }
+      case "GET_ALL_EDGES": {
+        const data = await findAllEdges(message.payload?.threshold ?? 0.3);
+        return { ok: true, type: messageType, data };
+      }
+      case "RENAME_FOLDER_TAG": {
+        const updated = await renameTagAcrossConversations(
+          message.payload.from,
+          message.payload.to
+        );
+        return { ok: true, type: messageType, data: { updated } };
+      }
+      case "MOVE_FOLDER_TAG": {
+        const updated = await moveTagAcrossConversations(
+          message.payload.from,
+          message.payload.to
+        );
+        return { ok: true, type: messageType, data: { updated } };
+      }
+      case "REMOVE_FOLDER_TAG": {
+        const updated = await removeTagFromConversations(message.payload.tag);
+        return { ok: true, type: messageType, data: { updated } };
+      }
+      case "ASK_KNOWLEDGE_BASE": {
+        const data = await askKnowledgeBase(
+          message.payload.query,
+          message.payload.limit
+        );
+        return { ok: true, type: messageType, data };
+      }
       case "GET_MESSAGES": {
         const data = await listMessages(message.payload.conversationId);
         return { ok: true, type: messageType, data };
+      }
+      case "GET_NOTES": {
+        const data = await listNotes();
+        return { ok: true, type: messageType, data };
+      }
+      case "CREATE_NOTE": {
+        const note = await createNote(message.payload);
+        return { ok: true, type: messageType, data: { note } };
+      }
+      case "UPDATE_NOTE": {
+        const note = await updateNote(message.payload.id, message.payload.changes);
+        return { ok: true, type: messageType, data: { note } };
+      }
+      case "DELETE_NOTE": {
+        await deleteNote(message.payload.id);
+        return { ok: true, type: messageType, data: { deleted: true } };
       }
       case "SEARCH_CONVERSATION_IDS_BY_TEXT": {
         const data = await searchConversationIdsByText(message.payload.query);
@@ -410,6 +544,15 @@ async function handleOffscreenRequest(message: RequestMessage): Promise<Response
   }
 }
 
+if (chrome?.alarms?.create) {
+  chrome.alarms.create("vectorize-job", { periodInMinutes: 5 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "vectorize-job") {
+      void runVectorizationTask("alarm");
+    }
+  });
+}
+
 function openSidepanelForTab(tabId: number): void {
   if (!chrome?.sidePanel?.open) {
     logger.warn("background", "sidePanel API not available");
@@ -473,4 +616,3 @@ chrome.runtime.onMessage.addListener(
     return true;
   }
 );
-

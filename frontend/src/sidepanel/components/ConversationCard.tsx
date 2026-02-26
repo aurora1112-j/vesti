@@ -3,6 +3,7 @@
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -10,12 +11,21 @@ import {
   Check,
   Copy,
   ExternalLink,
+  FolderOpen,
   MessageSquare,
   Pencil,
+  Star,
   Trash2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { resolveTurnCount } from "~lib/capture/turn-metrics";
 import type { Conversation } from "~lib/types";
+import { updateConversationAndSync } from "~lib/services/syncActions";
 import { PlatformTag } from "./PlatformTag";
 
 const TOOLTIP_DELAY_MS = 200;
@@ -120,6 +130,8 @@ interface ConversationCardProps {
   onOpenSource?: (conversation: Conversation) => void;
   onDelete?: (id: number) => Promise<void> | void;
   onRenameTitle?: (id: number, title: string) => Promise<boolean>;
+  topicOptions?: { id: number; label: string }[];
+  onConversationUpdated?: (conversation: Conversation) => void;
   matchedInMessagesOnly?: boolean;
 }
 
@@ -130,6 +142,8 @@ export function ConversationCard({
   onOpenSource,
   onDelete,
   onRenameTitle,
+  topicOptions = [],
+  onConversationUpdated,
   matchedInMessagesOnly = false,
 }: ConversationCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -262,6 +276,33 @@ export function ConversationCard({
     setIsEditingTitle(true);
   };
 
+  const handleToggleStar = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    try {
+      const updated = await updateConversationAndSync(conversation.id, {
+        is_starred: !conversation.is_starred,
+      });
+      onConversationUpdated?.(updated);
+    } catch (error) {
+      console.error("Failed to update star status", error);
+    }
+  };
+
+  const handleTopicChange = async (event: ChangeEvent<HTMLSelectElement>) => {
+    event.stopPropagation();
+    const value = event.target.value;
+    const nextTopicId = value ? Number(value) : null;
+
+    try {
+      const updated = await updateConversationAndSync(conversation.id, {
+        topic_id: Number.isNaN(nextTopicId) ? null : nextTopicId,
+      });
+      onConversationUpdated?.(updated);
+    } catch (error) {
+      console.error("Failed to update topic assignment", error);
+    }
+  };
+
   return (
     <div
       role="button"
@@ -287,9 +328,26 @@ export function ConversationCard({
     >
       <div className="flex items-center justify-between">
         <PlatformTag platform={conversation.platform} />
-        <span className="text-vesti-xs text-text-tertiary">
-          {formatRelativeTime(conversation.updated_at)}
-        </span>
+        <div className="flex items-center gap-1">
+          <ActionIconButton
+            label={conversation.is_starred ? "Unstar" : "Star"}
+            onClick={handleToggleStar}
+            icon={
+              <Star
+                className={
+                  conversation.is_starred
+                    ? "h-3.5 w-3.5 text-accent-primary"
+                    : "h-3.5 w-3.5"
+                }
+                strokeWidth={1.75}
+                fill={conversation.is_starred ? "currentColor" : "none"}
+              />
+            }
+          />
+          <span className="text-vesti-xs text-text-tertiary">
+            {formatRelativeTime(conversation.updated_at)}
+          </span>
+        </div>
       </div>
 
       <div className="mt-1.5 flex items-start gap-1">
@@ -334,12 +392,51 @@ export function ConversationCard({
         )}
 
         {!isEditingTitle && (
-          <ActionIconButton
-            label="Rename title"
-            onClick={handleStartTitleEdit}
-            disabled={!onRenameTitle || isSavingTitle}
-            icon={<Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />}
-          />
+          <div className="flex items-center gap-0.5 shrink-0">
+            <ActionIconButton
+              label="Rename title"
+              onClick={handleStartTitleEdit}
+              disabled={!onRenameTitle || isSavingTitle}
+              icon={<Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Assign group"
+                  onClick={(event) => event.stopPropagation()}
+                  className="flex h-6 items-center gap-1 rounded-sm px-1.5 text-[11px] text-text-tertiary opacity-60 transition-all duration-150 hover:bg-accent-primary-light hover:text-accent-primary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44 max-h-64 overflow-y-auto">
+                <DropdownMenuItem
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleTopicChange({
+                      target: { value: "" },
+                    } as ChangeEvent<HTMLSelectElement>);
+                  }}
+                >
+                  <span className="text-text-tertiary">No group</span>
+                </DropdownMenuItem>
+                {topicOptions.map((topic) => (
+                  <DropdownMenuItem
+                    key={topic.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleTopicChange({
+                        target: { value: String(topic.id) },
+                      } as ChangeEvent<HTMLSelectElement>);
+                    }}
+                  >
+                    {topic.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
       </div>
 
@@ -402,4 +499,3 @@ export function ConversationCard({
     </div>
   );
 }
-

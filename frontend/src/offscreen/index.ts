@@ -5,9 +5,20 @@ import { interceptAndPersistCapture } from "../lib/capture/storage-interceptor";
 import {
   listConversations,
   listMessages,
+  listNotes,
+  getTopics,
+  createTopic,
+  updateConversationTopic,
+  updateConversation,
   searchConversationIdsByText,
   deleteConversation,
+  createNote,
+  updateNote,
+  deleteNote,
   updateConversationTitle,
+  renameTagAcrossConversations,
+  moveTagAcrossConversations,
+  removeTagFromConversations,
   getDashboardStats,
   getDataOverview,
   getStorageUsage,
@@ -17,6 +28,12 @@ import {
   getSummary,
   getWeeklyReport,
 } from "../lib/db/repository";
+import { runGardener } from "../lib/services/gardenerService";
+import {
+  findRelatedConversations,
+  findAllEdges,
+  askKnowledgeBase,
+} from "../lib/services/searchService";
 import { getLlmSettings, setLlmSettings } from "../lib/services/llmSettingsService";
 import { callInference } from "../lib/services/llmService";
 import {
@@ -57,9 +74,87 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
         const data = await listConversations(message.payload);
         return { ok: true, type: messageType, data };
       }
+      case "GET_TOPICS": {
+        const data = await getTopics();
+        return { ok: true, type: messageType, data };
+      }
+      case "CREATE_TOPIC": {
+        const topic = await createTopic(message.payload);
+        return { ok: true, type: messageType, data: { topic } };
+      }
+      case "UPDATE_CONVERSATION_TOPIC": {
+        const conversation = await updateConversationTopic(
+          message.payload.id,
+          message.payload.topic_id
+        );
+        return { ok: true, type: messageType, data: { updated: true, conversation } };
+      }
+      case "UPDATE_CONVERSATION": {
+        const data = await updateConversation(
+          message.payload.id,
+          message.payload.changes
+        );
+        return { ok: true, type: messageType, data };
+      }
+      case "RUN_GARDENER": {
+        const data = await runGardener(message.payload.conversationId);
+        return { ok: true, type: messageType, data };
+      }
+      case "GET_RELATED_CONVERSATIONS": {
+        const data = await findRelatedConversations(
+          message.payload.conversationId,
+          message.payload.limit
+        );
+        return { ok: true, type: messageType, data };
+      }
+      case "GET_ALL_EDGES": {
+        const data = await findAllEdges(message.payload?.threshold ?? 0.3);
+        return { ok: true, type: messageType, data };
+      }
+      case "RENAME_FOLDER_TAG": {
+        const updated = await renameTagAcrossConversations(
+          message.payload.from,
+          message.payload.to
+        );
+        return { ok: true, type: messageType, data: { updated } };
+      }
+      case "MOVE_FOLDER_TAG": {
+        const updated = await moveTagAcrossConversations(
+          message.payload.from,
+          message.payload.to
+        );
+        return { ok: true, type: messageType, data: { updated } };
+      }
+      case "REMOVE_FOLDER_TAG": {
+        const updated = await removeTagFromConversations(message.payload.tag);
+        return { ok: true, type: messageType, data: { updated } };
+      }
+      case "ASK_KNOWLEDGE_BASE": {
+        const data = await askKnowledgeBase(
+          message.payload.query,
+          message.payload.limit
+        );
+        return { ok: true, type: messageType, data };
+      }
       case "GET_MESSAGES": {
         const data = await listMessages(message.payload.conversationId);
         return { ok: true, type: messageType, data };
+      }
+      case "GET_NOTES": {
+        const data = await listNotes();
+        return { ok: true, type: messageType, data };
+      }
+      case "CREATE_NOTE": {
+        const note = await createNote(message.payload);
+        return { ok: true, type: messageType, data: { note } };
+      }
+      case "UPDATE_NOTE": {
+        const note = await updateNote(message.payload.id, message.payload.changes);
+        return { ok: true, type: messageType, data: { note } };
+      }
+      case "DELETE_NOTE": {
+        await deleteNote(message.payload.id);
+        return { ok: true, type: messageType, data: { deleted: true } };
       }
       case "SEARCH_CONVERSATION_IDS_BY_TEXT": {
         const data = await searchConversationIdsByText(message.payload.query);

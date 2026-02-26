@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Conversation, Message, Platform } from "~lib/types";
+import type { Conversation, Message, Platform, Topic } from "~lib/types";
 import {
   deleteConversation,
   getConversations,
   getMessages,
+  getTopics,
   searchConversationIdsByText,
   updateConversationTitle,
 } from "~lib/services/storageService";
@@ -78,21 +79,45 @@ function matchesDatePreset(timestamp: number, preset: DatePreset): boolean {
   if (preset === "all_time") return true;
 
   const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+
   if (preset === "today") {
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     return timestamp >= startOfToday;
   }
 
   if (preset === "this_week") {
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const sevenDaysAgo = startOfToday - 6 * 24 * 60 * 60 * 1000;
-    return timestamp >= sevenDaysAgo;
+    const day = new Date(startOfToday).getDay();
+    const offset = (day + 6) % 7; // Monday as week start
+    const startOfWeek = startOfToday - offset * 24 * 60 * 60 * 1000;
+    return timestamp >= startOfWeek;
   }
 
-  return (
-    new Date(timestamp).getMonth() === now.getMonth() &&
-    new Date(timestamp).getFullYear() === now.getFullYear()
-  );
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  return timestamp >= startOfMonth;
+}
+
+interface TopicOption {
+  id: number;
+  label: string;
+}
+
+function flattenTopics(
+  topics: Topic[],
+  level: number = 0,
+  acc: TopicOption[] = []
+): TopicOption[] {
+  for (const topic of topics) {
+    const prefix = level > 0 ? `${"- ".repeat(level)}` : "";
+    acc.push({ id: topic.id, label: `${prefix}${topic.name}` });
+    if (topic.children && topic.children.length > 0) {
+      flattenTopics(topic.children, level + 1, acc);
+    }
+  }
+  return acc;
 }
 
 export function ConversationList({
@@ -103,6 +128,7 @@ export function ConversationList({
   refreshToken,
 }: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [messageMatchIds, setMessageMatchIds] = useState<Set<number>>(new Set());
   const [isMessageSearchPending, setIsMessageSearchPending] = useState(false);
@@ -153,7 +179,7 @@ export function ConversationList({
     const cached = queryCacheRef.current.get(normalizedSearchQuery);
     if (cached) {
       setIsMessageSearchPending(false);
-      setMessageMatchIds(new Set(cached));
+      setMessageMatchIds(new Set<number>(cached));
       return;
     }
 
@@ -167,12 +193,12 @@ export function ConversationList({
           }
           const matchSet = new Set(ids);
           queryCacheRef.current.set(normalizedSearchQuery, matchSet);
-          setMessageMatchIds(new Set(matchSet));
+          setMessageMatchIds(new Set<number>(matchSet));
         } catch {
           if (requestSeq !== searchRequestSeqRef.current) {
             return;
           }
-          setMessageMatchIds(new Set());
+          setMessageMatchIds(new Set<number>());
         } finally {
           if (requestSeq === searchRequestSeqRef.current) {
             setIsMessageSearchPending(false);
@@ -215,6 +241,26 @@ export function ConversationList({
     normalizedSearchQuery,
     selectedPlatforms,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTopics()
+      .then((data) => {
+        if (!cancelled) {
+          setTopics(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTopics([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken]);
+
+  const topicOptions = useMemo(() => flattenTopics(topics), [topics]);
 
   const grouped = useMemo(() => {
     const now = Date.now();
@@ -332,6 +378,27 @@ export function ConversationList({
     [conversations]
   );
 
+  const handleConversationUpdated = useCallback(
+    (updatedConversation: Conversation) => {
+      setConversations((prev) => {
+        let next = prev.map((item) =>
+          item.id === updatedConversation.id
+            ? { ...item, ...updatedConversation }
+            : item
+        );
+
+        next = next.sort((a, b) => b.updated_at - a.updated_at);
+
+        if (!normalizedSearchQuery) {
+          return next;
+        }
+
+        return next.filter((item) => matchesSearch(item, normalizedSearchQuery));
+      });
+    },
+    [normalizedSearchQuery]
+  );
+
   if (loading) {
     return (
       <div className="flex h-full flex-col gap-2.5 p-4">
@@ -381,6 +448,8 @@ export function ConversationList({
                 onOpenSource={handleOpenSource}
                 onDelete={handleDeleteConversation}
                 onRenameTitle={handleRenameTitle}
+                topicOptions={topicOptions}
+                onConversationUpdated={handleConversationUpdated}
               />
             ))}
           </div>

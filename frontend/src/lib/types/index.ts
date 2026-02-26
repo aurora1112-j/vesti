@@ -13,6 +13,29 @@ export type Platform =
   | "Qwen"
   | "Doubao";
 
+export interface Topic {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  created_at: number;
+  updated_at: number;
+  count?: number;
+  children?: Topic[];
+}
+
+export interface GardenerStep {
+  step: string;
+  status: "pending" | "running" | "completed";
+  details?: string;
+}
+
+export interface GardenerResult {
+  tags: string[];
+  matchedTopic?: Topic;
+  createdTopic?: Topic;
+  steps: GardenerStep[];
+}
+
 export interface Conversation {
   id: number;
   uuid: string;
@@ -28,6 +51,28 @@ export interface Conversation {
   is_archived: boolean;
   is_trash: boolean;
   tags: string[];
+  topic_id: number | null;
+  is_starred: boolean;
+  has_note?: boolean;
+}
+
+export interface VectorRecord {
+  id?: number;
+  conversation_id: number;
+  text_hash: string;
+  embedding: Float32Array;
+}
+
+export interface RelatedConversation {
+  id: number;
+  title: string;
+  platform: Platform;
+  similarity: number;
+}
+
+export interface RagResponse {
+  answer: string;
+  sources: RelatedConversation[];
 }
 
 export interface Message {
@@ -39,6 +84,15 @@ export interface Message {
   content_ast_version?: AstVersion | null;
   degraded_nodes_count?: number;
   created_at: number;
+}
+
+export interface Note {
+  id: number;
+  title: string;
+  content: string;
+  created_at: number;
+  updated_at: number;
+  linked_conversation_ids: number[];
 }
 
 export interface DashboardStats {

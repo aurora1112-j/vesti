@@ -7,12 +7,20 @@ import type {
   ForceArchiveTransientResult,
   LlmConfig,
   Message,
+  Note,
   Platform,
+  RelatedConversation,
+  RagResponse,
   StorageUsageSnapshot,
   SummaryRecord,
   WeeklyReportRecord,
+  Topic,
+  GardenerResult,
 } from "../types";
+import type { ChatSummaryData } from "../types/insightsPresentation";
 import { sendRequest } from "../messaging/runtime";
+import type { ConversationUpdateChanges } from "../messaging/protocol";
+import { toChatSummaryData } from "./insightAdapter";
 
 const LONG_RUNNING_TIMEOUT_MS = 120000;
 const TEST_CONNECTION_TIMEOUT_MS = 30000;
@@ -30,6 +38,152 @@ export async function getConversations(filters?: {
   }) as Promise<Conversation[]>;
 }
 
+export async function getTopics(): Promise<Topic[]> {
+  return sendRequest({
+    type: "GET_TOPICS",
+    target: "offscreen",
+  }) as Promise<Topic[]>;
+}
+
+export async function createTopic(name: string, parent_id?: number | null): Promise<Topic> {
+  const result = (await sendRequest({
+    type: "CREATE_TOPIC",
+    target: "offscreen",
+    payload: { name, parent_id },
+  })) as { topic: Topic };
+
+  chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+    void chrome.runtime.lastError;
+  });
+
+  return result.topic;
+}
+
+export async function updateConversationTopic(
+  id: number,
+  topic_id: number | null
+): Promise<Conversation> {
+  const result = (await sendRequest({
+    type: "UPDATE_CONVERSATION_TOPIC",
+    target: "offscreen",
+    payload: { id, topic_id },
+  })) as { updated: boolean; conversation: Conversation };
+
+  if (result.updated) {
+    chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  return result.conversation;
+}
+
+export async function updateConversation(
+  id: number,
+  changes: ConversationUpdateChanges
+): Promise<{ updated: boolean; conversation: Conversation }> {
+  return sendRequest({
+    type: "UPDATE_CONVERSATION",
+    target: "offscreen",
+    payload: { id, changes },
+  }) as Promise<{ updated: boolean; conversation: Conversation }>;
+}
+
+export async function runGardener(
+  conversationId: number
+): Promise<{ updated: boolean; conversation: Conversation; result: GardenerResult }> {
+  const result = (await sendRequest({
+    type: "RUN_GARDENER",
+    target: "offscreen",
+    payload: { conversationId },
+  })) as { updated: boolean; conversation: Conversation; result: GardenerResult };
+
+  if (result.updated) {
+    chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  return result;
+}
+
+export async function getRelatedConversations(
+  conversationId: number,
+  limit?: number
+): Promise<RelatedConversation[]> {
+  return sendRequest({
+    type: "GET_RELATED_CONVERSATIONS",
+    target: "offscreen",
+    payload: { conversationId, limit },
+  }, LONG_RUNNING_TIMEOUT_MS) as Promise<RelatedConversation[]>;
+}
+
+export async function getAllEdges(
+  threshold = 0.3
+): Promise<Array<{ source: number; target: number; weight: number }>> {
+  return sendRequest({
+    type: "GET_ALL_EDGES",
+    target: "offscreen",
+    payload: { threshold },
+  }, LONG_RUNNING_TIMEOUT_MS) as Promise<Array<{ source: number; target: number; weight: number }>>;
+}
+
+export async function renameFolderTag(
+  from: string,
+  to: string
+): Promise<{ updated: number }> {
+  const result = (await sendRequest({
+    type: "RENAME_FOLDER_TAG",
+    target: "offscreen",
+    payload: { from, to },
+  }, LONG_RUNNING_TIMEOUT_MS)) as { updated: number };
+
+  if (result.updated > 0) {
+    chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  return result;
+}
+
+export async function moveFolderTag(
+  from: string,
+  to: string
+): Promise<{ updated: number }> {
+  const result = (await sendRequest({
+    type: "MOVE_FOLDER_TAG",
+    target: "offscreen",
+    payload: { from, to },
+  }, LONG_RUNNING_TIMEOUT_MS)) as { updated: number };
+
+  if (result.updated > 0) {
+    chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  return result;
+}
+
+export async function removeFolderTag(
+  tag: string
+): Promise<{ updated: number }> {
+  const result = (await sendRequest({
+    type: "REMOVE_FOLDER_TAG",
+    target: "offscreen",
+    payload: { tag },
+  }, LONG_RUNNING_TIMEOUT_MS)) as { updated: number };
+
+  if (result.updated > 0) {
+    chrome.runtime.sendMessage({ type: "VESTI_DATA_UPDATED" }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  return result;
+}
+
 export async function getMessages(
   conversationId: number
 ): Promise<Message[]> {
@@ -38,6 +192,44 @@ export async function getMessages(
     target: "offscreen",
     payload: { conversationId },
   }) as Promise<Message[]>;
+}
+
+export async function getNotes(): Promise<Note[]> {
+  return sendRequest({
+    type: "GET_NOTES",
+    target: "offscreen",
+  }) as Promise<Note[]>;
+}
+
+export async function saveNote(
+  data: Omit<Note, "id" | "created_at" | "updated_at">
+): Promise<Note> {
+  const result = (await sendRequest({
+    type: "CREATE_NOTE",
+    target: "offscreen",
+    payload: data,
+  })) as { note: Note };
+  return result.note;
+}
+
+export async function updateNote(
+  id: number,
+  changes: Partial<Pick<Note, "title" | "content">>
+): Promise<Note> {
+  const result = (await sendRequest({
+    type: "UPDATE_NOTE",
+    target: "offscreen",
+    payload: { id, changes },
+  })) as { note: Note };
+  return result.note;
+}
+
+export async function deleteNote(id: number): Promise<void> {
+  await sendRequest({
+    type: "DELETE_NOTE",
+    target: "offscreen",
+    payload: { id },
+  });
 }
 
 export async function searchConversationIdsByText(
@@ -51,6 +243,20 @@ export async function searchConversationIdsByText(
     },
     FULL_TEXT_SEARCH_TIMEOUT_MS
   ) as Promise<number[]>;
+}
+
+export async function askKnowledgeBase(
+  query: string,
+  limit?: number
+): Promise<RagResponse> {
+  return sendRequest(
+    {
+      type: "ASK_KNOWLEDGE_BASE",
+      target: "offscreen",
+      payload: { query, limit },
+    },
+    LONG_RUNNING_TIMEOUT_MS
+  ) as Promise<RagResponse>;
 }
 
 export async function deleteConversation(id: number): Promise<void> {
@@ -179,6 +385,13 @@ export async function getConversationSummary(
   }) as Promise<SummaryRecord | null>;
 }
 
+export async function getSummary(
+  conversationId: number
+): Promise<ChatSummaryData | null> {
+  const record = await getConversationSummary(conversationId);
+  return record ? toChatSummaryData(record) : null;
+}
+
 export async function generateConversationSummary(
   conversationId: number
 ): Promise<SummaryRecord> {
@@ -190,6 +403,13 @@ export async function generateConversationSummary(
     },
     LONG_RUNNING_TIMEOUT_MS
   ) as Promise<SummaryRecord>;
+}
+
+export async function generateSummary(
+  conversationId: number
+): Promise<ChatSummaryData> {
+  const record = await generateConversationSummary(conversationId);
+  return toChatSummaryData(record);
 }
 
 export async function getWeeklyReport(

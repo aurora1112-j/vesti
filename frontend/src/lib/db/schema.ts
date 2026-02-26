@@ -8,15 +8,42 @@ import type {
 } from "../types";
 
 export type ConversationRecord = Omit<Conversation, "id"> & { id?: number };
-export type MessageRecord = Omit<Message, "id"> & { id?: number };
+export type MessageRecord = Omit<Message, "id" | "content_ast"> & {
+  id?: number;
+  content_ast?: unknown | null;
+};
 export type SummaryRecordRecord = Omit<SummaryRecord, "id"> & { id?: number };
 export type WeeklyReportRecordRecord = Omit<WeeklyReportRecord, "id"> & { id?: number };
+export interface TopicRecord {
+  id?: number;
+  parent_id: number | null;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+export interface VectorRecord {
+  id?: number;
+  conversation_id: number;
+  text_hash: string;
+  embedding: Float32Array;
+}
+export interface NoteRecord {
+  id?: number;
+  title: string;
+  content: string;
+  created_at: number;
+  updated_at: number;
+  linked_conversation_ids: number[];
+}
 
 export class MemoryHubDB extends Dexie {
   conversations!: Table<ConversationRecord, number>;
   messages!: Table<MessageRecord, number>;
   summaries!: Table<SummaryRecordRecord, number>;
   weekly_reports!: Table<WeeklyReportRecordRecord, number>;
+  topics!: Table<TopicRecord, number>;
+  vectors!: Table<VectorRecord, number>;
+  notes!: Dexie.Table<NoteRecord, number>;
 
   constructor() {
     super("MemoryHubDB");
@@ -138,6 +165,47 @@ export class MemoryHubDB extends Dexie {
             }
           });
       });
+    this.version(6)
+      .stores({
+        conversations:
+          "++id, platform, title, created_at, updated_at, uuid, source_created_at, turn_count, topic_id, is_starred, [platform+created_at], [platform+uuid], [topic_id+updated_at]",
+        messages:
+          "++id, conversation_id, role, created_at, [conversation_id+created_at]",
+        summaries: "++id, conversationId, createdAt",
+        weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
+        topics:
+          "++id, parent_id, name, created_at, updated_at, [parent_id+name]",
+        vectors:
+          "++id, conversation_id, text_hash, [conversation_id+text_hash]",
+      })
+      .upgrade(() => undefined);
+    this.version(7)
+      .stores({
+        conversations:
+          "++id, platform, title, created_at, updated_at, uuid, source_created_at, turn_count, topic_id, is_starred, [platform+created_at], [platform+uuid], [topic_id+updated_at]",
+        messages:
+          "++id, conversation_id, role, created_at, [conversation_id+created_at]",
+        summaries: "++id, conversationId, createdAt",
+        weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
+        topics:
+          "++id, parent_id, name, created_at, updated_at, [parent_id+name]",
+        vectors: "++id, conversation_id, text_hash",
+      })
+      .upgrade(() => undefined);
+    this.version(8)
+      .stores({
+        conversations:
+          "++id, platform, title, created_at, updated_at, uuid, source_created_at, turn_count, topic_id, is_starred, [platform+created_at], [platform+uuid], [topic_id+updated_at]",
+        messages:
+          "++id, conversation_id, role, created_at, [conversation_id+created_at]",
+        summaries: "++id, conversationId, createdAt",
+        weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
+        topics:
+          "++id, parent_id, name, created_at, updated_at, [parent_id+name]",
+        vectors: "++id, conversation_id, text_hash",
+        notes: "++id, created_at, updated_at",
+      })
+      .upgrade(() => undefined);
   }
 }
 
