@@ -18,15 +18,11 @@ export function DemoVideo() {
               controls
               playsInline
               preload="metadata"
-              poster="/screenshot.jpg"
+              poster="/library.png"
             >
               <source
-                src="/demo.mp4"
+                src="/demo-20260225.mp4"
                 type="video/mp4"
-              />
-              <source
-                src="/demo.MOV"
-                type="video/quicktime"
               />
               Your browser does not support the video tag.
             </video>
