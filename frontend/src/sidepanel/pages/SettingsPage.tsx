@@ -615,7 +615,7 @@ export function SettingsPage({ onNavigateToData }: SettingsPageProps) {
 
   return (
     <div className="vesti-shell flex h-full flex-col overflow-y-auto vesti-scroll bg-bg-app">
-      <header className="flex h-8 shrink-0 items-center px-4">
+      <header className="vesti-page-header">
         <h1 className="vesti-page-title text-text-primary">Settings</h1>
       </header>
 
