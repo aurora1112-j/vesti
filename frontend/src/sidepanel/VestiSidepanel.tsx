@@ -9,6 +9,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ReaderView } from "./containers/ReaderView";
 import { DataPage } from "./pages/DataPage";
 
+const DASHBOARD_NAV_REQUEST_KEY = "vesti_dashboard_open_tab";
+
 export function VestiSidepanel() {
   const [currentPage, setCurrentPage] = useState<PageId>("timeline");
   const [selectedConversation, setSelectedConversation] =
@@ -56,25 +58,33 @@ export function VestiSidepanel() {
   };
 
   const handleNavigateToLibrary = () => {
-    const libraryUrl = chrome.runtime.getURL("options.html?tab=library");
-    const optionsUrlPrefix = chrome.runtime.getURL("options.html");
-
-    chrome.tabs.query({}, (tabs) => {
-      const existingTab = tabs.find(
-        (tab) => typeof tab.url === "string" && tab.url.startsWith(optionsUrlPrefix)
-      );
-
-      if (existingTab?.id !== undefined) {
-        chrome.tabs.update(existingTab.id, { active: true, url: libraryUrl }, () => {
-          if (typeof existingTab.windowId === "number") {
-            chrome.windows.update(existingTab.windowId, { focused: true });
+    const fallbackUrl = chrome.runtime.getURL("options.html?tab=library");
+    const openDashboard = () => {
+      if (chrome.runtime?.openOptionsPage) {
+        chrome.runtime.openOptionsPage(() => {
+          if (chrome.runtime?.lastError) {
+            chrome.tabs.create({ url: fallbackUrl });
           }
         });
         return;
       }
+      chrome.tabs.create({ url: fallbackUrl });
+    };
 
-      chrome.tabs.create({ url: libraryUrl });
-    });
+    if (chrome.storage?.local) {
+      chrome.storage.local.set(
+        {
+          [DASHBOARD_NAV_REQUEST_KEY]: {
+            tab: "library",
+            requestedAt: Date.now(),
+          },
+        },
+        openDashboard
+      );
+      return;
+    }
+
+    openDashboard();
   };
 
   const handleNavigateToData = () => {
