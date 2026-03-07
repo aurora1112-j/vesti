@@ -57,10 +57,12 @@ export function VestiSidepanel() {
 
   const handleNavigateToLibrary = () => {
     const libraryUrl = chrome.runtime.getURL("options.html?tab=library");
-    const optionsUrlPattern = `${chrome.runtime.getURL("options.html")}*`;
+    const optionsUrlPrefix = chrome.runtime.getURL("options.html");
 
-    chrome.tabs.query({ url: optionsUrlPattern }, (tabs) => {
-      const existingTab = tabs[0];
+    chrome.tabs.query({}, (tabs) => {
+      const existingTab = tabs.find(
+        (tab) => typeof tab.url === "string" && tab.url.startsWith(optionsUrlPrefix)
+      );
 
       if (existingTab?.id !== undefined) {
         chrome.tabs.update(existingTab.id, { active: true, url: libraryUrl }, () => {
