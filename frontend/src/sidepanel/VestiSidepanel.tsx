@@ -9,6 +9,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ReaderView } from "./containers/ReaderView";
 import { DataPage } from "./pages/DataPage";
 
+const DASHBOARD_NAV_REQUEST_KEY = "vesti_dashboard_open_tab";
+
 export function VestiSidepanel() {
   const [currentPage, setCurrentPage] = useState<PageId>("timeline");
   const [selectedConversation, setSelectedConversation] =
@@ -55,6 +57,36 @@ export function VestiSidepanel() {
     setCurrentPage(page);
   };
 
+  const handleNavigateToLibrary = () => {
+    const fallbackUrl = chrome.runtime.getURL("options.html?tab=library");
+    const openDashboard = () => {
+      if (chrome.runtime?.openOptionsPage) {
+        chrome.runtime.openOptionsPage(() => {
+          if (chrome.runtime?.lastError) {
+            chrome.tabs.create({ url: fallbackUrl });
+          }
+        });
+        return;
+      }
+      chrome.tabs.create({ url: fallbackUrl });
+    };
+
+    if (chrome.storage?.local) {
+      chrome.storage.local.set(
+        {
+          [DASHBOARD_NAV_REQUEST_KEY]: {
+            tab: "library",
+            requestedAt: Date.now(),
+          },
+        },
+        openDashboard
+      );
+      return;
+    }
+
+    openDashboard();
+  };
+
   const handleNavigateToData = () => {
     setCurrentPage("data");
   };
@@ -87,7 +119,11 @@ export function VestiSidepanel() {
           ) : null}
         </main>
 
-        <Dock currentPage={currentPage} onNavigate={handleNavigate} />
+        <Dock
+          currentPage={currentPage}
+          onNavigate={handleNavigate}
+          onNavigateToLibrary={handleNavigateToLibrary}
+        />
       </div>
     </div>
   );

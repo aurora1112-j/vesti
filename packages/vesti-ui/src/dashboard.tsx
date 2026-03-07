@@ -11,6 +11,12 @@ import type { StorageApi } from "./types";
 
 type Tab = "library" | "explore" | "network";
 type DrawerView = "settings" | "data";
+type DashboardNavRequest = {
+  tab?: unknown;
+  requestedAt?: unknown;
+};
+
+const DASHBOARD_NAV_REQUEST_KEY = "vesti_dashboard_open_tab";
 
 type DashboardProps = {
   storage: StorageApi;
@@ -43,6 +49,35 @@ export function VestiDashboard({
   const [settingsAvailable, setSettingsAvailable] = useState(true);
   const [openConversationId, setOpenConversationId] = useState<number | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+
+    const applyNavRequest = (raw: unknown) => {
+      if (!raw || typeof raw !== "object") return;
+      const tab = (raw as DashboardNavRequest).tab;
+      if (tab === "library" || tab === "explore" || tab === "network") {
+        setActiveTab(tab);
+      }
+    };
+
+    chrome.storage.local.get(DASHBOARD_NAV_REQUEST_KEY, (result) => {
+      applyNavRequest(result?.[DASHBOARD_NAV_REQUEST_KEY]);
+    });
+
+    const onStorageChanged: Parameters<typeof chrome.storage.onChanged.addListener>[0] =
+      (changes, areaName) => {
+        if (areaName !== "local") return;
+        const navRequest = changes[DASHBOARD_NAV_REQUEST_KEY];
+        if (!navRequest) return;
+        applyNavRequest(navRequest.newValue);
+      };
+
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    return () => {
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (!drawerOpen || drawerView !== "settings") {
