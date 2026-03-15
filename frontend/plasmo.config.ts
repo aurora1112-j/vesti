@@ -4,12 +4,15 @@ export default {
   vite: (config) => {
     const repoRoot = path.resolve(__dirname, "..", "..");
     const packagesRoot = path.resolve(repoRoot, "packages");
+    const vestiUiEntry = path.resolve(packagesRoot, "vesti-ui", "src", "index.ts");
     const localNodeModules = path.resolve(__dirname, "node_modules");
 
     config.resolve = config.resolve || {};
     config.resolve.preserveSymlinks = false;
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
+      // Keep the extension on the frontend-controlled React 18 runtime.
+      "@vesti/ui": vestiUiEntry,
       react: path.join(localNodeModules, "react"),
       "react-dom": path.join(localNodeModules, "react-dom"),
       "react/jsx-runtime": path.join(localNodeModules, "react/jsx-runtime"),
