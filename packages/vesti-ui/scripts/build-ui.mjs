@@ -1,52 +1,37 @@
-import { existsSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 
-const rootDir = process.cwd();
-const frontendDir = path.resolve(rootDir, "../../frontend");
-const distDir = path.resolve(rootDir, "dist");
-const esbuildBin = path.resolve(
-  frontendDir,
-  "node_modules",
-  ".bin",
-  process.platform === "win32" ? "esbuild.cmd" : "esbuild"
-);
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const packageDir = path.resolve(scriptDir, "..");
+const distDir = path.resolve(packageDir, "dist");
 
 rmSync(distDir, { recursive: true, force: true });
 
-if (!existsSync(esbuildBin)) {
-  console.error(`[vesti-ui] esbuild binary not found: ${esbuildBin}`);
+try {
+  await build({
+    absWorkingDir: packageDir,
+    entryPoints: [path.resolve(packageDir, "src/index.ts")],
+    bundle: true,
+    format: "esm",
+    platform: "browser",
+    target: "es2020",
+    jsx: "automatic",
+    tsconfig: path.resolve(packageDir, "tsconfig.build.json"),
+    outfile: path.resolve(packageDir, "dist/index.js"),
+    external: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "lucide-react",
+      "marked",
+      "dompurify",
+      "echarts"
+    ]
+  });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }
-
-const args = [
-  path.resolve(rootDir, "src/index.ts"),
-  "--bundle",
-  "--format=esm",
-  "--platform=browser",
-  "--target=es2020",
-  "--jsx=automatic",
-  `--tsconfig=${path.resolve(rootDir, "tsconfig.build.json")}`,
-  `--outfile=${path.resolve(rootDir, "dist/index.js")}`,
-  "--external:react",
-  "--external:react-dom",
-  "--external:react/jsx-runtime",
-  "--external:react/jsx-dev-runtime",
-  "--external:lucide-react",
-  "--external:marked",
-  "--external:dompurify",
-  "--external:echarts"
-];
-
-const run = spawnSync(esbuildBin, args, {
-  stdio: "inherit",
-  env: process.env,
-  shell: process.platform === "win32"
-});
-
-if (run.error) {
-  console.error(run.error.message);
-  process.exit(1);
-}
-
-process.exit(run.status ?? 1);
