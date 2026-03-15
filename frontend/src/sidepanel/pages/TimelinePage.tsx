@@ -1,15 +1,21 @@
-﻿import { SlidersHorizontal, ListChecks } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type {
   Conversation,
   ConversationMatchSummary,
   DashboardStats,
+  Platform,
 } from "~lib/types";
 import { getDashboardStats } from "~lib/services/storageService";
 import { PLATFORM_TONE } from "../components/platformTone";
+import { ThreadsFilterDisclosure } from "../components/ThreadsFilterDisclosure";
 import { ConversationList } from "../containers/ConversationList";
 import { SearchLineIcon } from "../components/ThreadSearchIcons";
-import { DATE_PRESET_OPTIONS, PLATFORM_OPTIONS } from "../types/timelineFilters";
+import {
+  DATE_PRESET_OPTIONS,
+  PLATFORM_OPTIONS,
+  type DatePreset,
+} from "../types/timelineFilters";
 import type { ThreadsEvent, ThreadsSearchSession } from "../types/threadsSearch";
 import { useBatchSelection } from "../hooks/useBatchSelection";
 import { BatchActionBar } from "../components/BatchActionBar";
@@ -31,6 +37,29 @@ function toggleSetMember<T>(set: Set<T>, value: T): Set<T> {
   }
   next.add(value);
   return next;
+}
+
+function getDatePresetSummary(datePreset: DatePreset): string {
+  return (
+    DATE_PRESET_OPTIONS.find((preset) => preset.id === datePreset)?.label ??
+    "All time"
+  );
+}
+
+function getSourceSummary(selectedPlatforms: Set<Platform>): string {
+  const selected = PLATFORM_OPTIONS.filter((platform) =>
+    selectedPlatforms.has(platform)
+  );
+
+  if (selected.length === 0) {
+    return "All sources";
+  }
+
+  if (selected.length <= 2) {
+    return selected.join(", ");
+  }
+
+  return `${selected[0]} +${selected.length - 1}`;
 }
 
 export function TimelinePage({
@@ -67,6 +96,8 @@ export function TimelinePage({
 
   const todayCount = stats?.todayCount ?? 0;
   const platformDistribution = stats?.platformDistribution ?? null;
+  const dateSummary = getDatePresetSummary(datePreset);
+  const sourceSummary = getSourceSummary(selectedPlatforms);
   const handleAnchorConsumed = useCallback(() => {
     dispatch({ type: "ANCHOR_CONSUMED" });
   }, [dispatch]);
@@ -118,6 +149,15 @@ export function TimelinePage({
     dispatch({ type: "HEADER_MODE_CHANGED", headerMode: "default" });
   };
 
+  const handleSelectFromMenu = (id: number) => {
+    if (!isBatchMode) {
+      enterBatchMode();
+    }
+    if (!selectedIds.has(id)) {
+      toggleSelection(id);
+    }
+  };
+
   return (
     <div className={`flex h-full flex-col bg-bg-app ${isBatchMode ? "pb-[60px]" : ""}`}>
       {headerMode === "search" ? (
@@ -152,14 +192,14 @@ export function TimelinePage({
         </header>
       ) : (
         <header className="vesti-page-header justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <h1 className="vesti-page-title text-text-primary">Threads</h1>
-            <span className="inline-flex items-center gap-1.5 text-vesti-xs font-medium text-success/90">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-vesti-xs font-medium text-success/90">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               {todayCount} captured today
             </span>
           </div>
-          <div className="flex items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
               aria-label="Search conversations"
@@ -180,99 +220,85 @@ export function TimelinePage({
             >
               <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>
-            {/* Select button - toggle batch mode like filter */}
-            <button
-              type="button"
-              aria-label={isBatchMode ? "Exit selection" : "Select conversations"}
-              onClick={() => {
-                if (isBatchMode) {
-                  exitBatchMode();
-                } else {
-                  enterBatchMode();
-                }
-              }}
-              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
-                isBatchMode
-                  ? "bg-bg-secondary text-accent-primary"
-                  : "text-text-tertiary hover:bg-bg-secondary hover:text-text-secondary"
-              }`}
-            >
-              <ListChecks className="h-3.5 w-3.5" strokeWidth={1.8} />
-            </button>
+
           </div>
         </header>
       )}
 
       {headerMode === "filter" && (
-        <div className="shrink-0 border-b border-border-subtle bg-bg-secondary/40 px-4 py-3">
-          <section>
-            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.11em] text-text-secondary">
-              Date
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {DATE_PRESET_OPTIONS.map((preset) => {
-                const isActive = datePreset === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() =>
-                      dispatch({
-                        type: "FILTER_CHANGED",
-                        datePreset: preset.id,
-                        selectedPlatforms,
-                      })
-                    }
-                    className={`rounded-full border px-3 py-1 text-vesti-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
-                      isActive
-                        ? "border-border-default bg-bg-primary text-text-primary"
-                        : "border-border-subtle text-text-tertiary hover:text-text-secondary"
-                    }`}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+        <div className="shrink-0 border-b border-border-subtle bg-bg-secondary/30 px-4 py-2.5">
+          <div className="grid gap-2">
+            <ThreadsFilterDisclosure
+              title="Date"
+              summary={dateSummary}
+              isActive={datePreset !== "all_time"}
+            >
+              <div className="flex flex-wrap gap-1">
+                {DATE_PRESET_OPTIONS.map((preset) => {
+                  const isActive = datePreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        dispatch({
+                          type: "FILTER_CHANGED",
+                          datePreset: preset.id,
+                          selectedPlatforms,
+                        })
+                      }
+                      className={`rounded-full border px-2.5 py-[3px] text-[11px] font-medium leading-4 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
+                        isActive
+                          ? "border-border-default bg-bg-primary text-text-primary"
+                          : "border-border-subtle text-text-tertiary hover:text-text-secondary"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </ThreadsFilterDisclosure>
 
-          <section className="mt-3 border-t border-border-subtle pt-3">
-            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.11em] text-text-secondary">
-              Source
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {PLATFORM_OPTIONS.map((platform) => {
-                const tone = PLATFORM_TONE[platform];
-                const isActive = selectedPlatforms.has(platform);
-                const hasData =
-                  platformDistribution === null
-                    ? true
-                    : platformDistribution[platform] > 0;
+            <ThreadsFilterDisclosure
+              title="Source"
+              summary={sourceSummary}
+              isActive={selectedPlatforms.size > 0}
+            >
+              <div className="flex flex-wrap gap-1">
+                {PLATFORM_OPTIONS.map((platform) => {
+                  const tone = PLATFORM_TONE[platform];
+                  const isActive = selectedPlatforms.has(platform);
+                  const hasData =
+                    platformDistribution === null
+                      ? true
+                      : platformDistribution[platform] > 0;
 
-                return (
-                  <button
-                    key={platform}
-                    type="button"
-                    onClick={() => {
-                      dispatch({
-                        type: "FILTER_CHANGED",
-                        datePreset,
-                        selectedPlatforms: toggleSetMember(selectedPlatforms, platform),
-                      });
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-vesti-xs font-semibold tracking-[0.02em] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
-                      isActive
-                        ? `${tone.bg} ${tone.border} ${tone.text}`
-                        : `border-border-subtle bg-transparent text-text-tertiary hover:bg-bg-primary hover:text-text-secondary ${!hasData ? "opacity-45" : ""}`
-                    }`}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {platform}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+                  return (
+                    <button
+                      key={platform}
+                      type="button"
+                      onClick={() => {
+                        dispatch({
+                          type: "FILTER_CHANGED",
+                          datePreset,
+                          selectedPlatforms: toggleSetMember(selectedPlatforms, platform),
+                        });
+                      }}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-[3px] text-[11px] font-semibold leading-4 tracking-[0.01em] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
+                        isActive
+                          ? `${tone.bg} ${tone.border} ${tone.text}`
+                          : `border-border-subtle bg-transparent text-text-tertiary hover:bg-bg-primary hover:text-text-secondary ${!hasData ? "opacity-45" : ""}`
+                      }`}
+                    >
+                      <span className="h-1 w-1 rounded-full bg-current" />
+                      {platform}
+                    </button>
+                  );
+                })}
+              </div>
+            </ThreadsFilterDisclosure>
+          </div>
         </div>
       )}
 
@@ -292,6 +318,7 @@ export function TimelinePage({
           isBatchMode={isBatchMode}
           selectedIds={selectedIds}
           onToggleSelection={toggleSelection}
+          onSelectFromMenu={handleSelectFromMenu}
           onConversationsLoaded={setConversations}
         />
 
@@ -318,4 +345,3 @@ export function TimelinePage({
     </div>
   );
 }
-
