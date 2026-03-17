@@ -3,7 +3,7 @@ import type { Conversation, Platform, UiThemeMode } from "../../types";
 export const DAY_MS = 86_400_000;
 export const GRAPH_FONT_FAMILY =
   '"Inter", "SF Pro Text", -apple-system, "PingFang SC", sans-serif';
-export const GRAPH_HEIGHT = 360;
+export const GRAPH_HEIGHT = 420;
 export const TIMEBAR_HEIGHT = 72;
 export const TIMEBAR_HORIZONTAL_PADDING = 12;
 export const TIMEBAR_CHART_TOP = 8;

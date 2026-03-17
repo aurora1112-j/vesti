@@ -4,9 +4,9 @@ import type { GraphEdge, GraphNode } from "./temporal-graph-utils";
 import { clamp, truncateLabel } from "./temporal-graph-utils";
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const RELAXATION_ITERATIONS = 56;
-const VIRTUAL_WIDTH_MULTIPLIER = 1.62;
-const VIRTUAL_HEIGHT_MULTIPLIER = 1.46;
+const RELAXATION_ITERATIONS = 64;
+const VIRTUAL_WIDTH_MULTIPLIER = 2.2;
+const VIRTUAL_HEIGHT_MULTIPLIER = 1.72;
 
 export interface LayoutAnchor {
   anchorX: number;
@@ -77,9 +77,9 @@ function buildNodeAnchorMetrics(node: GraphNode, width: number): LayoutAnchor {
     anchorX: 0,
     anchorY: 0,
     labelHalfWidth,
-    horizontalFootprint: Math.max(node.radius + 16, labelHalfWidth + 8),
-    verticalFootprint: node.radius + 32,
-    collisionRadius: Math.max(node.radius + 14, labelHalfWidth * 0.52),
+    horizontalFootprint: Math.max(node.radius + 24, labelHalfWidth + 14),
+    verticalFootprint: node.radius + 42,
+    collisionRadius: Math.max(node.radius + 18, labelHalfWidth * 0.8),
   };
 }
 
@@ -105,8 +105,8 @@ function buildLayoutBounds(
   const virtualHeight = Math.max(height + 120, height * VIRTUAL_HEIGHT_MULTIPLIER);
   const left = centerX - virtualWidth / 2 + maxHorizontalFootprint;
   const right = centerX + virtualWidth / 2 - maxHorizontalFootprint;
-  const top = centerY - virtualHeight / 2 + maxVerticalFootprint * 0.72;
-  const bottom = centerY + virtualHeight / 2 - maxVerticalFootprint;
+  const top = centerY - virtualHeight / 2 + maxVerticalFootprint * 0.62;
+  const bottom = centerY + virtualHeight / 2 - maxVerticalFootprint * 0.88;
 
   return {
     left,
@@ -294,9 +294,9 @@ function buildInitialStates(
         );
       });
 
-    const spacing = Math.max(component.maxCollisionRadius * 1.15, 34);
-    const flattenY = 0.78;
-    const componentPull = 0.02 / Math.max(1, Math.sqrt(component.nodeCount));
+    const spacing = Math.max(component.maxCollisionRadius * 1.38, 52);
+    const flattenY = 0.92;
+    const componentPull = 0.012 / Math.max(1, Math.sqrt(component.nodeCount));
 
     componentNodes.forEach((node, nodeIndex) => {
       const metrics = metricsById.get(node.id)!;
@@ -352,7 +352,7 @@ function relaxStates(
         const dy = leftState.y - rightState.y;
         const distance = Math.hypot(dx, dy);
         const minimumDistance =
-          leftState.collisionRadius + rightState.collisionRadius + 12;
+          leftState.collisionRadius + rightState.collisionRadius + 18;
 
         if (distance >= minimumDistance) continue;
 
@@ -381,9 +381,9 @@ function relaxStates(
       const dx = target.x - source.x;
       const dy = target.y - source.y;
       const distance = Math.max(0.001, Math.hypot(dx, dy));
-      const targetDistance = 68 + (1 - edge.weight) * 34;
+      const targetDistance = 96 + (1 - edge.weight) * 48;
       const difference = distance - targetDistance;
-      const attraction = difference * 0.034 * edge.weight;
+      const attraction = difference * 0.024 * edge.weight;
 
       const sourceDisplacement = displacement.get(source.id)!;
       const targetDisplacement = displacement.get(target.id)!;

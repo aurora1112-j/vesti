@@ -452,7 +452,7 @@ export function NetworkTab({
   if (dataset.data.nodes.length === 0) {
     return (
       <div className="h-full overflow-y-auto bg-bg-tertiary">
-        <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center gap-3 px-4 py-8">
+        <div className="flex min-h-full w-full flex-col justify-center gap-3 px-6 py-8 md:px-8">
           <div className="max-w-sm">
             <p className="text-sm font-medium text-text-primary">
               Your temporal network will appear here.
@@ -470,8 +470,8 @@ export function NetworkTab({
 
   return (
     <div className="h-full overflow-y-auto bg-bg-tertiary">
-      <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center gap-4 px-4 py-8">
-        <div className="relative h-[360px] bg-bg-tertiary">
+      <div className="flex min-h-full w-full flex-col justify-center gap-4 px-6 py-8 md:px-8">
+        <div className="relative h-[420px] bg-bg-tertiary">
           {edgeStatus === "loading" && (
             <div className="pointer-events-none absolute left-0 top-0 z-10 rounded-full bg-bg-primary/85 px-2.5 py-1 text-[11px] font-sans text-text-tertiary backdrop-blur-sm">
               Building graph...

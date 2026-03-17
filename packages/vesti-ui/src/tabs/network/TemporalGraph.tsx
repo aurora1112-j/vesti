@@ -41,7 +41,23 @@ interface PanBounds {
   maxY: number;
 }
 
-const PAN_PADDING = 18;
+interface LabelCandidate {
+  id: number;
+  label: string;
+  alpha: number;
+  x: number;
+  y: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  priority: number;
+  force: boolean;
+}
+
+const PAN_PADDING = 12;
+const PAN_OVERSCROLL_X = 108;
+const PAN_OVERSCROLL_Y = 72;
 const DRAG_THRESHOLD = 5;
 
 function getGraphCenterY(height: number) {
@@ -84,20 +100,20 @@ function buildPanBounds(
   const minPanX =
     horizontalRange + PAN_PADDING * 2 <= width
       ? (width - (minX + maxX)) / 2
-      : width - PAN_PADDING - maxX;
+      : width - PAN_PADDING - maxX - PAN_OVERSCROLL_X;
   const maxPanX =
     horizontalRange + PAN_PADDING * 2 <= width
       ? (width - (minX + maxX)) / 2
-      : PAN_PADDING - minX;
+      : PAN_PADDING - minX + PAN_OVERSCROLL_X;
 
   const minPanY =
     verticalRange + PAN_PADDING * 2 <= height
       ? (height - (minY + maxY)) / 2
-      : height - PAN_PADDING - maxY;
+      : height - PAN_PADDING - maxY - PAN_OVERSCROLL_Y;
   const maxPanY =
     verticalRange + PAN_PADDING * 2 <= height
       ? (height - (minY + maxY)) / 2
-      : PAN_PADDING - minY;
+      : PAN_PADDING - minY + PAN_OVERSCROLL_Y;
 
   return {
     minX: Math.min(minPanX, maxPanX),
@@ -105,6 +121,15 @@ function buildPanBounds(
     minY: Math.min(minPanY, maxPanY),
     maxY: Math.max(minPanY, maxPanY),
   };
+}
+
+function labelsOverlap(left: LabelCandidate, right: LabelCandidate) {
+  return !(
+    left.right < right.left ||
+    left.left > right.right ||
+    left.bottom < right.top ||
+    left.top > right.bottom
+  );
 }
 
 export function TemporalGraph({
@@ -169,6 +194,7 @@ export function TemporalGraph({
     const centerY = getGraphCenterY(height);
     const renderedNodes: RenderNode[] = [];
     const renderedNodesById = new Map<number, RenderNode>();
+    const labelCandidates: LabelCandidate[] = [];
 
     for (const node of data.nodes) {
       if (node.timelineDay > currentDayRef.current) continue;
@@ -264,12 +290,53 @@ export function TemporalGraph({
           : isNeighbor
             ? Math.max(0.62, Math.min(1, (alpha - 0.2) / 0.28))
             : Math.min(1, (alpha - 0.3) / 0.25);
-        context.font = `11px ${GRAPH_FONT_FAMILY}`;
-        context.textAlign = "center";
-        context.fillStyle = getGraphLabelFill(themeMode, labelAlpha);
-        context.fillText(truncateLabel(node.label, 18), node.x, node.y + node.radius + 13);
+
+        const label = truncateLabel(node.label, 18);
+        const anchor = layoutRef.current.get(node.id);
+        const labelHalfWidth = anchor?.labelHalfWidth ?? Math.max(34, label.length * 3.5);
+        const labelY = node.y + node.radius + 13;
+
+        labelCandidates.push({
+          id: node.id,
+          label,
+          alpha: labelAlpha,
+          x: node.x,
+          y: labelY,
+          left: node.x - labelHalfWidth,
+          right: node.x + labelHalfWidth,
+          top: labelY - 10,
+          bottom: labelY + 4,
+          priority:
+            (isSelected ? 100 : 0) +
+            (isNeighbor ? 25 : 0) +
+            node.radius +
+            labelAlpha * 10,
+          force: isSelected,
+        });
       }
     }
+
+    const acceptedLabels: LabelCandidate[] = [];
+    labelCandidates
+      .sort((left, right) => right.priority - left.priority || left.id - right.id)
+      .forEach((candidate) => {
+        if (
+          !candidate.force &&
+          acceptedLabels.some((accepted) => labelsOverlap(candidate, accepted))
+        ) {
+          return;
+        }
+        acceptedLabels.push(candidate);
+      });
+
+    context.font = `11px ${GRAPH_FONT_FAMILY}`;
+    context.textAlign = "center";
+    acceptedLabels
+      .sort((left, right) => left.priority - right.priority || left.id - right.id)
+      .forEach((candidate) => {
+        context.fillStyle = getGraphLabelFill(themeMode, candidate.alpha);
+        context.fillText(candidate.label, candidate.x, candidate.y);
+      });
   }, [data.edges, data.nodes, height, highlightedNodeIdSet, selectedNodeId, themeMode, width]);
 
   useEffect(() => {
