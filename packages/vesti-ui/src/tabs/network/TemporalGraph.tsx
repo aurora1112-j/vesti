@@ -84,8 +84,8 @@ const VIEW_PADDING = 16;
 const OVERSCROLL_X = 120;
 const OVERSCROLL_Y = 80;
 const DRAG_THRESHOLD = 5;
-const MIN_ZOOM = 0.72;
-const MAX_ZOOM = 2.6;
+const MIN_ZOOM = 0.18;
+const MAX_ZOOM = 2.8;
 const WHEEL_ZOOM_INTENSITY = 0.0016;
 
 function createWorldBounds(): WorldBounds {
@@ -304,10 +304,12 @@ export function TemporalGraph({
 
       const targetX = projectX(anchor.anchorX, transform);
       const targetY = projectY(anchor.anchorY, transform);
+      const screenRadius = clamp(node.radius * transform.scale, 4, 30);
       const age = currentDayRef.current - node.timelineDay;
       const enterProgress = Math.max(0, Math.min(1, age / 0.8));
       const renderNode: RenderNode = {
         ...node,
+        radius: screenRadius,
         x: centerX + (targetX - centerX) * enterProgress,
         y: centerY + (targetY - centerY) * enterProgress,
       };
@@ -342,7 +344,8 @@ export function TemporalGraph({
       context.moveTo(source.x, source.y);
       context.lineTo(target.x, target.y);
       context.strokeStyle = getGraphEdgeStroke(themeMode, isHighlightedEdge ? alpha * 1.12 : alpha);
-      context.lineWidth = edge.weight * (isHighlightedEdge ? 2.3 : 1.8);
+      context.lineWidth =
+        edge.weight * (isHighlightedEdge ? 2.3 : 1.8) * clamp(transform.scale, 0.66, 1.28);
       context.stroke();
     }
 
@@ -386,7 +389,7 @@ export function TemporalGraph({
       context.stroke();
 
       const allowGeneralLabel =
-        transform.scale >= fitScaleRef.current * 1.12 || nodeDegree <= 1;
+        transform.scale >= fitScaleRef.current * 1.35 || nodeDegree === 0;
 
       if (isSelected || isNeighbor || (alpha > 0.36 && allowGeneralLabel)) {
         const labelAlpha = isSelected
