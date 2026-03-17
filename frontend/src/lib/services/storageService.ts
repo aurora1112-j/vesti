@@ -25,10 +25,11 @@ import type { ChatSummaryData } from "../types/insightsPresentation";
 import type { ExploreSession, ExploreMessage } from "../db/repository";
 import { sendRequest } from "../messaging/runtime";
 import type { ConversationUpdateChanges } from "../messaging/protocol";
+import type { LlmDiagnostic } from "./llmService";
 import { toChatSummaryData } from "./insightAdapter";
 
 const LONG_RUNNING_TIMEOUT_MS = 120000;
-const TEST_CONNECTION_TIMEOUT_MS = 30000;
+const TEST_CONNECTION_TIMEOUT_MS = 45000;
 const FULL_TEXT_SEARCH_TIMEOUT_MS = 15000;
 
 export async function getConversations(filters?: {
@@ -465,14 +466,18 @@ export async function setLlmSettings(settings: LlmConfig): Promise<void> {
   });
 }
 
-export async function testLlmConnection(): Promise<{ ok: boolean; message?: string }> {
+export async function testLlmConnection(): Promise<{
+  ok: boolean;
+  message?: string;
+  diagnostic?: LlmDiagnostic | null;
+}> {
   return sendRequest(
     {
       type: "TEST_LLM_CONNECTION",
       target: "offscreen",
     },
     TEST_CONNECTION_TIMEOUT_MS
-  ) as Promise<{ ok: boolean; message?: string }>;
+  ) as Promise<{ ok: boolean; message?: string; diagnostic?: LlmDiagnostic | null }>;
 }
 
 export async function getConversationSummary(
@@ -550,3 +555,4 @@ export async function forceArchiveTransient(): Promise<ForceArchiveTransientResu
     target: "background",
   }) as Promise<ForceArchiveTransientResult>;
 }
+

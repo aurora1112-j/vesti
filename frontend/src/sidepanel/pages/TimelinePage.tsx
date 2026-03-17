@@ -113,6 +113,9 @@ export function TimelinePage({
   const [batchFeedback, setBatchFeedback] = useState<{
     message: string;
     tone: "default" | "warning" | "error";
+    title?: string;
+    detail?: string;
+    hint?: string;
   } | null>(null);
   const suppressNextReaderOpenRef = useRef(false);
   const suppressNextReaderOpenTimerRef = useRef<number | null>(null);
@@ -237,12 +240,24 @@ export function TimelinePage({
         });
         downloadConversationExport(result);
         closePanel();
-        setBatchFeedback({
-          message: result.notice
-            ? `${result.notice.message} Saved as ${result.filename}.`
-            : `Exported ${result.filename}`,
-          tone: result.notice?.tone ?? "default",
-        });
+        if (result.notice?.title || result.notice?.detail || result.notice?.hint) {
+          setBatchFeedback({
+            message: result.notice.message,
+            tone: result.notice.tone,
+            title: result.notice.title,
+            detail: result.notice.detail,
+            hint: result.notice.hint
+              ? `${result.notice.hint} Saved as ${result.filename}.`
+              : `Saved as ${result.filename}.`,
+          });
+        } else {
+          setBatchFeedback({
+            message: result.notice
+              ? `${result.notice.message} Saved as ${result.filename}.`
+              : `Exported ${result.filename}`,
+            tone: result.notice?.tone ?? "default",
+          });
+        }
       } catch (error) {
         setBatchFeedback({
           message: getErrorMessage(error),

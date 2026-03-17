@@ -18,6 +18,9 @@ type BatchActionMode = Exclude<BatchSelectionMode, "inactive">;
 interface BatchFeedback {
   message: string;
   tone: "default" | "warning" | "error";
+  title?: string;
+  detail?: string;
+  hint?: string;
 }
 
 interface BatchActionBarProps {
@@ -124,6 +127,7 @@ export function BatchActionBar({
   const toolbarNeutralActionClassName = `${toolbarActionBaseClassName} text-text-secondary hover:bg-bg-secondary hover:text-text-primary`;
   const toolbarDeleteActionClassName = `${toolbarActionBaseClassName} text-danger hover:bg-bg-secondary`;
   const toolbarSelectActionClassName = `${toolbarNeutralActionClassName} px-1.5`;
+  const hasStructuredFeedback = Boolean(feedback?.title || feedback?.detail || feedback?.hint);
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-3">
@@ -201,9 +205,19 @@ export function BatchActionBar({
             })}
           </div>
 
-          {feedback && (
-            <p className={`mt-3 data-feedback-row ${feedbackClassName}`}>{feedback.message}</p>
-          )}
+          {feedback &&
+            (hasStructuredFeedback ? (
+              <div className={`mt-3 data-feedback-callout ${feedbackClassName}`}>
+                <div className="data-feedback-callout-head">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />
+                  <p className="data-feedback-title">{feedback.title || feedback.message}</p>
+                </div>
+                {feedback.detail && <p className="data-feedback-detail">{feedback.detail}</p>}
+                {feedback.hint && <p className="data-feedback-hint">{feedback.hint}</p>}
+              </div>
+            ) : (
+              <p className={`mt-3 data-feedback-row ${feedbackClassName}`}>{feedback.message}</p>
+            ))}
         </div>
       ) : showingDeletePanel ? (
         <div className="rounded-xl border border-border-subtle bg-bg-primary/95 p-3 shadow-paper backdrop-blur-sm">
@@ -276,9 +290,19 @@ export function BatchActionBar({
             </div>
           </div>
 
-          {feedback && (
-            <p className={`mt-3 data-feedback-row ${feedbackClassName}`}>{feedback.message}</p>
-          )}
+          {feedback &&
+            (hasStructuredFeedback ? (
+              <div className={`mt-3 data-feedback-callout ${feedbackClassName}`}>
+                <div className="data-feedback-callout-head">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />
+                  <p className="data-feedback-title">{feedback.title || feedback.message}</p>
+                </div>
+                {feedback.detail && <p className="data-feedback-detail">{feedback.detail}</p>}
+                {feedback.hint && <p className="data-feedback-hint">{feedback.hint}</p>}
+              </div>
+            ) : (
+              <p className={`mt-3 data-feedback-row ${feedbackClassName}`}>{feedback.message}</p>
+            ))}
         </div>
       ) : (
         <>
@@ -342,9 +366,19 @@ export function BatchActionBar({
             </div>
           </div>
 
-          {feedback && (
-            <p className={`mt-2 data-feedback-row ${feedbackClassName}`}>{feedback.message}</p>
-          )}
+          {feedback &&
+            (hasStructuredFeedback ? (
+              <div className={`mt-2 data-feedback-callout ${feedbackClassName}`}>
+                <div className="data-feedback-callout-head">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />
+                  <p className="data-feedback-title">{feedback.title || feedback.message}</p>
+                </div>
+                {feedback.detail && <p className="data-feedback-detail">{feedback.detail}</p>}
+                {feedback.hint && <p className="data-feedback-hint">{feedback.hint}</p>}
+              </div>
+            ) : (
+              <p className={`mt-2 data-feedback-row ${feedbackClassName}`}>{feedback.message}</p>
+            ))}
         </>
       )}
     </div>
