@@ -6,7 +6,6 @@ import {
   GRAPH_FONT_FAMILY,
   TIMEBAR_HEIGHT,
   TIMEBAR_HORIZONTAL_PADDING,
-  dayToPixel,
   getTimebarMetrics,
   getTrendPointY,
   pixelToDay,
@@ -78,24 +77,22 @@ function buildTrendPoints(
   chartTop: number,
   chartHeight: number
 ) {
-  const chartLeft = TIMEBAR_HORIZONTAL_PADDING;
-  const chartRight = Math.max(width - TIMEBAR_HORIZONTAL_PADDING, TIMEBAR_HORIZONTAL_PADDING);
+  const chartLeft = timelineToPixel(0, totalDays, width);
+  const chartRight = timelineToPixel(totalDays, totalDays, width);
   const chartBottom = chartTop + chartHeight;
   const points: Point[] = [{ x: chartLeft, y: chartBottom }];
 
   for (let day = 1; day <= totalDays; day += 1) {
     points.push({
-      x: dayToPixel(day, totalDays, width),
+      x: timelineToPixel(day, totalDays, width),
       y: getTrendPointY(dayCounts[day] ?? 0, maxCount, chartTop, chartHeight),
     });
   }
 
-  points.push({ x: chartRight, y: chartBottom });
-
   return { chartRight, points };
 }
 
-function traceSmoothedLine(context: CanvasRenderingContext2D, points: Point[]) {
+function traceLine(context: CanvasRenderingContext2D, points: Point[]) {
   if (points.length === 0) return;
 
   context.moveTo(points[0].x, points[0].y);
@@ -105,16 +102,10 @@ function traceSmoothedLine(context: CanvasRenderingContext2D, points: Point[]) {
     return;
   }
 
-  for (let index = 1; index < points.length - 1; index += 1) {
+  for (let index = 1; index < points.length; index += 1) {
     const current = points[index];
-    const next = points[index + 1];
-    const midX = (current.x + next.x) / 2;
-    const midY = (current.y + next.y) / 2;
-    context.quadraticCurveTo(current.x, current.y, midX, midY);
+    context.lineTo(current.x, current.y);
   }
-
-  const last = points[points.length - 1];
-  context.lineTo(last.x, last.y);
 }
 
 function drawArea(
@@ -128,7 +119,7 @@ function drawArea(
   context.beginPath();
   context.moveTo(points[0].x, baselineY);
   context.lineTo(points[0].x, points[0].y);
-  traceSmoothedLine(context, points);
+  traceLine(context, points);
   context.lineTo(points[points.length - 1].x, baselineY);
   context.closePath();
   context.fillStyle = fillStyle;
@@ -144,7 +135,7 @@ function drawLine(
   if (points.length === 0) return;
 
   context.beginPath();
-  traceSmoothedLine(context, points);
+  traceLine(context, points);
   context.strokeStyle = strokeStyle;
   context.lineWidth = lineWidth;
   context.stroke();
@@ -166,6 +157,26 @@ function getMarkerY(points: Point[], markerX: number) {
   }
 
   return points[points.length - 1].y;
+}
+
+function drawDataPoints(
+  context: CanvasRenderingContext2D,
+  points: Point[],
+  strokeStyle: string,
+  fillStyle: string
+) {
+  if (points.length <= 1) return;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index];
+    context.beginPath();
+    context.arc(point.x, point.y, 2.25, 0, Math.PI * 2);
+    context.fillStyle = fillStyle;
+    context.fill();
+    context.strokeStyle = strokeStyle;
+    context.lineWidth = 1;
+    context.stroke();
+  }
 }
 
 export function TimeBar({
@@ -256,6 +267,12 @@ export function TimeBar({
     }
 
     drawLine(context, points, getFutureLineStroke(themeMode), 1.4);
+    drawDataPoints(
+      context,
+      points,
+      getFutureLineStroke(themeMode),
+      themeMode === "dark" ? "rgba(180, 178, 168, 0.9)" : "rgba(100, 98, 90, 0.92)"
+    );
 
     if (markerX > TIMEBAR_HORIZONTAL_PADDING) {
       context.save();
@@ -268,6 +285,12 @@ export function TimeBar({
       );
       context.clip();
       drawLine(context, points, getActiveLineStroke(themeMode), 2);
+      drawDataPoints(
+        context,
+        points,
+        getActiveLineStroke(themeMode),
+        themeMode === "dark" ? "#E5E3DB" : "#1A1A1A"
+      );
       context.restore();
     }
 
@@ -290,7 +313,7 @@ export function TimeBar({
 
       let previousTickX = -Infinity;
       for (let day = 7; day <= totalDays; day += 7) {
-        const tickX = dayToPixel(day, totalDays, width);
+        const tickX = timelineToPixel(day, totalDays, width);
         if (tickX - previousTickX < 28) continue;
         context.fillText(String(day), tickX, tickY);
         previousTickX = tickX;
