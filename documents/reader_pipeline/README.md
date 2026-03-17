@@ -1,28 +1,49 @@
 ﻿# Reader Pipeline Documentation Package
 
-Status: Active canonical documentation tree for reader pipeline and schema evolution work  
-Audience: Reader maintainers, data pipeline engineers, QA
+Status: Active canonical documentation tree for reader, export, compression, insights, and schema-consumer evolution  
+Audience: Reader maintainers, data pipeline engineers, web/dashboard contributors, QA
 
 ## Purpose
 
-`documents/reader_pipeline/` is the source of truth for reader/data-pipeline evolution that sits between capture output and reader/rendered consumption.
+`documents/reader_pipeline/` 是 reader / data-pipeline 方向的 current source of truth。
+它负责回答：
 
-It owns:
-- schema and migration specs
-- pipeline dual-track contracts
-- fallback/performance rules
-- reader pipeline acceptance guidance
-- AST probe quick-reference material
+- capture 持久化结果进入 reader / export / compression / insights / web 之后的消费规范
+- conversation package 与时间语义
+- reader / data schema 的演进边界
+- 迁移、验收、回归操作口径
 
-It does not own:
-- raw parser DOM normalization
-- web dashboard product specs
-- historical handoff snapshots
+它不负责：
 
-## Current source-of-truth docs
+- 原始 DOM discovery 和 parser normalization 细节
+- capture governance 模式本身
+- dated handoff 快照
 
-- `v1_6_data_pipeline_dual_track_spec.md`
-- `v1_6_schema_v5_migration_spec.md`
-- `v1_6_performance_fallback_spec.md`
-- `v1_6_manual_sampling_and_acceptance.md`
-- `v1_6_ast_probe_cheat_sheet.md`
+## Canonical Docs
+
+- `reader_pipeline_engineering_spec.md`
+  - 主规格。定义 reader pipeline 的目标、共享 content package、统一时间语义和各消费端规则
+- `reader_pipeline_current_architecture.md`
+  - 只读诊断。解释当前 reader / export / compression / insights / web 链路哪些边界已经合理，哪些地方仍在漂移
+- `reader_pipeline_operational_playbook.md`
+  - 操作文档。统一迁移验证、reader fidelity 检查、导出检查、时间语义回归和 release gate
+
+## Recommended Reading Order
+
+1. `reader_pipeline_engineering_spec.md`
+2. `reader_pipeline_current_architecture.md`
+3. `reader_pipeline_operational_playbook.md`
+
+## Historical Migration Note
+
+旧版 `v1_6_*` spec、manual sampling 和 AST cheat sheet 已迁入
+`documents/archive/reader_pipeline/`。它们继续保留以便追溯，但不再作为当前实现决策的
+source of truth。
+
+## Archive Mapping
+
+| 历史材料组 | 归档位置 |
+| --- | --- |
+| 旧 spec / migration / fallback docs | `../archive/reader_pipeline/superseded_specs/` |
+| 旧 manual sampling / acceptance | `../archive/reader_pipeline/legacy_playbooks/` |
+| 旧 AST probe / cheat sheet | `../archive/reader_pipeline/reference_cheat_sheets/` |

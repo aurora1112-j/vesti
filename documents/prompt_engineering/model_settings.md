@@ -1,4 +1,4 @@
-# Vesti Model Access RFC (v1.2-rc.5)
+﻿# Vesti Model Access RFC (v1.2-rc.5)
 
 - Document version: v1.2-rc.5
 - Updated on: 2026-03-17

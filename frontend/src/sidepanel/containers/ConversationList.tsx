@@ -7,6 +7,12 @@ import type {
   Topic,
 } from "~lib/types";
 import {
+  getConversationCaptureFreshnessAt,
+  getConversationFirstCapturedAt,
+  getConversationOriginAt,
+  getConversationSourceCreatedAt,
+} from "~lib/conversations/timestamps";
+import {
   deleteConversation,
   getConversations,
   getMessages,
@@ -62,10 +68,6 @@ function toLocalDateTime(value: number): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
-function getDisplayCreatedAt(conversation: Conversation): number {
-  return conversation.source_created_at ?? conversation.created_at;
-}
-
 function buildConversationCopyText(
   conversation: Conversation,
   messages: Message[]
@@ -74,8 +76,22 @@ function buildConversationCopyText(
   lines.push(`# ${conversation.title || "Untitled Conversation"}`);
   lines.push(`Platform: ${conversation.platform}`);
   lines.push(`Source URL: ${conversation.url || "N/A"}`);
-  lines.push(`Created At: ${toLocalDateTime(getDisplayCreatedAt(conversation))}`);
-  lines.push(`Updated At: ${toLocalDateTime(conversation.updated_at)}`);
+  lines.push(`Started At: ${toLocalDateTime(getConversationOriginAt(conversation))}`);
+  const sourceCreatedAt = getConversationSourceCreatedAt(conversation);
+  if (sourceCreatedAt !== null) {
+    lines.push(`Source Time: ${toLocalDateTime(sourceCreatedAt)}`);
+  }
+  lines.push(
+    `First Captured At: ${toLocalDateTime(
+      getConversationFirstCapturedAt(conversation)
+    )}`
+  );
+  lines.push(
+    `Last Captured At: ${toLocalDateTime(
+      getConversationCaptureFreshnessAt(conversation)
+    )}`
+  );
+  lines.push(`Last Modified: ${toLocalDateTime(conversation.updated_at)}`);
   lines.push(`Message Count: ${messages.length}`);
   lines.push("");
 
@@ -183,7 +199,9 @@ export function ConversationList({
     if (!conversations.length) return [];
     return conversations
       .filter((conversation) => {
-        if (!matchesDatePreset(conversation.updated_at, datePreset)) return false;
+        if (!matchesDatePreset(getConversationOriginAt(conversation), datePreset)) {
+          return false;
+        }
         if (selectedPlatforms.size > 0 && !selectedPlatforms.has(conversation.platform)) {
           return false;
         }
@@ -306,7 +324,9 @@ export function ConversationList({
       const matchesQuery =
         normalizedSearchQuery.length === 0 ? true : baseMatch || textMatch;
       if (!matchesQuery) return acc;
-      if (!matchesDatePreset(conversation.updated_at, datePreset)) return acc;
+      if (!matchesDatePreset(getConversationOriginAt(conversation), datePreset)) {
+        return acc;
+      }
       if (selectedPlatforms.size > 0 && !selectedPlatforms.has(conversation.platform)) {
         return acc;
       }
@@ -358,16 +378,16 @@ export function ConversationList({
     const older: FilteredConversationItem[] = [];
 
     for (const item of filteredConversations) {
-      const diff = now - item.conversation.updated_at;
+      const diff = now - getConversationOriginAt(item.conversation);
       if (diff < 86_400_000) today.push(item);
       else if (diff < 604_800_000) week.push(item);
       else older.push(item);
     }
 
     const groups: { label: string; items: FilteredConversationItem[] }[] = [];
-    if (today.length > 0) groups.push({ label: "Today", items: today });
-    if (week.length > 0) groups.push({ label: "This Week", items: week });
-    if (older.length > 0) groups.push({ label: "Earlier", items: older });
+    if (today.length > 0) groups.push({ label: "Started Today", items: today });
+    if (week.length > 0) groups.push({ label: "Started This Week", items: week });
+    if (older.length > 0) groups.push({ label: "Started Earlier", items: older });
     return groups;
   }, [filteredConversations]);
 
@@ -489,7 +509,9 @@ export function ConversationList({
             : item
         );
 
-        next = next.sort((a, b) => b.updated_at - a.updated_at);
+        next = next.sort(
+          (a, b) => getConversationOriginAt(b) - getConversationOriginAt(a)
+        );
 
         if (!normalizedSearchQuery) {
           return next;

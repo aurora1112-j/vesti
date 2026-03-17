@@ -11,10 +11,13 @@ import {
 } from "~lib/services/llmModelProfile";
 import {
   callInference,
+  getLlmDiagnostic,
+  type LlmDiagnostic,
   sanitizeSummaryText,
   truncateForContext,
 } from "~lib/services/llmService";
 import { getLlmSettings } from "~lib/services/llmSettingsService";
+import { getConversationOriginAt } from "~lib/conversations/timestamps";
 import type { Conversation, Message } from "~lib/types";
 import { logger } from "~lib/utils/logger";
 import type {
@@ -50,6 +53,7 @@ export interface CompressedConversationExport {
   route?: ExportCompressionRoute;
   usedFallbackPrompt: boolean;
   fallbackReason?: string;
+  diagnostic?: LlmDiagnostic;
 }
 
 interface ExportCompressionAdapter {
@@ -179,7 +183,7 @@ function buildPromptPayload(
   return {
     conversationTitle: item.conversation.title,
     conversationPlatform: item.conversation.platform,
-    conversationOriginAt: item.conversation.source_created_at || item.conversation.created_at,
+    conversationOriginAt: getConversationOriginAt(item.conversation),
     messages: item.messages,
     locale: detectLocale(),
     profile,
@@ -591,7 +595,8 @@ function buildSummaryFallback(
 function buildLocalFallback(
   item: ConversationExportDatasetItem,
   mode: ExportCompressionMode,
-  reason: string
+  reason: string,
+  diagnostic?: LlmDiagnostic | null
 ): CompressedConversationExport {
   const body =
     mode === "compact"
@@ -605,8 +610,42 @@ function buildLocalFallback(
     mode,
     source: "local_fallback",
     usedFallbackPrompt: false,
-    fallbackReason: reason,
+    fallbackReason: diagnostic?.code || reason,
+    diagnostic: diagnostic || undefined,
   };
+}
+
+function getExportValidationFeedback(reason: string | undefined):
+  | { detail: string; hint: string }
+  | null {
+  switch (reason) {
+    case "export_output_too_short":
+      return {
+        detail:
+          "LLM returned text, but it was too short to satisfy the export compression baseline. Validation: export_output_too_short.",
+        hint: "Try the other model path later or use Full export while we tune this profile.",
+      };
+    case "export_missing_required_headings":
+      return {
+        detail:
+          "LLM returned text, but the required markdown sections were missing. Validation: export_missing_required_headings.",
+        hint: "We expect the shipping export headings exactly; try again after the model/profile switch finishes propagating.",
+      };
+    case "export_grounded_sections_insufficient":
+      return {
+        detail:
+          "LLM returned the right shape, but too many sections were generic or not grounded in the thread. Validation: export_grounded_sections_insufficient.",
+        hint: "This usually means the model answered loosely instead of preserving the thread's actual moves and constraints.",
+      };
+    case "export_artifact_signal_missing":
+      return {
+        detail:
+          "LLM returned structured text, but dropped code, command, or file-path evidence that the thread contained. Validation: export_artifact_signal_missing.",
+        hint: "Use Full export for now if artifact fidelity is critical, then retry after we tune the compression profile.",
+      };
+    default:
+      return null;
+  }
 }
 
 function extractSections(
@@ -842,16 +881,42 @@ function buildCompressionNotice(
     };
   }
 
+  const representativeFallback = results.find(
+    (result) => result.source === "local_fallback" && result.diagnostic
+  );
+  const diagnostic = representativeFallback?.diagnostic;
+  const validationFallback = results.find(
+    (result) => result.source === "local_fallback" && result.fallbackReason
+  );
+  const validationFeedback = diagnostic
+    ? null
+    : getExportValidationFeedback(validationFallback?.fallbackReason);
+  const detail = diagnostic
+    ? `${diagnostic.userMessage}
+${diagnostic.technicalSummary}`
+    : validationFeedback?.detail;
+  const hint = diagnostic
+    ? "Check Settings > Model Access."
+    : validationFeedback?.hint;
+
   if (llmCount === 0) {
     return {
       tone: "warning",
       message: `${mode === "compact" ? "Compact" : "Summary"} export used structured local fallback for all selected threads.`,
+      title: "Local fallback used for all selected threads",
+      detail,
+      hint,
+      diagnostic: diagnostic || null,
     };
   }
 
   return {
     tone: "warning",
     message: `${mode === "compact" ? "Compact" : "Summary"} export used structured local fallback for ${fallbackCount} of ${results.length} selected threads.`,
+    title: `Local fallback used for ${fallbackCount} of ${results.length} selected threads`,
+    detail,
+    hint,
+    diagnostic: diagnostic || null,
   };
 }
 
@@ -902,13 +967,16 @@ export async function compressExportDataset(
       items.push(await adapter.compress(item, mode));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "compression_failed";
+      const diagnostic = getLlmDiagnostic(error);
       logger.warn("llm", "Export compression fell back to local formatter", {
         route,
         mode,
         conversationId: item.conversation.id,
         reason,
+        diagnosticCode: diagnostic?.code,
+        diagnosticRequestId: diagnostic?.requestId,
       });
-      items.push(buildLocalFallback(item, mode, reason));
+      items.push(buildLocalFallback(item, mode, reason, diagnostic));
     }
   }
 

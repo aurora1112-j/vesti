@@ -12,7 +12,7 @@ export type PromptVariant = "current" | "experimental";
 export interface CompactionPromptPayload {
   conversationTitle?: string;
   conversationPlatform?: string;
-  conversationCreatedAt?: number;
+  conversationOriginAt?: number;
   messages: Message[];
   locale?: "zh" | "en";
 }
@@ -20,7 +20,7 @@ export interface CompactionPromptPayload {
 export interface ConversationSummaryPromptPayload {
   conversationTitle?: string;
   conversationPlatform?: string;
-  conversationCreatedAt?: number;
+  conversationOriginAt?: number;
   messages: Message[];
   locale?: "zh" | "en";
 }

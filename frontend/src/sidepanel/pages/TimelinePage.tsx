@@ -70,7 +70,7 @@ function toggleSetMember<T>(set: Set<T>, value: T): Set<T> {
 function getDatePresetSummary(datePreset: DatePreset): string {
   return (
     DATE_PRESET_OPTIONS.find((preset) => preset.id === datePreset)?.label ??
-    "All time"
+    "Started any time"
   );
 }
 
@@ -142,7 +142,7 @@ export function TimelinePage({
     };
   }, []);
 
-  const todayCount = stats?.todayCount ?? 0;
+  const firstCapturedTodayCount = stats?.firstCapturedTodayCount ?? 0;
   const platformDistribution = stats?.platformDistribution ?? null;
   const dateSummary = getDatePresetSummary(datePreset);
   const sourceSummary = getSourceSummary(selectedPlatforms);
@@ -389,7 +389,7 @@ export function TimelinePage({
             <h1 className="vesti-page-title text-text-primary">Threads</h1>
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-vesti-xs font-medium text-success/90">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              {todayCount} captured today
+              {firstCapturedTodayCount} first captured today
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
@@ -422,7 +422,7 @@ export function TimelinePage({
         <div className="shrink-0 border-b border-border-subtle bg-bg-secondary/30 px-4 py-2.5">
           <div className="grid gap-2">
             <ThreadsFilterDisclosure
-              title="Date"
+              title="Started"
               summary={dateSummary}
               isActive={datePreset !== "all_time"}
             >

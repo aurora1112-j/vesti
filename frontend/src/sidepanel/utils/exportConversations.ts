@@ -1,5 +1,11 @@
 import { getMessages } from "~lib/services/storageService";
 import type { Conversation, Message } from "~lib/types";
+import {
+  getConversationCaptureFreshnessAt,
+  getConversationFirstCapturedAt,
+  getConversationOriginAt,
+  getConversationSourceCreatedAt,
+} from "~lib/conversations/timestamps";
 import type {
   ConversationExportConfig,
   ConversationExportContentMode,
@@ -105,11 +111,22 @@ function toMarkdown(
     lines.push("");
     lines.push(`- **Platform:** ${conversation.platform}`);
     lines.push(`- **URL:** ${conversation.url || "N/A"}`);
+    lines.push(`- **Started At:** ${toLocalDateTime(getConversationOriginAt(conversation))}`);
+    const sourceCreatedAt = getConversationSourceCreatedAt(conversation);
+    if (sourceCreatedAt !== null) {
+      lines.push(`- **Source Time:** ${toLocalDateTime(sourceCreatedAt)}`);
+    }
     lines.push(
-      `- **Date:** ${toLocalDateTime(
-        conversation.source_created_at || conversation.created_at
+      `- **First Captured At:** ${toLocalDateTime(
+        getConversationFirstCapturedAt(conversation)
       )}`
     );
+    lines.push(
+      `- **Last Captured At:** ${toLocalDateTime(
+        getConversationCaptureFreshnessAt(conversation)
+      )}`
+    );
+    lines.push(`- **Last Modified:** ${toLocalDateTime(conversation.updated_at)}`);
     lines.push(`- **Messages:** ${messages.length}`);
 
     if (mode !== "full") {
@@ -167,11 +184,22 @@ function toText(
     const { conversation, messages } = item;
     lines.push(`${index + 1}. ${conversation.title || "Untitled"}`);
     lines.push(`   Platform: ${conversation.platform}`);
+    lines.push(`   Started At: ${toLocalDateTime(getConversationOriginAt(conversation))}`);
+    const sourceCreatedAt = getConversationSourceCreatedAt(conversation);
+    if (sourceCreatedAt !== null) {
+      lines.push(`   Source Time: ${toLocalDateTime(sourceCreatedAt)}`);
+    }
     lines.push(
-      `   Date: ${toLocalDateTime(
-        conversation.source_created_at || conversation.created_at
+      `   First Captured At: ${toLocalDateTime(
+        getConversationFirstCapturedAt(conversation)
       )}`
     );
+    lines.push(
+      `   Last Captured At: ${toLocalDateTime(
+        getConversationCaptureFreshnessAt(conversation)
+      )}`
+    );
+    lines.push(`   Last Modified: ${toLocalDateTime(conversation.updated_at)}`);
     lines.push(`   URL: ${conversation.url || "N/A"}`);
     lines.push(`   Messages: ${messages.length}`);
 
@@ -212,7 +240,11 @@ function toJson(
       title: conversation.title,
       platform: conversation.platform,
       url: conversation.url,
-      created_at: conversation.source_created_at || conversation.created_at,
+      source_created_at: getConversationSourceCreatedAt(conversation),
+      origin_at: getConversationOriginAt(conversation),
+      first_captured_at: getConversationFirstCapturedAt(conversation),
+      last_captured_at: getConversationCaptureFreshnessAt(conversation),
+      created_at: conversation.created_at,
       updated_at: conversation.updated_at,
       snippet: conversation.snippet,
       message_count: messages.length,

@@ -1,4 +1,4 @@
-# Vesti v2.0 Proxy + Embeddings Engineer Handoff
+﻿# Vesti v2.0 Proxy + Embeddings Engineer Handoff
 
 Status: Implemented in extension branch, ready for backend/web-view integration.
 

@@ -4,6 +4,7 @@ import type {
   Message,
   ThinkHandlingPolicy,
 } from "../types";
+import { getConversationCaptureFreshnessAt } from "../conversations/timestamps";
 import { logger } from "../utils/logger";
 import {
   getEffectiveModelId,
@@ -132,7 +133,7 @@ function toText(content: unknown): string {
         return "";
       })
       .filter(Boolean);
-    return parts.join(" 锟斤拷 ");
+    return parts.join(" | ");
   }
   return "";
 }
@@ -207,7 +208,7 @@ function buildTechnicalSummary(
     parts.push(`HTTP ${status}`);
   }
   parts.push(`Request: ${requestId || "unknown"}`);
-  return parts.join(" 锟斤拷 ");
+  return parts.join(" | ");
 }
 
 function extractRequestIdFromPayload(value: unknown): string | null {
@@ -784,7 +785,7 @@ export function buildSummaryPrompt(messages: Message[], lang: "zh" | "en" = "zh"
   const conversation = buildConversationLines(messages);
 
   if (lang === "zh") {
-    return `请基于以下对话生成中文总结。\n要求：\n1) 输出严格为纯文本，不要使用 Markdown 语法（不要 *, #, -, 代码块）。\n2) 输出 3-6 条简洁句子，每条单独换行。\n3) 聚焦技术决策、调试结论与可执行行动。\n\n对话内容：\n${conversation}`;
+    return `请基于以下对话生成中文总结。\n要求：\n1) 输出严格为纯文本，不要使用 Markdown 语法（不要使用 *, #, -, 或代码块）。\n2) 输出 3-6 条简洁句子，每条单独换行。\n3) 聚焦技术决策、调试结论与可执行行动。\n\n对话内容：\n${conversation}`;
   }
 
   return `Summarize the conversation in plain text.\nRequirements:\n1) No Markdown syntax (no *, #, -, or code fences).\n2) 3-6 concise lines, one sentence per line.\n3) Focus on technical decisions, debugging findings, and action items.\n\nConversation:\n${conversation}`;
@@ -797,7 +798,7 @@ export function buildWeeklyPrompt(
   const items = buildWeeklyLines(conversations);
 
   if (lang === "zh") {
-    return `请基于以下会话生成中文周报。\n要求：\n1) 输出严格为纯文本，不要使用 Markdown 语法（不要 *, #, -, 代码块）。\n2) 内容分为主题、关键进展与后续行动。\n3) 每条信息单独换行，保持简洁。\n\n本周会话：\n${items}`;
+    return `请基于以下会话生成中文周报。\n要求：\n1) 输出严格为纯文本，不要使用 Markdown 语法（不要使用 *, #, -, 或代码块）。\n2) 内容分为主题、关键进展与后续行动。\n3) 每条信息单独换行，保持简洁。\n\n本周会话：\n${items}`;
   }
 
   return `Write a weekly report in plain text.\nRequirements:\n1) No Markdown syntax (no *, #, -, or code fences).\n2) Cover themes, progress, and next actions.\n3) Keep concise lines.\n\nWeekly conversations:\n${items}`;
@@ -809,8 +810,13 @@ export function buildWeeklySourceHash(
   rangeEnd: number
 ): string {
   const payload = conversations
-    .map((conversation) => `${conversation.id}:${conversation.updated_at}`)
+    .map(
+      (conversation) =>
+        `${conversation.id}:${getConversationCaptureFreshnessAt(conversation)}`
+    )
     .join("|");
   return `${rangeStart}-${rangeEnd}-${payload}`;
 }
+
+
 

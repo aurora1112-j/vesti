@@ -46,6 +46,8 @@ export interface Conversation {
   snippet: string;
   url: string;
   source_created_at: number | null;
+  first_captured_at: number;
+  last_captured_at: number;
   created_at: number;
   updated_at: number;
   message_count: number;
@@ -219,10 +221,10 @@ export interface Note {
 export interface DashboardStats {
   totalConversations: number;
   totalTokens: number;
-  activeStreak: number;
-  todayCount: number;
+  firstCaptureStreak: number;
+  firstCapturedTodayCount: number;
   platformDistribution: Record<Platform, number>;
-  heatmapData: { date: string; count: number }[];
+  firstCaptureHeatmapData: { date: string; count: number }[];
 }
 
 export type ExportFormat = "json" | "txt" | "md";
@@ -311,6 +313,7 @@ export interface ActiveCaptureStatus {
   messageCount?: number;
   turnCount?: number;
   lastDecision?: CaptureDecisionMeta;
+  firstObservedAt?: number;
   updatedAt?: number;
 }
 

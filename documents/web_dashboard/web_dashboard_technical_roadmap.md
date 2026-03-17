@@ -68,8 +68,8 @@ The dashboard roadmap depends on, but does not own, the following deeper work:
 - runtime/parser boundary clarification
 
 Those future directions are already tracked in:
-- `documents/capture_engine/v1_4_capture_engine_hardening_retrospective.md`
-- `documents/capture_engine/v1_5_capture_engine_refactor_roadmap.md`
+- `documents/capture_engine/capture_engine_current_architecture.md`
+- `documents/capture_engine/capture_engine_engineering_spec.md`
 
 The web layer should reference those documents when a UI feature depends on improved parser/runtime guarantees, rather than re-specifying parser internals here.
 

@@ -62,6 +62,8 @@ export class CapturePipeline {
         snippet: messages[0]?.textContent.slice(0, 100) || "",
         url: window.location.href,
         source_created_at: this.parser.getSourceCreatedAt(),
+        first_captured_at: now,
+        last_captured_at: now,
         created_at: now,
         updated_at: now,
         message_count: messages.length,

@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { resolveTurnCount } from "~lib/capture/turn-metrics";
+import { getConversationCaptureFreshnessAt } from "~lib/conversations/timestamps";
 import type { Conversation } from "~lib/types";
 import { updateConversationAndSync } from "~lib/services/syncActions";
 import { PlatformTag } from "./PlatformTag";
@@ -487,7 +488,7 @@ export function ConversationCard({
             />
           )}
           <span className="text-vesti-xs text-text-tertiary">
-            {formatRelativeTime(conversation.updated_at)}
+            Last captured {formatRelativeTime(getConversationCaptureFreshnessAt(conversation))}
           </span>
         </div>
       </div>

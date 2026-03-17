@@ -1,5 +1,24 @@
 import { Topic, Conversation, AgentStep, RelatedConversation, Note } from './types';
 
+function buildMockConversation(
+  conversation: Omit<
+    Conversation,
+    'source_created_at' | 'first_captured_at' | 'last_captured_at'
+  >,
+  options?: {
+    source_created_at?: number | null;
+    first_captured_at?: number;
+    last_captured_at?: number;
+  }
+): Conversation {
+  return {
+    ...conversation,
+    source_created_at: options?.source_created_at ?? null,
+    first_captured_at: options?.first_captured_at ?? conversation.created_at,
+    last_captured_at: options?.last_captured_at ?? conversation.updated_at,
+  };
+}
+
 export const mockTopics: Topic[] = [
   {
     id: 1,
@@ -88,68 +107,78 @@ export const mockTopics: Topic[] = [
 ];
 
 export const mockConversations: Conversation[] = [
-  {
+  buildMockConversation({
     id: 1,
     title: 'Building a Reusable Component Library',
     platform: 'ChatGPT',
     snippet: 'Discussed best practices for creating a scalable component library with TypeScript. Covered folder structure, prop patterns, and documentation strategies...',
     tags: ['React', 'TypeScript', 'Components'],
     topic_id: 1,
+    created_at: Date.parse('2024-01-13T08:30:00Z'),
     updated_at: Date.parse('2024-01-15T10:30:00Z'),
     is_starred: true,
     has_note: true,
-  },
-  {
+  }, {
+    source_created_at: Date.parse('2024-01-13T08:00:00Z'),
+  }),
+  buildMockConversation({
     id: 2,
     title: 'Optimizing React Rendering Performance',
     platform: 'Claude',
     snippet: 'Explored React.memo, useMemo, and useCallback patterns. Analyzed when to use each optimization technique and measured their impact on rendering cycles...',
     tags: ['React', 'Performance', 'Optimization'],
     topic_id: 13,
+    created_at: Date.parse('2024-01-12T11:15:00Z'),
     updated_at: Date.parse('2024-01-14T15:20:00Z'),
     is_starred: false,
     has_note: true,
-  },
-  {
+  }),
+  buildMockConversation({
     id: 3,
     title: 'CSS Grid vs Flexbox Trade-offs',
     platform: 'Gemini',
     snippet: 'Deep dive into layout systems. Grid excels at 2D layouts while Flexbox is better for 1D. Discussed responsive patterns and browser compatibility...',
     tags: ['CSS', 'Layout', 'Design'],
     topic_id: 12,
+    created_at: Date.parse('2024-01-11T07:45:00Z'),
     updated_at: Date.parse('2024-01-13T09:15:00Z'),
     is_starred: false,
-  },
-  {
+  }),
+  buildMockConversation({
     id: 4,
     title: 'RESTful API Design Principles',
     platform: 'DeepSeek',
     snippet: 'Covered resource naming, HTTP methods, status codes, and versioning strategies. Discussed when to use REST vs GraphQL for different use cases...',
     tags: ['API', 'REST', 'Backend'],
     topic_id: 21,
+    created_at: Date.parse('2024-01-10T13:20:00Z'),
     updated_at: Date.parse('2024-01-12T14:45:00Z'),
     is_starred: true,
-  },
-  {
+  }, {
+    source_created_at: Date.parse('2024-01-10T13:00:00Z'),
+  }),
+  buildMockConversation({
     id: 5,
     title: 'Database Indexing Strategies',
     platform: 'Claude',
     snippet: 'Explored B-tree vs Hash indexes, covering when to use composite indexes and how they impact query performance. Included practical PostgreSQL examples...',
     tags: ['Database', 'PostgreSQL', 'Performance'],
     topic_id: 22,
+    created_at: Date.parse('2024-01-09T09:00:00Z'),
     updated_at: Date.parse('2024-01-11T11:30:00Z'),
     is_starred: false,
-  },
-  {
+  }),
+  buildMockConversation({
     id: 6,
     title: 'Neural Network Architectures',
     platform: 'ChatGPT',
     snippet: 'Compared CNN, RNN, and Transformer architectures. Discussed use cases for each and how attention mechanisms revolutionized NLP tasks...',
     tags: ['ML', 'Deep Learning', 'Neural Networks'],
     topic_id: 3,
+    created_at: Date.parse('2024-01-08T15:00:00Z'),
     updated_at: Date.parse('2024-01-10T16:00:00Z'),
     is_starred: false,
-  },
+  }),
 ];
 
 export const mockAgentSteps: AgentStep[] = [

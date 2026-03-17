@@ -25,6 +25,11 @@ import {
   buildExportMdV1,
   buildExportTxtV1,
 } from "../services/exportSerializers";
+import {
+  getConversationCaptureFreshnessAt,
+  getConversationFirstCapturedAt,
+  getConversationOriginAt,
+} from "../conversations/timestamps";
 import { SUPPORTED_PLATFORMS, normalizePlatform } from "../platform";
 import { db } from "./schema";
 import { enforceStorageWriteGuard, getStorageUsageSnapshot } from "./storageLimits";
@@ -291,10 +296,37 @@ function toConversation(record: ConversationRecord): Conversation {
       ? Math.max(0, Math.floor(record.turn_count))
       : Math.floor(messageCount / 2);
   const platform = normalizePlatform((record as { platform?: unknown }).platform);
+  const createdAt =
+    typeof record.created_at === "number" && Number.isFinite(record.created_at)
+      ? record.created_at
+      : 0;
+  const updatedAt =
+    typeof record.updated_at === "number" && Number.isFinite(record.updated_at)
+      ? record.updated_at
+      : createdAt;
+  const firstCapturedAt =
+    typeof record.first_captured_at === "number" &&
+    Number.isFinite(record.first_captured_at)
+      ? record.first_captured_at
+      : createdAt;
+  const lastCapturedAt =
+    typeof record.last_captured_at === "number" &&
+    Number.isFinite(record.last_captured_at)
+      ? record.last_captured_at
+      : updatedAt;
 
   return {
     ...(record as Conversation),
     platform: platform ?? record.platform,
+    source_created_at:
+      typeof record.source_created_at === "number" &&
+      Number.isFinite(record.source_created_at)
+        ? record.source_created_at
+        : null,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    first_captured_at: firstCapturedAt,
+    last_captured_at: lastCapturedAt,
     turn_count: turnCount,
   };
 }
@@ -448,14 +480,19 @@ export async function listConversations(
 
   if (filters?.dateRange) {
     results = results.filter(
-      (c) =>
-        c.created_at >= filters.dateRange!.start &&
-        c.created_at <= filters.dateRange!.end
+      (c) => {
+        const originAt = getConversationOriginAt(toConversation(c));
+        return originAt >= filters.dateRange!.start && originAt <= filters.dateRange!.end;
+      }
     );
   }
 
   return results
-    .sort((a, b) => b.updated_at - a.updated_at)
+    .sort(
+      (a, b) =>
+        getConversationOriginAt(toConversation(b)) -
+        getConversationOriginAt(toConversation(a))
+    )
     .map(toConversation);
 }
 
@@ -745,13 +782,14 @@ export async function listConversationsByRange(
   rangeStart: number,
   rangeEnd: number
 ): Promise<Conversation[]> {
-  const records = await db.conversations
-    .where("created_at")
-    .between(rangeStart, rangeEnd, true, true)
-    .toArray();
+  const records = await db.conversations.toArray();
   return records
-    .sort((a, b) => b.updated_at - a.updated_at)
-    .map(toConversation);
+    .map(toConversation)
+    .filter((conversation) => {
+      const originAt = getConversationOriginAt(conversation);
+      return originAt >= rangeStart && originAt <= rangeEnd;
+    })
+    .sort((a, b) => getConversationOriginAt(b) - getConversationOriginAt(a));
 }
 
 export async function listMessages(
@@ -1054,7 +1092,7 @@ export async function saveWeeklyReport(
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const conversations = await db.conversations.toArray();
+  const conversations = (await db.conversations.toArray()).map(toConversation);
   const distribution = initPlatformDistribution();
 
   for (const c of conversations) {
@@ -1062,33 +1100,33 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   const today = dayKey(Date.now());
-  const todayCount = conversations.filter(
-    (c) => dayKey(c.created_at) === today
+  const firstCapturedTodayCount = conversations.filter(
+    (c) => dayKey(getConversationFirstCapturedAt(c)) === today
   ).length;
 
   const daysWithConversations = new Set(
-    conversations.map((c) => dayKey(c.created_at))
+    conversations.map((c) => dayKey(getConversationFirstCapturedAt(c)))
   );
 
-  let activeStreak = 0;
+  let firstCaptureStreak = 0;
   let cursor = new Date();
   while (daysWithConversations.has(dayKey(cursor.getTime()))) {
-    activeStreak += 1;
+    firstCaptureStreak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  const heatmapData = Array.from(daysWithConversations).map((d) => ({
+  const firstCaptureHeatmapData = Array.from(daysWithConversations).map((d) => ({
     date: d,
-    count: conversations.filter((c) => dayKey(c.created_at) === d).length,
+    count: conversations.filter((c) => dayKey(getConversationFirstCapturedAt(c)) === d).length,
   }));
 
   return {
     totalConversations: conversations.length,
     totalTokens: 0,
-    activeStreak,
-    todayCount,
+    firstCaptureStreak,
+    firstCapturedTodayCount,
     platformDistribution: distribution,
-    heatmapData,
+    firstCaptureHeatmapData,
   };
 }
 

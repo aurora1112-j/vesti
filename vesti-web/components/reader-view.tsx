@@ -1,32 +1,62 @@
 'use client';
 
 import { Conversation } from '@/lib/types';
+import {
+  getConversationCaptureFreshnessAt,
+  getConversationFirstCapturedAt,
+  getConversationOriginAt,
+  getConversationSourceCreatedAt,
+} from '@/lib/conversation-timestamps';
 
 interface ReaderViewProps {
   conversation: Conversation;
 }
 
+function formatDate(value: number): string {
+  return new Date(value).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function formatDateTime(value: number): string {
+  return new Date(value).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function ReaderView({ conversation }: ReaderViewProps) {
+  const sourceCreatedAt = getConversationSourceCreatedAt(conversation);
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-prose mx-auto px-8 py-12">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-serif font-medium text-text-primary mb-4 leading-tight">
             {conversation.title}
           </h1>
-          <div className="flex items-center gap-3 text-sm font-sans text-text-secondary">
+          <div className="flex flex-wrap items-center gap-3 text-sm font-sans text-text-secondary">
             <span>{conversation.platform}</span>
-            <span>•</span>
-            <span>{new Date(conversation.updated_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}</span>
+            <span>|</span>
+            <span>Started {formatDate(getConversationOriginAt(conversation))}</span>
+            <span>|</span>
+            <span>Last captured {formatDateTime(getConversationCaptureFreshnessAt(conversation))}</span>
+          </div>
+          <div className="mt-4 grid gap-2 text-xs font-sans text-text-secondary sm:grid-cols-2">
+            {sourceCreatedAt !== null && (
+              <span>Source Time: {formatDateTime(sourceCreatedAt)}</span>
+            )}
+            <span>First Captured: {formatDateTime(getConversationFirstCapturedAt(conversation))}</span>
+            <span>Last Captured: {formatDateTime(getConversationCaptureFreshnessAt(conversation))}</span>
+            <span>Last Modified: {formatDateTime(conversation.updated_at)}</span>
           </div>
         </div>
 
-        {/* Tags */}
         <div className="flex flex-wrap gap-2 mb-8">
           {conversation.tags.map((tag) => (
             <span
@@ -38,12 +68,11 @@ export function ReaderView({ conversation }: ReaderViewProps) {
           ))}
         </div>
 
-        {/* Content */}
         <div className="prose prose-lg">
           <div className="space-y-6 text-lg leading-loose font-serif text-text-primary">
             <p>
               When building a reusable component library, the foundation of success lies in careful
-              planning and adherence to established patterns. Let's explore the key considerations
+              planning and adherence to established patterns. Let&apos;s explore the key considerations
               that will make your library both powerful and maintainable.
             </p>
 
@@ -59,15 +88,15 @@ export function ReaderView({ conversation }: ReaderViewProps) {
             <div className="bg-bg-tertiary rounded-lg p-4 font-mono text-sm my-6 border border-border-default">
               <pre className="text-text-primary overflow-x-auto">
 {`components/
-├── Button/
-│   ├── Button.tsx
-│   ├── Button.test.tsx
-│   ├── Button.stories.tsx
-│   └── index.ts
-├── Input/
-│   ├── Input.tsx
-│   └── index.ts
-└── index.ts`}
+|- Button/
+|  |- Button.tsx
+|  |- Button.test.tsx
+|  |- Button.stories.tsx
+|  |- index.ts
+|- Input/
+|  |- Input.tsx
+|  |- index.ts
+|- index.ts`}
               </pre>
             </div>
 
@@ -76,7 +105,7 @@ export function ReaderView({ conversation }: ReaderViewProps) {
             </h2>
             <p>
               TypeScript provides excellent tools for creating flexible, type-safe component APIs.
-              Use discriminated unions for variant props, and consider the "as" prop pattern for
+              Use discriminated unions for variant props, and consider the &quot;as&quot; prop pattern for
               polymorphic components that need to render as different elements.
             </p>
 
@@ -95,8 +124,8 @@ export function ReaderView({ conversation }: ReaderViewProps) {
             </p>
 
             <p className="text-text-secondary italic">
-              "The best component library is one that developers can use without constantly referring
-              to documentation, but when they do need help, the answers are immediately available."
+              &quot;The best component library is one that developers can use without constantly referring
+              to documentation, but when they do need help, the answers are immediately available.&quot;
             </p>
           </div>
         </div>

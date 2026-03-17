@@ -4,6 +4,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronRight, ChevronDown, BookOpen, List, Star, ChevronUp, Check, ArrowRight, X } from 'lucide-react';
 import { Topic, Conversation, Platform } from '@/lib/types';
+import {
+  getConversationCaptureFreshnessAt,
+  getConversationFirstCapturedAt,
+  getConversationOriginAt,
+  getConversationSourceCreatedAt,
+} from '@/lib/conversation-timestamps';
 import { MOCK_NOTES } from '@/lib/mock-data';
 import { getConversations, getTopics } from '@/lib/storageService';
 import { useExtensionSync, type ConversationUpdatedPayload } from '@/hooks/use-extension-sync';
@@ -216,6 +222,24 @@ export function LibraryTab() {
     return `${Math.floor(months / 12)}y ago`;
   }
 
+  function formatAbsoluteDate(timestamp: number): string {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  function formatAbsoluteDateTime(timestamp: number): string {
+    return new Date(timestamp).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
   function findTopicById(nodes: Topic[], id: number): Topic | null {
     for (const node of nodes) {
       if (node.id === id) return node;
@@ -401,7 +425,7 @@ export function LibraryTab() {
                         </span>
                       ))}
                       <span className="ml-auto text-[11px] font-sans text-text-tertiary">
-                        {formatTimeAgo(conv.updated_at)}
+                        {formatAbsoluteDate(getConversationOriginAt(conv))}
                       </span>
                       {conv.has_note && (
                         <span
@@ -519,10 +543,12 @@ export function LibraryTab() {
                 >
                   {selectedConversation.platform}
                 </span>
-                <span>·</span>
-                <span>January 15, 2024</span>
-                <span>·</span>
-                <span>12 messages</span>
+                <span>|</span>
+                <span>Started {formatAbsoluteDate(getConversationOriginAt(selectedConversation))}</span>
+                <span>|</span>
+                <span>
+                  Last captured {formatTimeAgo(getConversationCaptureFreshnessAt(selectedConversation))}
+                </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {selectedConversation.tags.map((tag) => (
@@ -533,6 +559,29 @@ export function LibraryTab() {
                     {tag}
                   </span>
                 ))}
+              </div>
+              <div className="mt-4 grid gap-2 text-[12px] font-sans text-text-secondary sm:grid-cols-2">
+                {getConversationSourceCreatedAt(selectedConversation) !== null && (
+                  <span>
+                    Source Time:{' '}
+                    {formatAbsoluteDateTime(
+                      getConversationSourceCreatedAt(selectedConversation) as number
+                    )}
+                  </span>
+                )}
+                <span>
+                  First Captured:{' '}
+                  {formatAbsoluteDateTime(
+                    getConversationFirstCapturedAt(selectedConversation)
+                  )}
+                </span>
+                <span>
+                  Last Captured:{' '}
+                  {formatAbsoluteDateTime(
+                    getConversationCaptureFreshnessAt(selectedConversation)
+                  )}
+                </span>
+                <span>Last Modified: {formatAbsoluteDateTime(selectedConversation.updated_at)}</span>
               </div>
             </div>
 
@@ -628,7 +677,7 @@ export function LibraryTab() {
                       className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-bg-surface-card transition-colors group"
                     >
                       <span className="text-[13px] font-sans text-text-primary">{note.title}</span>
-                      <span className="text-[13px] font-sans text-accent-primary">Open →</span>
+                      <span className="text-[13px] font-sans text-accent-primary">Open -&gt;</span>
                     </button>
                   ))}
                 </div>
@@ -758,7 +807,7 @@ export function LibraryTab() {
                     {conversation.platform}
                   </span>
                         </div>
-                        <span className="text-[13px] font-sans text-accent-primary">View →</span>
+                        <span className="text-[13px] font-sans text-accent-primary">View -&gt;</span>
                       </button>
                     );
                   })}
@@ -781,3 +830,4 @@ export function LibraryTab() {
     </div>
   );
 }
+
