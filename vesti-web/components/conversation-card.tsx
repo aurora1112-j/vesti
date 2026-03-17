@@ -2,6 +2,7 @@
 
 // LEGACY PROTOTYPE: not wired by app/page.tsx
 import { Conversation } from '@/lib/types';
+import { getConversationCaptureFreshnessAt } from '@/lib/conversation-timestamps';
 import { Star, GripVertical } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -72,7 +73,10 @@ export function ConversationCard({ conversation, onSelect, isSelected }: Convers
             ))}
           </div>
           <span className="text-xs text-text-tertiary font-sans flex-shrink-0">
-            {formatDistanceToNow(new Date(conversation.updated_at), { addSuffix: true })}
+            Last captured{' '}
+            {formatDistanceToNow(new Date(getConversationCaptureFreshnessAt(conversation)), {
+              addSuffix: true,
+            })}
           </span>
         </div>
       </div>

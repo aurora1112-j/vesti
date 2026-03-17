@@ -119,6 +119,7 @@ type ContentTransientStatusResponse =
         messageCount?: number;
         turnCount?: number;
         lastDecision?: ActiveCaptureStatus["lastDecision"];
+        firstObservedAt?: number;
         updatedAt?: number;
       };
     }
@@ -274,6 +275,7 @@ async function buildActiveCaptureStatus(mode: CaptureMode): Promise<ActiveCaptur
       messageCount: response.status.messageCount,
       turnCount: response.status.turnCount,
       lastDecision: response.status.lastDecision,
+      firstObservedAt: response.status.firstObservedAt,
       updatedAt: response.status.updatedAt,
     };
   } catch {

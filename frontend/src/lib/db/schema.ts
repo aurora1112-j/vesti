@@ -350,6 +350,47 @@ export class MemoryHubDB extends Dexie {
         explore_messages: "id, sessionId, timestamp, [sessionId+timestamp]",
       })
       .upgrade(() => undefined);
+    this.version(12)
+      .stores({
+        conversations:
+          "++id, platform, title, created_at, updated_at, uuid, source_created_at, turn_count, topic_id, is_starred, [platform+created_at], [platform+uuid], [topic_id+updated_at]",
+        messages:
+          "++id, conversation_id, role, created_at, [conversation_id+created_at]",
+        summaries: "++id, conversationId, createdAt",
+        weekly_reports: "++id, rangeStart, rangeEnd, createdAt",
+        topics:
+          "++id, parent_id, name, created_at, updated_at, [parent_id+name]",
+        vectors: "++id, conversation_id, text_hash",
+        notes: "++id, created_at, updated_at",
+        explore_sessions: "id, updatedAt, createdAt",
+        explore_messages: "id, sessionId, timestamp, [sessionId+timestamp]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("conversations")
+          .toCollection()
+          .modify((record: Partial<ConversationRecord>) => {
+            if (
+              typeof record.first_captured_at !== "number" ||
+              !Number.isFinite(record.first_captured_at)
+            ) {
+              record.first_captured_at =
+                typeof record.created_at === "number" && Number.isFinite(record.created_at)
+                  ? record.created_at
+                  : Date.now();
+            }
+
+            if (
+              typeof record.last_captured_at !== "number" ||
+              !Number.isFinite(record.last_captured_at)
+            ) {
+              record.last_captured_at =
+                typeof record.updated_at === "number" && Number.isFinite(record.updated_at)
+                  ? record.updated_at
+                  : record.first_captured_at;
+            }
+          });
+      });
   }
 }
 

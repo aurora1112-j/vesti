@@ -43,7 +43,7 @@ import {
   askKnowledgeBase,
 } from "../lib/services/searchService";
 import { getLlmSettings, setLlmSettings } from "../lib/services/llmSettingsService";
-import { callInference } from "../lib/services/llmService";
+import { callInference, getLlmDiagnostic } from "../lib/services/llmService";
 import {
   generateConversationSummary,
   generateWeeklyReport,
@@ -254,9 +254,25 @@ async function handleRequest(message: RequestMessage): Promise<ResponseMessage> 
       }
       case "TEST_LLM_CONNECTION": {
         const settings = requireSettings(await getLlmSettings());
-        await callInference(settings, "Reply with OK only.", {
-          systemPrompt: "You are a connectivity probe. Reply with OK only.",
-        });
+        try {
+          await callInference(settings, "Reply with OK only.", {
+            systemPrompt: "You are a connectivity probe. Reply with OK only.",
+          });
+        } catch (error) {
+          const diagnostic = getLlmDiagnostic(error);
+          if (diagnostic) {
+            return {
+              ok: true,
+              type: messageType,
+              data: {
+                ok: false,
+                message: diagnostic.userMessage,
+                diagnostic,
+              },
+            };
+          }
+          throw error;
+        }
         return {
           ok: true,
           type: messageType,

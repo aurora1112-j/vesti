@@ -1,12 +1,15 @@
 import { SlidersHorizontal } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Conversation,
   ConversationMatchSummary,
   DashboardStats,
   Platform,
 } from "~lib/types";
-import { getDashboardStats } from "~lib/services/storageService";
+import {
+  deleteConversations,
+  getDashboardStats,
+} from "~lib/services/storageService";
 import { PLATFORM_TONE } from "../components/platformTone";
 import { ThreadsFilterDisclosure } from "../components/ThreadsFilterDisclosure";
 import { ConversationList } from "../containers/ConversationList";
@@ -19,8 +22,36 @@ import {
 import type { ThreadsEvent, ThreadsSearchSession } from "../types/threadsSearch";
 import { useBatchSelection } from "../hooks/useBatchSelection";
 import { BatchActionBar } from "../components/BatchActionBar";
-import { ExportDialog, type ExportConfig, type ExportResult } from "../components/ExportDialog";
-import { exportConversations } from "../utils/exportConversations";
+import {
+  copyConversationExport,
+  downloadConversationExport,
+  exportConversations,
+} from "../utils/exportConversations";
+import type {
+  ConversationExportContentMode,
+  ConversationExportFormat,
+} from "../types/export";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function getBatchListBottomInset(mode: "inactive" | "selecting" | "export_panel" | "delete_panel", hasFeedback: boolean): number {
+  if (mode === "inactive") {
+    return 16;
+  }
+
+  if (mode === "selecting") {
+    return hasFeedback ? 104 : 68;
+  }
+
+  if (mode === "export_panel") {
+    return 308;
+  }
+
+  return 248;
+}
 
 interface TimelinePageProps {
   session: ThreadsSearchSession;
@@ -42,7 +73,7 @@ function toggleSetMember<T>(set: Set<T>, value: T): Set<T> {
 function getDatePresetSummary(datePreset: DatePreset): string {
   return (
     DATE_PRESET_OPTIONS.find((preset) => preset.id === datePreset)?.label ??
-    "All time"
+    "Started any time"
   );
 }
 
@@ -77,8 +108,28 @@ export function TimelinePage({
     anchorConversationId,
   } = session;
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [visibleConversations, setVisibleConversations] = useState<Conversation[]>([]);
+  const [exportMode, setExportMode] =
+    useState<ConversationExportContentMode>("full");
+  const [selectedExportFormat, setSelectedExportFormat] =
+    useState<ConversationExportFormat>("md");
+  const [batchActionKey, setBatchActionKey] = useState<string | null>(null);
+  const [deleteConfirmValue, setDeleteConfirmValue] = useState("");
+  const [batchFeedback, setBatchFeedback] = useState<{
+    message: string;
+    tone: "default" | "warning" | "error";
+    title?: string;
+    detail?: string;
+    technicalSummary?: string;
+    hint?: string;
+  } | null>(null);
+  const [copyJustSucceeded, setCopyJustSucceeded] = useState(false);
+  const suppressNextReaderOpenRef = useRef(false);
+  const suppressNextReaderOpenTimerRef = useRef<number | null>(null);
+  const copySuccessTimerRef = useRef<number | null>(null);
+  const clipboardAvailable =
+    typeof navigator !== "undefined" &&
+    typeof navigator.clipboard?.writeText === "function";
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +145,35 @@ export function TimelinePage({
     };
   }, [refreshToken]);
 
-  const todayCount = stats?.todayCount ?? 0;
+  useEffect(() => {
+    return () => {
+      if (suppressNextReaderOpenTimerRef.current !== null) {
+        window.clearTimeout(suppressNextReaderOpenTimerRef.current);
+      }
+      if (copySuccessTimerRef.current !== null) {
+        window.clearTimeout(copySuccessTimerRef.current);
+      }
+    };
+  }, []);
+
+  const clearCopySuccess = useCallback(() => {
+    setCopyJustSucceeded(false);
+    if (copySuccessTimerRef.current !== null) {
+      window.clearTimeout(copySuccessTimerRef.current);
+      copySuccessTimerRef.current = null;
+    }
+  }, []);
+
+  const markCopySuccess = useCallback(() => {
+    clearCopySuccess();
+    setCopyJustSucceeded(true);
+    copySuccessTimerRef.current = window.setTimeout(() => {
+      setCopyJustSucceeded(false);
+      copySuccessTimerRef.current = null;
+    }, 1800);
+  }, [clearCopySuccess]);
+
+  const firstCapturedTodayCount = stats?.firstCapturedTodayCount ?? 0;
   const platformDistribution = stats?.platformDistribution ?? null;
   const dateSummary = getDatePresetSummary(datePreset);
   const sourceSummary = getSourceSummary(selectedPlatforms);
@@ -111,27 +190,239 @@ export function TimelinePage({
     },
     [dispatch]
   );
+  const getConversationId = useCallback((conversation: Conversation) => conversation.id, []);
 
   // Batch selection
   const {
+    mode: batchMode,
     selectedIds,
     selectedCount,
     isBatchMode,
+    isAllSelected,
+    totalCount,
     toggleSelection,
     selectAll,
     clearSelection,
     enterBatchMode,
+    openExportPanel,
+    openDeletePanel,
+    closePanel,
     exitBatchMode,
   } = useBatchSelection({
-    items: conversations,
-    getId: (c) => c.id,
-    maxSelection: 20,
+    items: visibleConversations,
+    getId: getConversationId,
   });
+  const selectedConversations = visibleConversations.filter((conversation) =>
+    selectedIds.has(conversation.id)
+  );
+  const activeBatchMode = batchMode === "inactive" ? "selecting" : batchMode;
+  const listBottomInset = getBatchListBottomInset(
+    batchMode,
+    Boolean(batchFeedback)
+  );
 
-  const handleExport = async (config: ExportConfig): Promise<ExportResult> => {
-    const selectedConversations = conversations.filter((c) => selectedIds.has(c.id));
-    return exportConversations(selectedConversations, config);
-  };
+  const handleClearSelection = useCallback(() => {
+    setDeleteConfirmValue("");
+    clearCopySuccess();
+    clearSelection();
+  }, [clearCopySuccess, clearSelection]);
+
+  const handleExitBatchMode = useCallback(() => {
+    setDeleteConfirmValue("");
+    setBatchActionKey(null);
+    setBatchFeedback(null);
+    clearCopySuccess();
+    exitBatchMode();
+  }, [clearCopySuccess, exitBatchMode]);
+
+  const handleToggleExportPanel = useCallback(() => {
+    setDeleteConfirmValue("");
+    setBatchFeedback(null);
+    clearCopySuccess();
+    if (batchMode === "export_panel") {
+      closePanel();
+      return;
+    }
+    setSelectedExportFormat("md");
+    openExportPanel();
+  }, [batchMode, clearCopySuccess, closePanel, openExportPanel]);
+
+  const handleToggleDeletePanel = useCallback(() => {
+    setBatchFeedback(null);
+    clearCopySuccess();
+    if (batchMode === "delete_panel") {
+      setDeleteConfirmValue("");
+      closePanel();
+      return;
+    }
+    setDeleteConfirmValue("");
+    openDeletePanel();
+  }, [batchMode, clearCopySuccess, closePanel, openDeletePanel]);
+
+  const handleClosePanel = useCallback(() => {
+    setDeleteConfirmValue("");
+    clearCopySuccess();
+    closePanel();
+  }, [clearCopySuccess, closePanel]);
+
+  const buildExportFeedback = useCallback(
+    (
+      result: Awaited<ReturnType<typeof exportConversations>>,
+      action: "download" | "copy"
+    ) => {
+      const actionHint =
+        action === "download"
+          ? `Saved as ${result.filename}.`
+          : "Copied current export to clipboard.";
+
+      if (
+        result.notice?.title ||
+        result.notice?.detail ||
+        result.notice?.technicalSummary ||
+        result.notice?.hint
+      ) {
+        return {
+          message: result.notice.message,
+          tone: result.notice.tone,
+          title: result.notice.title,
+          detail: result.notice.detail,
+          technicalSummary: result.notice.technicalSummary,
+          hint: result.notice.hint
+            ? `${result.notice.hint} ${actionHint}`
+            : actionHint,
+        };
+      }
+
+      return {
+        message:
+          action === "download"
+            ? result.notice
+              ? `${result.notice.message} Saved as ${result.filename}.`
+              : `Exported ${result.filename}`
+            : result.notice
+              ? `${result.notice.message} Copied current export to clipboard.`
+              : `Copied current ${result.filename.split(".").pop()?.toUpperCase() || "export"} export to clipboard.`,
+        tone: result.notice?.tone ?? "default",
+      };
+    },
+    []
+  );
+
+  const runExportAction = useCallback(
+    async (action: "download" | "copy") => {
+      if (selectedConversations.length === 0) return;
+      const format = selectedExportFormat;
+      setBatchActionKey(`${action}-${format}`);
+      setBatchFeedback(null);
+      clearCopySuccess();
+      try {
+        const result = await exportConversations(selectedConversations, {
+          contentMode: exportMode,
+          format,
+        });
+        if (action === "download") {
+          downloadConversationExport(result);
+          closePanel();
+          setBatchFeedback(buildExportFeedback(result, "download"));
+        } else {
+          try {
+            await copyConversationExport(result);
+            markCopySuccess();
+            setBatchFeedback(buildExportFeedback(result, "copy"));
+          } catch (error) {
+            setBatchFeedback({
+              message: "Generated export could not be copied to the clipboard.",
+              tone: "error",
+              title: result.notice?.title,
+              detail:
+                result.notice?.detail ||
+                getErrorMessage(error),
+              technicalSummary: result.notice?.technicalSummary,
+              hint: result.notice?.hint
+                ? `${result.notice.hint} Check clipboard permissions or use Download instead.`
+                : "Check clipboard permissions or use Download instead.",
+            });
+          }
+        }
+      } catch (error) {
+        setBatchFeedback({
+          message:
+            action === "copy"
+              ? "Generated export could not be copied to the clipboard."
+              : getErrorMessage(error),
+          tone: "error",
+          detail:
+            action === "copy"
+              ? getErrorMessage(error)
+              : undefined,
+          hint:
+            action === "copy"
+              ? "Check clipboard permissions or use Download instead."
+              : undefined,
+        });
+      } finally {
+        setBatchActionKey(null);
+      }
+    },
+    [
+      buildExportFeedback,
+      clearCopySuccess,
+      closePanel,
+      exportMode,
+      markCopySuccess,
+      selectedConversations,
+      selectedExportFormat,
+    ]
+  );
+
+  const handleDownload = useCallback(() => {
+    void runExportAction("download");
+  }, [runExportAction]);
+
+  const handleCopy = useCallback(() => {
+    void runExportAction("copy");
+  }, [runExportAction]);
+
+  const handleExportModeChange = useCallback(
+    (mode: ConversationExportContentMode) => {
+      clearCopySuccess();
+      setExportMode(mode);
+    },
+    [clearCopySuccess]
+  );
+
+  const handleExportFormatChange = useCallback(
+    (format: ConversationExportFormat) => {
+      clearCopySuccess();
+      setSelectedExportFormat(format);
+    },
+    [clearCopySuccess]
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (deleteConfirmValue !== "DELETE" || selectedConversations.length === 0) {
+      return;
+    }
+
+    setBatchActionKey("delete");
+    setBatchFeedback(null);
+    try {
+      await deleteConversations(selectedConversations.map((conversation) => conversation.id));
+      setDeleteConfirmValue("");
+      handleExitBatchMode();
+    } catch (error) {
+      setBatchFeedback({
+        message: getErrorMessage(error),
+        tone: "error",
+      });
+    } finally {
+      setBatchActionKey(null);
+    }
+  }, [
+    deleteConfirmValue,
+    handleExitBatchMode,
+    selectedConversations,
+  ]);
 
   const handleOpenSearch = () => {
     dispatch({ type: "HEADER_MODE_CHANGED", headerMode: "search" });
@@ -149,17 +440,49 @@ export function TimelinePage({
     dispatch({ type: "HEADER_MODE_CHANGED", headerMode: "default" });
   };
 
+  const armSuppressNextReaderOpen = useCallback(() => {
+    suppressNextReaderOpenRef.current = true;
+    if (suppressNextReaderOpenTimerRef.current !== null) {
+      window.clearTimeout(suppressNextReaderOpenTimerRef.current);
+    }
+    suppressNextReaderOpenTimerRef.current = window.setTimeout(() => {
+      suppressNextReaderOpenRef.current = false;
+      suppressNextReaderOpenTimerRef.current = null;
+    }, 0);
+  }, []);
+
+  const consumeSuppressNextReaderOpen = useCallback(() => {
+    if (!suppressNextReaderOpenRef.current) {
+      return false;
+    }
+    suppressNextReaderOpenRef.current = false;
+    if (suppressNextReaderOpenTimerRef.current !== null) {
+      window.clearTimeout(suppressNextReaderOpenTimerRef.current);
+      suppressNextReaderOpenTimerRef.current = null;
+    }
+    return true;
+  }, []);
+
+  const handleConversationSelect = useCallback(
+    (conversation: Conversation) => {
+      if (consumeSuppressNextReaderOpen()) {
+        return;
+      }
+      onSelectConversation(conversation);
+    },
+    [consumeSuppressNextReaderOpen, onSelectConversation]
+  );
+
   const handleSelectFromMenu = (id: number) => {
-    if (!isBatchMode) {
-      enterBatchMode();
-    }
-    if (!selectedIds.has(id)) {
-      toggleSelection(id);
-    }
+    setDeleteConfirmValue("");
+    setBatchFeedback(null);
+    clearCopySuccess();
+    armSuppressNextReaderOpen();
+    enterBatchMode(id);
   };
 
   return (
-    <div className={`flex h-full flex-col bg-bg-app ${isBatchMode ? "pb-[60px]" : ""}`}>
+    <div className="flex h-full flex-col bg-bg-app">
       {headerMode === "search" ? (
         <header className="vesti-page-header gap-2">
           <div className="threads-search-surface flex h-8 flex-1 items-center gap-2 rounded-lg px-3">
@@ -196,7 +519,7 @@ export function TimelinePage({
             <h1 className="vesti-page-title text-text-primary">Threads</h1>
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-vesti-xs font-medium text-success/90">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              {todayCount} captured today
+              {firstCapturedTodayCount} first captured today
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
@@ -229,7 +552,7 @@ export function TimelinePage({
         <div className="shrink-0 border-b border-border-subtle bg-bg-secondary/30 px-4 py-2.5">
           <div className="grid gap-2">
             <ThreadsFilterDisclosure
-              title="Date"
+              title="Started"
               summary={dateSummary}
               isActive={datePreset !== "all_time"}
             >
@@ -307,7 +630,7 @@ export function TimelinePage({
           searchQuery={query}
           datePreset={datePreset}
           selectedPlatforms={selectedPlatforms}
-          onSelect={onSelectConversation}
+          onSelect={handleConversationSelect}
           refreshToken={refreshToken}
           resultSummaryMap={resultSummaryMap}
           anchorConversationId={anchorConversationId}
@@ -319,29 +642,38 @@ export function TimelinePage({
           selectedIds={selectedIds}
           onToggleSelection={toggleSelection}
           onSelectFromMenu={handleSelectFromMenu}
-          onConversationsLoaded={setConversations}
+          onFilteredConversationsChange={setVisibleConversations}
+          bottomInsetPx={listBottomInset}
         />
 
         {/* Batch action bar */}
         {isBatchMode && (
           <BatchActionBar
+            mode={activeBatchMode}
+            exportMode={exportMode}
+            selectedExportFormat={selectedExportFormat}
             selectedCount={selectedCount}
-            totalCount={conversations.length}
-            onSelectAll={selectAll}
-            onClearSelection={clearSelection}
-            onExport={() => setIsExportDialogOpen(true)}
-            onExit={exitBatchMode}
+            totalCount={totalCount}
+            actionKey={batchActionKey}
+            deleteConfirmValue={deleteConfirmValue}
+            clipboardAvailable={clipboardAvailable}
+            copyJustSucceeded={copyJustSucceeded}
+            feedback={batchFeedback}
+            onDeleteConfirmValueChange={setDeleteConfirmValue}
+            onExportModeChange={handleExportModeChange}
+            onExportFormatChange={handleExportFormatChange}
+            onSelectAll={isAllSelected ? handleClearSelection : selectAll}
+            onClearSelection={handleClearSelection}
+            onToggleExportPanel={handleToggleExportPanel}
+            onToggleDeletePanel={handleToggleDeletePanel}
+            onClosePanel={handleClosePanel}
+            onDownload={handleDownload}
+            onCopy={handleCopy}
+            onConfirmDelete={handleConfirmDelete}
+            onExit={handleExitBatchMode}
           />
         )}
       </div>
-
-      {/* Export dialog */}
-      <ExportDialog
-        open={isExportDialogOpen}
-        conversations={conversations.filter((c) => selectedIds.has(c.id))}
-        onClose={() => setIsExportDialogOpen(false)}
-        onExport={handleExport}
-      />
     </div>
   );
 }

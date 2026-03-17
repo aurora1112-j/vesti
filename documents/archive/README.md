@@ -1,38 +1,60 @@
-﻿# Documents Archive
+# Documents Archive
 
 Status: Active archive index  
 Audience: Maintainers, release owners, engineers performing historical lookup
 
 ## Purpose
 
-`documents/archive/` stores documentation that is intentionally preserved but no longer serves as the primary source of truth.
+`documents/archive/` 用于保留仍有追溯价值、但不再是当前 source of truth 的文档。
 
-Archive content includes:
-- retired root-level planning notes
-- historical stage briefs
-- candidate drafts
-- legacy material superseded by canonical subsystem directories
+归档内容包括：
+- 退役的 root-level planning notes
+- 历史阶段 brief / execution log / checklist
+- 被 canonical 子系统目录替代的旧 spec
+- 仍有参考价值的 cheat sheet 与 legacy playbook
 
 ## Rules
 
-- archive content is preserved instead of hard-deleted
-- archive content is not canonical for current engineering decisions
-- when a document is moved here, living guidance should be discoverable from a canonical directory or from `documents/README.md`
-- archived files should usually keep their original filenames for traceability
+- archive 只负责保留历史，不负责当前实现决策
+- 文档迁入 archive 后，活入口必须由 canonical 目录或 `documents/README.md` 承担
+- 历史文件尽量保留原文件名，方便追溯
 
 ## Structure
 
 ### `legacy_root/`
-Historical root-level docs that were useful during earlier phases but should no longer live at the root of `documents/`.
+
+历史上曾放在 `documents/` 根目录、现在不应继续停留在根目录的资料。
 
 ### `candidate_drafts/`
-Candidate proposals, exploration drafts, and design alternatives that are not active specification entrypoints.
 
-## How to use archive material
+候选方案、探索稿、未成为 canonical entrypoint 的设计备选。
 
-Use archive docs for:
-- reconstructing older decisions
-- understanding project evolution
-- tracing the origin of current canonical specs
+### `capture_engine/`
 
-Do not use archive docs as the default answer to "what is the current spec?"
+capture engine 历史资料。
+
+推荐子目录：
+- `superseded_specs/`
+- `legacy_playbooks/`
+- `execution_logs/`
+- `sampling_checklists/`
+
+### `reader_pipeline/`
+
+reader pipeline 历史资料。
+
+推荐子目录：
+- `superseded_specs/`
+- `legacy_playbooks/`
+- `reference_cheat_sheets/`
+
+## How To Use Archive Material
+
+适用场景：
+- 追溯旧决策的来源
+- 理解系统演进路径
+- 对照 canonical 文档收口前后的差异
+
+不适用场景：
+- 直接回答“当前规格是什么”
+- 作为当前实现的默认入口

@@ -50,6 +50,8 @@ export interface ConversationDraft {
   snippet: string;
   url: string;
   source_created_at: number | null;
+  first_captured_at: number;
+  last_captured_at: number;
   created_at: number;
   updated_at: number;
   message_count: number;
@@ -461,7 +463,19 @@ export type ResponseDataMap = {
   CLEAR_INSIGHTS_CACHE: { cleared: boolean };
   GET_LLM_SETTINGS: { settings: LlmConfig | null };
   SET_LLM_SETTINGS: { saved: boolean };
-  TEST_LLM_CONNECTION: { ok: boolean; message?: string };
+  TEST_LLM_CONNECTION: {
+    ok: boolean;
+    message?: string;
+    diagnostic?: {
+      code: string;
+      route: string;
+      status: number | null;
+      requestId: string | null;
+      rawMessage: string;
+      userMessage: string;
+      technicalSummary: string;
+    };
+  };
   GET_CONVERSATION_SUMMARY: SummaryRecord | null;
   GENERATE_CONVERSATION_SUMMARY: SummaryRecord;
   GET_WEEKLY_REPORT: WeeklyReportRecord | null;
