@@ -62,16 +62,22 @@ Primary responsibilities:
 Primary responsibilities:
 - determine current graph node set
 - request edge data for those nodes
-- render graph via ECharts
-- apply platform filtering without mutating the underlying node-set fetch contract
+- render the graph via a canvas-based temporal playback system with deterministic fixed anchors
+- map conversation chronology into a day-by-day playback timeline while keeping the underlying node-set fetch contract explicit
+- allow panning across a larger logical graph area instead of forcing all visible anchors to fit inside the viewport
+- reset and auto-run the replay whenever the `Network` tab becomes active again
+- expose a local trend-chart scrubber over daily new-conversation counts so users can pause on a specific time point
+- distribute same-day births within that day by capture order so one-day datasets still produce a visible replay
+- treat node clicks as local inspection: highlight connected nodes in-graph and open a right-side node details drawer, rather than navigating away immediately
 
 As of rc8, `Network` explicitly requests edges for its active base node set rather than passively reading whatever vectors already exist.
+The current renderer no longer depends on ECharts or a live force simulation; it builds temporal node state in the web layer, computes deterministic fixed anchors for the full graph, lets the viewport pan across a larger logical graph space, draws nodes/edges onto `<canvas>`, and drives only the visible time position from a fixed-duration local playback clock.
 
 Current temporal status:
-- `Network` is not yet on the finalized thread timestamp contract used by Threads / Reader / Web Reader
-- node chronology is not formally defined as `originAt`, `first_captured_at`, or `last_captured_at`
-- the current `Time Range` control is not a stable runtime-backed time filter contract
-- temporal animation / replay behavior must be treated as provisional until a dedicated `Network` time contract is written
+- `Network` node chronology now uses the same `originAt = source_created_at ?? first_captured_at ?? created_at` start-time semantics as Threads / Reader / Web Reader
+- `first_captured_at` and `last_captured_at` remain secondary acquisition / freshness clocks and do not move nodes on the main playback timeline
+- the trend scrubber / replay UI is local to the tab and does not yet imply a stable runtime-backed time-filtering contract
+- temporal playback is only partially finalized: node chronology and fixed anchor placement are locked, but filtering / edge-contract time semantics remain pending
 
 ## 4. Message and data flow
 
@@ -96,7 +102,7 @@ For `Network`:
 2. call `getAllEdges({ threshold, conversationIds })`
 3. runtime performs best-effort vector ensure for those ids
 4. runtime computes edges among the ensured node set
-5. UI filters visibility by active platform selection only after receiving the edge set
+5. UI derives node/edge visibility from the current replay time locally after receiving the edge set
 
 ## 5. Known design constraints
 
@@ -116,14 +122,14 @@ Data may arrive after the shell is already mounted. Tabs must therefore tolerate
 There is active work on dynamic network-generation animation, where nodes may appear or connect progressively over time.
 
 That work must not assume that:
-- `created_at` is the final node time source
-- the graph already inherits the same semantics as Threads / Reader
-- `Time Range` already implies edge-level or storage-level filtering
+- anything other than `originAt` should drive node chronology
+- `first_captured_at` or `last_captured_at` should move node positions on the main playback timeline
+- the current trend scrubber already implies edge-level or storage-level filtering
 
-Before shipping time-driven `Network` behavior, the dashboard contract still needs to fix:
-- which timestamp defines node chronology
+Before the rest of time-driven `Network` behavior is treated as a finalized contract, the dashboard layer still needs to fix:
 - whether time filtering is UI-only or part of the graph data contract
-- whether animation expresses origin time, first capture time, or last capture freshness
+- whether capture / freshness clocks surface only as metadata or also influence secondary visual channels
+- whether animation beyond node birth expresses origin time, first capture time, or last capture freshness
 
 ### 5.5 Historical document split
 Older web/dashboard knowledge is currently spread across dated memos and handoffs. This file replaces them as the canonical ?current architecture? entry for web surfaces while leaving those older files intact as evidence.

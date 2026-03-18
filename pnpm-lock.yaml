@@ -102,9 +102,6 @@ importers:
       dompurify:
         specifier: ^3.3.1
         version: 3.3.3
-      echarts:
-        specifier: ^6.0.0
-        version: 6.0.0
       lucide-react:
         specifier: '>=0.5.0'
         version: 0.564.0(react@19.2.4)
@@ -3378,9 +3375,6 @@ packages:
     resolution: {integrity: sha512-M3NhsLbV1i6HuGzBUH8vXrtxOk+tWmzWKDMbAVSUp3Zsjm7ywFeuwrUXhmhQyRK1q5B5GGy7hcXPbj3bnfZg2g==}
     engines: {node: '>=6'}
 
-  echarts@6.0.0:
-    resolution: {integrity: sha512-Tte/grDQRiETQP4xz3iZWSvoHrkCQtwqd6hs+mifXcjrCuo2iKWbajFObuLJVBlDIJlOzgQPd1hsaKt/3+OMkQ==}
-
   electron-to-chromium@1.5.313:
     resolution: {integrity: sha512-QBMrTWEf00GXZmJyx2lbYD45jpI3TUFnNIzJ5BBc8piGUDwMPa1GV6HJWTZVvY/eiN3fSopl7NRbgGp9sZ9LTA==}
 
@@ -4972,9 +4966,6 @@ packages:
   ts-interface-checker@0.1.13:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
 
-  tslib@2.3.0:
-    resolution: {integrity: sha512-N82ooyxVNm6h1riLCoyS9e3fuJ3AMG2zIZs2Gd1ATcSFjSA23Q0fzjjZeh0jbJvWVDZ0cJT8yaNNaaXHzueNjg==}
-
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
@@ -5181,9 +5172,6 @@ packages:
 
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
-
-  zrender@6.0.0:
-    resolution: {integrity: sha512-41dFXEEXuJpNecuUQq6JlbybmnHaqqpGlbH1yxnA5V9MMP4SbohSVZsJIwz+zdjQXSSlR1Vc34EgH1zxyTDvhg==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -8191,7 +8179,6 @@ snapshots:
   '@vesti/ui@file:packages/vesti-ui(lucide-react@0.544.0(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       dompurify: 3.3.3
-      echarts: 6.0.0
       lucide-react: 0.544.0(react@18.2.0)
       marked: 17.0.4
       react: 18.2.0
@@ -8654,11 +8641,6 @@ snapshots:
   dotenv@16.4.7: {}
 
   dotenv@7.0.0: {}
-
-  echarts@6.0.0:
-    dependencies:
-      tslib: 2.3.0
-      zrender: 6.0.0
 
   electron-to-chromium@1.5.313: {}
 
@@ -10441,8 +10423,6 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tslib@2.3.0: {}
-
   tslib@2.8.1: {}
 
   tsup@7.2.0(@swc/core@1.15.18(@swc/helpers@0.5.19))(postcss@8.5.8)(typescript@5.2.2):
@@ -10676,9 +10656,5 @@ snapshots:
   zod@3.25.76: {}
 
   zod@4.3.6: {}
-
-  zrender@6.0.0:
-    dependencies:
-      tslib: 2.3.0
 
   zwitch@2.0.4: {}

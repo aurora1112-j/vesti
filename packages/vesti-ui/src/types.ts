@@ -44,6 +44,9 @@ export interface Conversation {
   created_at: number;
   updated_at: number;
   source_created_at?: number | null;
+  first_captured_at?: number;
+  last_captured_at?: number;
+  message_count?: number;
   is_starred: boolean;
   is_archived?: boolean;
   is_trash?: boolean;

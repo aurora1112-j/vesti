@@ -87,13 +87,22 @@ This rule is now a formal engineering constraint for future web work.
 ## 5. Network-specific contract
 
 `Network` operates on two logical datasets:
-- current node set: typically the recent conversation subset chosen for graph display
+- current node set: the active conversation timeline chosen for graph display
 - edge set: similarity links among the current node set
 
 Locked requirements:
 - entering `Network` must be sufficient to compute and render real edges for the active node set
 - edge availability must not depend on whether a conversation was previously opened in `Library`
-- platform filtering may reduce visible edges, but must not silently redefine the underlying node-set computation contract
+- the graph renderer may change, but it must continue to honor the same `getConversations` + `getAllEdges({ threshold, conversationIds })` contract boundary
+- the current Network UX is a canvas-based temporal playback view with deterministic fixed anchors: nodes and edges appear day by day, while old items decay visually instead of disappearing
+- node chronology is defined as `originAt = source_created_at ?? first_captured_at ?? created_at`
+- `first_captured_at` and `last_captured_at` remain secondary acquisition / freshness clocks and must not change node placement on the main playback timeline
+- each time the dashboard re-enters the `Network` tab, playback resets to the start and auto-runs once over a fixed 8-second duration
+- the bottom time control is a draggable conversation-count trend chart based on daily new-conversation counts, not a static progress bar
+- when many conversations land on the same day, replay still distributes their births within that day by capture order so the graph remains readable
+- node placement is deterministic for a given dataset and viewport size; replay and scrubbing must not reshuffle spatial positions
+- the visible viewport may pan across a larger logical graph area; node anchors are not required to fit entirely inside the initial viewport
+- clicking a node is a local inspection action: it highlights adjacent nodes/edges and opens a right-side details drawer; navigation back to `Library` is secondary, not the primary click action
 - genuine empty graphs are allowed if similarity truly does not produce edges
 
 ## 6. Internal interface notes
@@ -101,13 +110,14 @@ Locked requirements:
 The web dashboard depends on the following internal edge contract as of rc8:
 - `StorageApi.getAllEdges(options?: { threshold?: number; conversationIds?: number[] })`
 - `GET_ALL_EDGES` payload: `{ threshold?: number; conversationIds?: number[] }`
+- `StorageApi.getConversations()` must preserve `source_created_at`, `first_captured_at`, `last_captured_at`, and `created_at` on the returned conversation records so `Network` can derive `originAt`
 
 These are internal engineering contracts used to keep `Network` self-sufficient. They are not public API commitments.
 
 ## 7. Non-goals for this spec version
 
 This spec does not define:
-- new graph UX patterns
+- alternate graph modes beyond the current temporal replay + trend scrubber interaction
 - new storage schema
 - parser/runtime refactors
 - unified diagnostics system for all tabs
