@@ -52,6 +52,12 @@ https://github.com/user-attachments/assets/c860092c-9ab1-4773-8b8c-063e22912672
 
 </div>
 
+<div align="center">
+如果心迹帮你找回过一次思考的轨迹，不妨留下一颗 Star ✦
+☆ Star 心迹 Vesti
+<sub>也欢迎 Fork 参与建设，或通过 Issue 与我们对话。</sub>
+</div>
+
 ---
 
 ## ⚡ 为什么我们需要心迹
