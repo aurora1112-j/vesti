@@ -227,6 +227,35 @@ export function MessageBubble({
         </div>
       ) : null}
 
+      {(message.artifacts ?? []).length > 0 ? (
+        <div className="mt-3">
+          <DisclosureSection
+            title="Artifacts"
+            description={`${message.artifacts?.length ?? 0} captured artifact${(message.artifacts?.length ?? 0) === 1 ? "" : "s"}`}
+          >
+            <div className="space-y-2">
+              {(message.artifacts ?? []).map((artifact, index) => (
+                <div
+                  key={`${artifact.kind}-${artifact.label ?? index}`}
+                  className="rounded-lg border border-border-subtle bg-bg-primary/80 px-3 py-2"
+                >
+                  <div className="text-[12px] font-medium text-text-primary">
+                    {artifact.label || artifact.kind}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-text-tertiary">
+                    kind: {artifact.kind}
+                    {artifact.captureMode ? ` · mode: ${artifact.captureMode}` : ""}
+                    {artifact.renderDimensions
+                      ? ` · ${artifact.renderDimensions.width}×${artifact.renderDimensions.height}`
+                      : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DisclosureSection>
+        </div>
+      ) : null}
+
       <div className={`reader-expand-row ${canCollapse ? "has-btn" : ""}`}>
         {canCollapse ? (
           <button

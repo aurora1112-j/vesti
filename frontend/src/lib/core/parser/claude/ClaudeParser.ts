@@ -1,5 +1,5 @@
 import type { IParser, ParsedMessage } from "../IParser";
-import type { Platform } from "../../../types";
+import type { MessageArtifact, Platform } from "../../../types";
 import {
   closestAnySelector,
   extractEarliestTimeFromSelectors,
@@ -12,8 +12,10 @@ import {
   uniqueNodesInDocumentOrder,
 } from "../shared/selectorUtils";
 import { extractAstFromElement } from "../shared/astExtractor";
+import { queryShallowestAppShellText } from "../shared/appShellInterceptor";
 import { resolveCanonicalMessageText } from "../shared/canonicalMessageText";
 import { astPerfModeController, type AstPerfMode } from "../shared/astPerfMode";
+import { createMessageArtifact } from "../../../utils/messageArtifacts";
 import { logger } from "../../../utils/logger";
 
 const SELECTORS = {
@@ -66,6 +68,9 @@ const SELECTORS = {
     "[data-testid*='assistant-message'] .markdown",
     "[data-testid*='assistant-message'] .prose",
   ],
+  artifactRoots: ["#markdown-artifact"],
+  appShellTitle: ["div.truncate.font-base-bold"],
+  sidebarTitle: ["span.truncate.text-sm.whitespace-nowrap"],
   title: ["nav h1", "h1", "title"],
   generating: [
     "[data-is-streaming='true']",
@@ -118,6 +123,7 @@ const SELECTORS = {
     "[class*='toolbar']",
     "[class*='group/status']",
     "[class*='group/row']",
+    "#markdown-artifact",
     ".sr-only",
     "[contenteditable='true']",
   ],
@@ -167,6 +173,7 @@ interface ContentSnapshot {
   contentEl: Element | null;
   sanitizedContent: Element;
   textContent: string;
+  artifacts: MessageArtifact[];
 }
 
 
@@ -180,6 +187,28 @@ export class ClaudeParser implements IParser {
   }
 
   getConversationTitle(): string {
+    const appShellTitle = queryShallowestAppShellText(SELECTORS.appShellTitle, {
+      excludeWithinSelectors: [
+        "main article",
+        ".standard-markdown",
+        ".progressive-markdown",
+        "[data-testid*='message-content']",
+      ],
+    });
+    const cleanedAppShellTitle = this.cleanTitle(appShellTitle ?? "");
+    if (cleanedAppShellTitle) return cleanedAppShellTitle;
+
+    const sidebarTitle = queryShallowestAppShellText(SELECTORS.sidebarTitle, {
+      excludeWithinSelectors: [
+        "main article",
+        ".standard-markdown",
+        ".progressive-markdown",
+        "[data-testid*='message-content']",
+      ],
+    });
+    const cleanedSidebarTitle = this.cleanTitle(sidebarTitle ?? "");
+    if (cleanedSidebarTitle) return cleanedSidebarTitle;
+
     const titleEl = queryFirst(SELECTORS.title);
     const title = this.cleanTitle(safeTextContent(titleEl));
     if (title) return title;
@@ -592,8 +621,9 @@ export class ClaudeParser implements IParser {
         role,
         textContent,
         contentAst: ast.root,
-        contentAstVersion: ast.root ? "ast_v1" : null,
+        contentAstVersion: ast.root ? "ast_v2" : null,
         degradedNodesCount: ast.degradedNodesCount,
+        artifacts: snapshot.artifacts,
         htmlContent: astSource ? astSource.innerHTML : undefined,
       },
       degradedNodesCount: ast.degradedNodesCount,
@@ -676,6 +706,7 @@ export class ClaudeParser implements IParser {
   private getContentSnapshot(node: Element, role: MessageRole): ContentSnapshot {
     const contentEl = this.resolveContentElement(node, role);
     const baseEl = contentEl ?? node;
+    const artifacts = role === "ai" ? this.extractArtifacts(baseEl) : [];
     const sanitizedContent = this.sanitizeContentElement(baseEl);
     const rawText = this.cleanExtractedText(this.extractVisibleText(sanitizedContent));
     const textContent = this.isNoiseText(rawText) ? "" : rawText;
@@ -684,11 +715,97 @@ export class ClaudeParser implements IParser {
       contentEl,
       sanitizedContent,
       textContent,
+      artifacts,
     };
   }
 
   private extractMessageText(node: Element, role: MessageRole): string {
     return this.getContentSnapshot(node, role).textContent;
+  }
+
+  private extractArtifacts(root: Element): MessageArtifact[] {
+    const artifacts: MessageArtifact[] = [];
+    const artifactRoot = queryFirstWithin(root, SELECTORS.artifactRoots);
+    if (!artifactRoot) {
+      return artifacts;
+    }
+
+    const snapshot = this.sanitizeClaudeArtifact(artifactRoot);
+    const artifact = createMessageArtifact({
+      kind: "standalone_artifact",
+      label: this.inferArtifactLabel(snapshot.plainText),
+    });
+
+    artifact.captureMode = "standalone_artifact";
+    artifact.renderDimensions = snapshot.renderDimensions;
+    artifact.plainText = snapshot.plainText;
+    artifact.normalizedHtmlSnapshot = snapshot.normalizedHtmlSnapshot;
+    if (snapshot.markdownSnapshot) {
+      artifact.markdownSnapshot = snapshot.markdownSnapshot;
+    }
+
+    artifacts.push(artifact);
+    return artifacts;
+  }
+
+  private sanitizeClaudeArtifact(source: Element): {
+    renderDimensions: { width: number; height: number };
+    plainText: string;
+    normalizedHtmlSnapshot: string;
+    markdownSnapshot: string | null;
+  } {
+    const clone = source.cloneNode(true) as Element;
+
+    clone.querySelectorAll("button, svg, .h-8, [role='button'], [aria-label*='copy' i]").forEach((node) => {
+      node.remove();
+    });
+
+    clone.querySelectorAll(".katex").forEach((node) => {
+      const katex = node as Element;
+      const annotation = katex.querySelector("annotation[encoding='application/x-tex']");
+      if (!annotation?.textContent?.trim()) {
+        return;
+      }
+      const tex = annotation.textContent.trim();
+      const container = katex.closest(".katex-display") ?? katex;
+      const textNode = document.createTextNode(
+        container.classList.contains("katex-display") ? `\n$$\n${tex}\n$$\n` : `$${tex}$`,
+      );
+      container.parentNode?.replaceChild(textNode, container);
+    });
+
+    clone.querySelectorAll("pre").forEach((pre) => {
+      const code = pre.querySelector("code");
+      if (!code) {
+        return;
+      }
+
+      const className = code.className ?? "";
+      const languageClass = className
+        .split(/\s+/)
+        .find((token) => token.startsWith("language-"));
+      const language = languageClass ? languageClass.replace("language-", "") : "";
+      const codeText = code.textContent ?? "";
+      const wrapper = pre.closest("[class*='copy'], [class*='code']") ?? pre;
+      const textNode = document.createTextNode(`\n\`\`\`${language}\n${codeText}\n\`\`\`\n`);
+      wrapper.parentNode?.replaceChild(textNode, wrapper);
+    });
+
+    const plainText = this.cleanExtractedText(this.extractVisibleText(clone));
+    const width = Math.max(source.clientWidth || 0, source.scrollWidth || 0);
+    const height = Math.max(source.clientHeight || 0, source.scrollHeight || 0);
+
+    return {
+      renderDimensions: { width, height },
+      plainText,
+      normalizedHtmlSnapshot: clone.innerHTML,
+      markdownSnapshot: null,
+    };
+  }
+
+  private inferArtifactLabel(plainText: string): string | undefined {
+    const firstLine = plainText.split("\n").map((line) => line.trim()).find(Boolean);
+    return firstLine ? firstLine.slice(0, 80) : undefined;
   }
 
   private inferRole(node: Element): MessageRole | null {

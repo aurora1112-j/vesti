@@ -143,6 +143,14 @@ function countAstNodes(nodes: AstNode[]): number {
       node.type === "blockquote"
     ) {
       count += countAstNodes(node.children);
+      continue;
+    }
+
+    if (node.type === "table" && node.kind === "v2") {
+      count += countAstNodes(node.columns.flatMap((column) => column.header));
+      count += countAstNodes(
+        node.rows.flatMap((row) => row.cells.flatMap((cell) => cell.children)),
+      );
     }
   }
   return count;
@@ -639,7 +647,7 @@ class AstExtractor {
 
   private extractTable(element: Element): AstNode[] {
     try {
-      const tableNode = extractTableNode(element);
+      const tableNode = extractTableNode(element, this.options.platform);
       if (!tableNode) {
         return this.fallbackToText(element, true);
       }
