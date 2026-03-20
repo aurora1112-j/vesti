@@ -52,12 +52,16 @@ https://github.com/user-attachments/assets/c860092c-9ab1-4773-8b8c-063e22912672
 
 </div>
 
+<br>
 <div align="center">
-如果心迹帮你找回过一次思考的轨迹，不妨留下一颗 Star ✦
-☆ Star 心迹 Vesti
-<sub>也欢迎 Fork 参与建设，或通过 Issue 与我们对话。</sub>
+<p>如果心迹帮你找回过一次思考的轨迹，不妨留下一颗 Star。</p>
+<a href="https://github.com/abraxas914/VESTI">
+  <img src="https://img.shields.io/badge/☆%20Star%20心迹%20Vesti-4B0082?style=for-the-badge&logoColor=FFD700" alt="Star 心迹 Vesti">
+</a>
+<br><br>
+<sub>也欢迎 <a href="https://github.com/abraxas914/VESTI/fork">Fork</a> 参与建设，或通过 <a href="https://github.com/abraxas914/VESTI/issues">Issue</a> 与我们对话。</sub>
 </div>
-
+<br>
 ---
 
 ## ⚡ 为什么我们需要心迹
