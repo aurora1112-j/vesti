@@ -73,10 +73,21 @@ Audience: Reader maintainers, export/compression owners, web contributors
   - artifact replay / deep web preview
   - richer web search / graph surfaces that consume package sidecars
 
+## Week 3 Shipped State
+
+- completed:
+  - shipped export runtime now uses prompt-ready package ingestion
+  - conversation summary / insight generation no longer depend only on raw `content_text`
+  - prompt-side sample-to-signal mapping and runtime checklist are frozen in-repo
+- still deferred:
+  - full package-native `E0/E1/E2/E3` runtimeization
+  - weekly digest full package-aware rollout
+  - artifact replay / prompt-time artifact deep inspection
+
 ## Current Slice Recommendation
 
 当前建议顺序：
 
-1. sidepanel / web shared renderer extraction
+1. weekly digest compatibility-to-package transition
 2. artifact fidelity second pass
-3. `insights / compression` compatibility-to-implementation transition
+3. full package-native runtime planning for `E0/E1/E2/E3`

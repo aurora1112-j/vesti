@@ -345,3 +345,44 @@ Rules:
 - `canonicalPlainText` is fallback body text, not the only structure source
 - `citations[]` and `artifacts[]` are message sidecars
 - `normalizedHtmlSnapshotRef` is expected only for rich-structure or artifact-bearing messages
+
+## 2026-03 shipped runtime adapter layer
+
+Before shipped prompt consumers build their final prompt text, they now pass through a bounded
+internal adapter layer.
+
+```ts
+interface PromptStructureSignals {
+  hasTable: boolean;
+  hasMath: boolean;
+  hasCode: boolean;
+  hasCitations: boolean;
+  hasArtifacts: boolean;
+}
+
+interface PromptReadyMessage {
+  id: number;
+  role: "user" | "ai";
+  created_at: number;
+  bodyText: string;
+  transcriptText: string;
+  structureSignals: PromptStructureSignals;
+  sidecarSummaryLines: string[];
+  artifactRefs: string[];
+}
+
+interface PromptReadyConversationContext {
+  messages: PromptReadyMessage[];
+  transcript: string;
+  bodyChars: number;
+}
+```
+
+Rules:
+- `bodyText` is the canonical prompt-facing body, not raw renderer-polluted transcript text
+- `transcriptText` may append bounded sidecar summaries, but must keep body and sidecars distinct
+- `artifactRefs` are resolved from sidecars first, regex fallback second
+- this adapter is a shipped runtime boundary for:
+  - export compression
+  - conversation summary
+  - insight generation
