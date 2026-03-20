@@ -14,6 +14,10 @@ import {
   getConversationOriginAt,
   getConversationSourceCreatedAt,
 } from "../conversations/timestamps";
+import {
+  formatArtifactDescriptor,
+  getArtifactExcerptText,
+} from "../utils/artifactSummary";
 
 export interface ExportDataset {
   conversations: Conversation[];
@@ -217,35 +221,35 @@ function formatExportCitationLines(citations: MessageCitation[], format: "txt" |
   return citations.map((citation) => `- ${citation.label} — ${citation.href}`);
 }
 
-function formatArtifactSummary(artifact: MessageArtifact): string {
-  const parts = [artifact.kind];
-
-  if (artifact.captureMode) {
-    parts.push(`mode=${artifact.captureMode}`);
-  }
-
-  if (artifact.renderDimensions) {
-    parts.push(`${artifact.renderDimensions.width}x${artifact.renderDimensions.height}`);
-  }
-
-  return parts.join(", ");
-}
-
 function formatExportArtifactLines(artifacts: MessageArtifact[], format: "txt" | "md"): string[] {
   if (artifacts.length === 0) {
     return [];
   }
 
   if (format === "md") {
-    return artifacts.map((artifact) => {
+    return artifacts.flatMap((artifact) => {
       const title = artifact.label ?? artifact.kind;
-      return `- **${title}** (${formatArtifactSummary(artifact)})`;
+      const excerpt = getArtifactExcerptText(artifact, {
+        maxLines: 2,
+        maxCharsPerLine: 120,
+      });
+      return [
+        `- **${title}** (${formatArtifactDescriptor(artifact)})`,
+        excerpt ? `  - Excerpt: ${excerpt}` : null,
+      ].filter((line): line is string => Boolean(line));
     });
   }
 
-  return artifacts.map((artifact) => {
+  return artifacts.flatMap((artifact) => {
     const title = artifact.label ?? artifact.kind;
-    return `- ${title} (${formatArtifactSummary(artifact)})`;
+    const excerpt = getArtifactExcerptText(artifact, {
+      maxLines: 2,
+      maxCharsPerLine: 120,
+    });
+    return [
+      `- ${title} (${formatArtifactDescriptor(artifact)})`,
+      excerpt ? `  Excerpt: ${excerpt}` : null,
+    ].filter((line): line is string => Boolean(line));
   });
 }
 

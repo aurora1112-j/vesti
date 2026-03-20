@@ -17,6 +17,7 @@ import { resolveCanonicalMessageText } from "../shared/canonicalMessageText";
 import { astPerfModeController, type AstPerfMode } from "../shared/astPerfMode";
 import { createMessageArtifact } from "../../../utils/messageArtifacts";
 import { logger } from "../../../utils/logger";
+import { serializeAstRootToMarkdown } from "../../../utils/astMarkdown";
 
 const SELECTORS = {
   userPrimaryNodes: ["[data-testid='user-message']", "[data-testid*='user-message']"],
@@ -792,6 +793,13 @@ export class ClaudeParser implements IParser {
     });
 
     const plainText = this.cleanExtractedText(this.extractVisibleText(clone));
+    const artifactAst = extractAstFromElement(clone, {
+      platform: "Claude",
+      perfMode: "full",
+    });
+    const markdownSnapshot = artifactAst.root
+      ? this.cleanExtractedTextPreservingMarkdown(serializeAstRootToMarkdown(artifactAst.root))
+      : null;
     const width = Math.max(source.clientWidth || 0, source.scrollWidth || 0);
     const height = Math.max(source.clientHeight || 0, source.scrollHeight || 0);
 
@@ -799,7 +807,7 @@ export class ClaudeParser implements IParser {
       renderDimensions: { width, height },
       plainText,
       normalizedHtmlSnapshot: clone.innerHTML,
-      markdownSnapshot: null,
+      markdownSnapshot: markdownSnapshot && markdownSnapshot.length > 0 ? markdownSnapshot : null,
     };
   }
 
@@ -913,6 +921,15 @@ export class ClaudeParser implements IParser {
       .trim();
 
     return text;
+  }
+
+  private cleanExtractedTextPreservingMarkdown(rawText: string): string {
+    return rawText
+      .replace(/\r/g, "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t\f\v]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
 
   private cleanTitle(rawTitle: string): string {

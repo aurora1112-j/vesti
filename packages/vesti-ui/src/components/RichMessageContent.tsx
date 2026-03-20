@@ -1,7 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import katex from "katex";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { AstNode, AstRoot, AstTableNode, Message } from "../types";
+import type { AstNode, AstRoot, AstTableNode, Message, MessageArtifact } from "../types";
 
 const COPY_FEEDBACK_MS = 1400;
 
@@ -17,6 +17,35 @@ interface MathNodeViewProps {
 interface CodeBlockViewProps {
   code: string;
   language?: string | null;
+}
+
+function collectArtifactExcerpt(artifact: MessageArtifact): string | null {
+  const rawSource =
+    artifact.markdownSnapshot?.trim() ||
+    artifact.plainText?.trim() ||
+    artifact.normalizedHtmlSnapshot
+      ?.replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|h1|h2|h3|blockquote|tr)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&amp;/gi, "&")
+      .trim();
+
+  if (!rawSource) {
+    return null;
+  }
+
+  const lines = rawSource
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((line) => (line.length > 110 ? `${line.slice(0, 107).trimEnd()}...` : line));
+
+  return lines.length > 0 ? lines.join(" | ") : null;
 }
 
 function hasRenderableAst(root: AstRoot | null | undefined): root is AstRoot {
@@ -318,21 +347,31 @@ function renderArtifactMeta(message: Message): ReactNode {
       </summary>
       <div className="space-y-2 border-t border-border-subtle px-3 py-3">
         {(message.artifacts ?? []).map((artifact, index) => (
-          <div
-            key={`${artifact.kind}-${artifact.label ?? index}`}
-            className="rounded-lg border border-border-subtle bg-bg-surface-card/60 px-3 py-2"
-          >
-            <div className="text-[12px] font-medium text-text-primary">
-              {artifact.label || artifact.kind}
-            </div>
-            <div className="mt-1 text-[11px] text-text-tertiary">
-              kind: {artifact.kind}
-              {artifact.captureMode ? ` | mode: ${artifact.captureMode}` : ""}
-              {artifact.renderDimensions
-                ? ` | ${artifact.renderDimensions.width}x${artifact.renderDimensions.height}`
-                : ""}
-            </div>
-          </div>
+          (() => {
+            const excerpt = collectArtifactExcerpt(artifact);
+            return (
+              <div
+                key={`${artifact.kind}-${artifact.label ?? index}`}
+                className="rounded-lg border border-border-subtle bg-bg-surface-card/60 px-3 py-2"
+              >
+                <div className="text-[12px] font-medium text-text-primary">
+                  {artifact.label || artifact.kind}
+                </div>
+                <div className="mt-1 text-[11px] text-text-tertiary">
+                  kind: {artifact.kind}
+                  {artifact.captureMode ? ` | mode: ${artifact.captureMode}` : ""}
+                  {artifact.renderDimensions
+                    ? ` | ${artifact.renderDimensions.width}x${artifact.renderDimensions.height}`
+                    : ""}
+                </div>
+                {excerpt ? (
+                  <div className="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-text-secondary">
+                    {excerpt}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()
         ))}
       </div>
     </details>

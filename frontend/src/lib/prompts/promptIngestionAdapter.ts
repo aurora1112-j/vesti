@@ -1,5 +1,9 @@
 import type { Conversation, Message } from "../types";
 import { extractAstPlainText, inspectAstStructure, isAstRoot, shouldPreferAstCanonicalText } from "../utils/astText";
+import {
+  formatArtifactDescriptor,
+  getArtifactExcerptText,
+} from "../utils/artifactSummary";
 
 const PATH_PATTERN =
   /(?:[A-Za-z]:\\[^\s`"')]+|(?:\.?\.?(?:\/|\\))?(?:[\w.-]+(?:\/|\\))+[\w./\\-]*[\w-]+(?:\.[A-Za-z0-9]+)?)/g;
@@ -167,18 +171,16 @@ function buildArtifactSummaryLines(message: Message): string[] {
     return [];
   }
 
-  const lines = artifacts.slice(0, 3).map((artifact) => {
-    const descriptor = [
-      artifact.kind,
-      artifact.captureMode ? `mode=${artifact.captureMode}` : null,
-      artifact.renderDimensions
-        ? `${artifact.renderDimensions.width}x${artifact.renderDimensions.height}`
-        : null,
-    ]
-      .filter(Boolean)
-      .join(", ");
+  const lines = artifacts.slice(0, 3).flatMap((artifact) => {
     const label = artifact.label ?? artifact.kind;
-    return `Artifact: ${label}${descriptor ? ` (${descriptor})` : ""}`;
+    const excerpt = getArtifactExcerptText(artifact, {
+      maxLines: 2,
+      maxCharsPerLine: 110,
+    });
+    return [
+      `Artifact: ${label} (${formatArtifactDescriptor(artifact)})`,
+      excerpt ? `Artifact Excerpt: ${excerpt}` : null,
+    ].filter((line): line is string => Boolean(line));
   });
 
   if (artifacts.length > 3) {
