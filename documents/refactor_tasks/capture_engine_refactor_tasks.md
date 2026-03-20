@@ -94,12 +94,27 @@ Audience: Parser maintainers, runtime engineers, QA
 - richer artifact / citation package beyond current MVP
 - full multimodal `content package` persistence contract
 
+## Week 2 Shipped State
+
+- completed:
+  - Claude `App Shell Interceptor`
+  - `semantic_ast_v2` minimum table path
+  - `citations[] / artifacts[] / rich-only normalized_html_snapshot`
+  - `Qwen / Yuanbao` live DOM realignment
+  - `Kimi / DeepSeek / Yuanbao / Qwen` parser regression cleanups
+  - Doubao wrapper-shell table noise cleanup
+  - frozen Week 2 DOM/text regression manifest
+- still deferred:
+  - `Kimi / Yuanbao` non-DOM fallback track
+  - richer artifact replay / markdown reconstruction
+  - multimodal image / upload capture
+  - historical repair migration
+
 ## Current Slice Recommendation
 
 下一轮优先级：
 
-1. `App Shell Interceptor`
-2. `semantic_ast_v2`（table / math / code）
-3. `citations[] / artifacts[] / rich-only normalized_html_snapshot`
-4. `reader / web / export` 对接第一批 package 结构
-5. 最后再推进 `insights / compression / search`
+1. Claude artifact fidelity second pass
+2. `semantic_ast_v2` 扩展到更完整的 math / code / pseudo-table case
+3. `Kimi / Yuanbao` fallback / shadow-path exploration
+4. 最后再推进 `insights / compression / search`

@@ -60,11 +60,23 @@ Audience: Reader maintainers, export/compression owners, web contributors
   - summary prompt grounding
 - 不把 `citations[] / artifacts[]` 强行塞进 prompt，先定义影响边界
 
+## Week 2 Shipped State
+
+- completed:
+  - export 成为 package-aware consumer
+  - web/library detail 不再停留在纯 `content_text` transcript
+  - `Sources` / `Artifacts` disclosure 已进入 sidepanel 和 web package contract
+  - web rich reader 已具备 table / math / code 的第一批 AST rendering
+  - week2 regression manifest/checklist 已冻结
+- still deferred:
+  - `insights / compression` package-aware implementation
+  - artifact replay / deep web preview
+  - richer web search / graph surfaces that consume package sidecars
+
 ## Current Slice Recommendation
 
 当前建议顺序：
 
-1. 统一 helper 与 schema / 类型
-2. `reader / web / export`
-3. `citations[] / artifacts[] / semantic_ast_v2` 的 renderer contract
-4. `insights / compression` 兼容阶段
+1. sidepanel / web shared renderer extraction
+2. artifact fidelity second pass
+3. `insights / compression` compatibility-to-implementation transition
