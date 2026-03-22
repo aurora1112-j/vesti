@@ -1032,12 +1032,11 @@ function buildStructuredSummaryReference(
   return null;
 }
 
-function buildSummaryReferenceFromRecord(summaryRecord: SummaryRecord): string {
-  const structuredRef = buildStructuredSummaryReference(summaryRecord.structured);
-  if (structuredRef) {
-    return structuredRef;
-  }
-  return buildSummaryReference(summaryRecord.content || "");
+function buildWeeklyBridgeReference(summary: ConversationSummaryV2): string {
+  return (
+    buildStructuredSummaryReference(summary) ??
+    buildSummaryReference(summary.core_question || "")
+  );
 }
 
 function selectWeeklyCandidates(conversations: Conversation[]): Conversation[] {
@@ -1229,13 +1228,19 @@ async function buildWeeklyLiteInput(
   }
 
   const selectedConversations = ranked.map((item) => item.conversation);
-  const selectedWithEvidence = ranked.filter(
-    (item) => !!item.summaryRecord?.content || !!item.summaryRecord?.structured
-  );
-  const selectedSummaries = selectedWithEvidence.map((item) => ({
-    conversationId: item.conversation.id,
-    summary: buildSummaryReferenceFromRecord(item.summaryRecord!),
-  }));
+  const selectedSummaries = ranked.flatMap((item) => {
+    const summary = toSummaryV2ForWeekly(item.summaryRecord ?? null);
+    if (!summary) {
+      return [];
+    }
+
+    return [
+      {
+        conversationId: item.conversation.id,
+        summary: buildWeeklyBridgeReference(summary),
+      },
+    ];
+  });
 
   return {
     selectedConversations,
