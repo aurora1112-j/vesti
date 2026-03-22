@@ -33,15 +33,21 @@ If `vesti-web/next-env.d.ts` is touched by build output, restore it before commi
   - conversation title comes from app-shell metadata, not body `<h1>`
 - `CLAUDE_ARTIFACT_001`
   - standalone artifact is captured as sidecar
+  - `plainText` and `normalizedHtmlSnapshot` exist
+  - `markdownSnapshot` only appears when safely derived
   - artifact content does not leak back into `content_text`
 
 ### ChatGPT
 
 - `SEARCH_CITATION_001`
+  - citation labels collapse to the first visible line
+  - persisted/exported citation URLs do not include `utm_*`
   - citation pill text does not remain at the end of the message body
   - `Sources` metadata still exists after body cleanup
 - `TABLE_FIDELITY_001`
+  - true tables still emit `semantic_ast_v2`
   - KaTeX in table cells does not collapse into duplicated renderer text
+  - alignment survives when present
 
 ### Qwen
 
@@ -95,3 +101,7 @@ If `vesti-web/next-env.d.ts` is touched by build output, restore it before commi
 - Markdown export writes `Sources` and `Artifacts` as separate per-message sections
 - TXT export writes `Sources:` and `Artifacts:` as separate per-message sections
 - export body text does not reintroduce citation tail or artifact tail noise
+
+## Frozen Review Rule
+
+- any change that touches citation, artifact, title provenance, or rich table/math/code behavior must map back to at least one frozen case ID in the manifest

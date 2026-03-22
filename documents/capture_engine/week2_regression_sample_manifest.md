@@ -9,9 +9,14 @@ This manifest defines the approved sample set for Week 2 capture / reader / web 
 
 It is intentionally small and operator-friendly:
 
-- the `txt` files remain the canonical human-reviewed problem statements
+- the `txt` files remain the canonical human-reviewed acceptance statements
 - the Playwright sample directories remain the canonical DOM/screenshot snapshots
 - new parser or reader work should validate against this manifest before merge
+
+The four text files below are no longer open investigation inputs. They are now treated as:
+- implemented in shipped code
+- frozen acceptance inputs
+- with any remaining boundary called out as deferred rather than missing
 
 ## Approved Text Samples
 
@@ -58,3 +63,6 @@ These are not the primary Week 2 freeze set, but they are still useful when debu
    - `page.html`
    - `page.png`
    - the associated text sample or bug memo
+5. The four approved text samples are a frozen acceptance gate:
+   - do not rewrite their intent case-by-case in PR review
+   - do not reopen schema or replay scope under their names
