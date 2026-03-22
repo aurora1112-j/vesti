@@ -18,6 +18,8 @@ It is the bridge between:
   - `conversationSummary.ts`
   - `insightGenerationService.ts`
 
+The four operator text samples below are frozen acceptance references. They are not soft guidance.
+
 ## Runtime Signal Contract
 
 The shipped runtime now assumes each prompt-ready message exposes:
@@ -46,6 +48,7 @@ Source:
 Expected runtime interpretation:
 - title remains app-shell metadata
 - prompt ingestion must not infer title from body heading
+- summary/export consumers must preserve title provenance from upstream metadata
 
 Consumers that must honor this:
 - `conversationSummary.ts`
@@ -59,6 +62,7 @@ Source:
 Expected prompt signals:
 - `hasArtifacts = true`
 - `sidecarSummaryLines` includes artifact summary lines
+- artifact excerpt source priority is `markdownSnapshot -> plainText -> normalizedHtmlSnapshot`
 - `artifactRefs` are derived from artifact sidecars first
 - `bodyText` must not include artifact-tail pollution
 
@@ -90,6 +94,7 @@ Source:
 Expected prompt signals:
 - `hasCitations = true`
 - `sidecarSummaryLines` contains citation summaries
+- citation labels remain first-visible-line summaries
 - citation text must not return inside `bodyText`
 - citation influence belongs in transcript sidecar context, not body-tail text
 
@@ -178,3 +183,9 @@ If a runtime change alters prompt-ingestion behavior, reviewers should verify:
 2. whether `bodyText` stayed clean
 3. whether the right `structureSignals` and `artifactRefs` still exist
 4. whether the shipped consumer changed prompt behavior for the right reason
+
+## Explicit defers
+
+- artifact replay remains deferred
+- weekly digest is still a package-aware summary bridge, not a weekly runtime rewrite
+- overseas live sampling is not part of this frozen acceptance set

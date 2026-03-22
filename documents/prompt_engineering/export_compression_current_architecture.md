@@ -70,6 +70,32 @@ Practical effects:
 
 This is still a **compatibility-enhanced** stage, not a full package-native prompt runtime.
 
+## Frozen acceptance gate
+
+The following four operator text samples are now mandatory prompt/runtime acceptance references:
+- `SEARCH_CITATION_001`
+- `CLAUDE_ARTIFACT_001`
+- `CLAUDE_TITLE_001`
+- `TABLE_FIDELITY_001`
+
+They should be read as frozen contract checks, not as open-ended bug memos.
+
+Prompt/runtime consequences:
+- `SEARCH_CITATION_001`
+  - `hasCitations` stays true when citations exist
+  - citation summary lines stay available in sidecar summaries
+  - citation text stays out of `bodyText`
+- `CLAUDE_ARTIFACT_001`
+  - `hasArtifacts` stays true for standalone artifacts
+  - artifact summary lines stay sidecar-derived
+  - excerpt priority remains `markdownSnapshot -> plainText -> normalizedHtmlSnapshot`
+- `CLAUDE_TITLE_001`
+  - title provenance remains upstream app-shell metadata
+  - summary/export consumers do not infer title from body headings
+- `TABLE_FIDELITY_001`
+  - `hasTable / hasMath / hasCode` stay grounded in AST-aware canonical body behavior
+  - renderer-polluted text must not become the canonical prompt body
+
 ## 2026-03 limitation note
 
 The current shipped compression path is now less text-centric, but not fully package-native.
@@ -114,3 +140,8 @@ The expected next bridge is:
 - then summary-to-weekly adaptation
 
 It should not regress back to direct raw-transcript dependence while artifact work is being expanded.
+
+Explicit defer notes for this stage:
+- artifact replay is still deferred
+- weekly digest is bridged, not rewritten
+- overseas live sampling remains out of current acceptance scope

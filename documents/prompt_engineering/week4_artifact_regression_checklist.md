@@ -6,6 +6,7 @@ Audience: Prompt/runtime engineers, parser maintainers, reader/web reviewers
 Reference manifest:
 
 - [`week4_artifact_sample_manifest.md`](D:/DEV/VESTI-main-git/documents/prompt_engineering/week4_artifact_sample_manifest.md)
+- [`post_audit_frozen_case_matrix.md`](D:/DEV/VESTI-main-git/documents/prompt_engineering/post_audit_frozen_case_matrix.md)
 
 ## Build Gates
 
@@ -72,6 +73,8 @@ Must remain true:
 - artifact excerpt text does not re-enter `bodyText`
 - citation tail stays outside `bodyText`
 - table/math/code-heavy messages still influence runtime heuristics through structure signals
+- `CLAUDE_TITLE_001` title provenance remains app-shell-first for downstream summary/export consumers
+- `SEARCH_CITATION_001` citation labels stay first-visible-line-only and exported URLs stay free of `utm_*`
 
 ## Export Checks
 
@@ -102,6 +105,7 @@ Must remain true:
 - excerpt comes from sidecar fields, not transcript tail
 - `Sources` and `Artifacts` can coexist without polluting body text
 - table/math/code rendering remains AST-first when AST exists
+- reader/web do not invent a second artifact descriptor or excerpt contract
 
 ## Live Sampling Boundary
 
@@ -123,3 +127,7 @@ Do not fold these into Week 4 artifact commits:
 - artifact replay / interactive preview
 - schema migration
 - overseas three-platform live sampling expansion
+
+## Review rule
+
+- any change touching citation, artifact, title provenance, or rich table/math/code behavior must point back to at least one frozen case ID in the Week 4 manifest or the Week 2 DOM freeze set

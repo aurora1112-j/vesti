@@ -58,6 +58,7 @@ Reference mapping:
 
 - [`week3_prompt_signal_mapping.md`](D:/DEV/VESTI-main-git/documents/prompt_engineering/week3_prompt_signal_mapping.md)
 - [`week2_regression_sample_manifest.md`](D:/DEV/VESTI-main-git/documents/capture_engine/week2_regression_sample_manifest.md)
+- [`post_audit_frozen_case_matrix.md`](D:/DEV/VESTI-main-git/documents/prompt_engineering/post_audit_frozen_case_matrix.md)
 
 ## Manual Runtime Assertions
 

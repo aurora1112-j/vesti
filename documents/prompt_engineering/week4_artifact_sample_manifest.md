@@ -14,6 +14,14 @@ It narrows the review focus to four connected questions:
 - which shipped consumers must honor artifact sidecars
 - which adjacent table/code/math/citation cases must continue to hold after artifact work
 
+The four operator text samples in this manifest are frozen acceptance references:
+- `CLAUDE_ARTIFACT_001`
+- `SEARCH_CITATION_001`
+- `TABLE_FIDELITY_001`
+- `CLAUDE_TITLE_001`
+
+They are implemented in shipped code and should now be reviewed as acceptance gates, not open problem memos.
+
 This manifest is meant to be used together with:
 
 - [`week3_prompt_signal_mapping.md`](D:/DEV/VESTI-main-git/documents/prompt_engineering/week3_prompt_signal_mapping.md)
@@ -59,6 +67,10 @@ Expected package behavior:
 - `artifacts[].plainText` exists
 - `artifacts[].markdownSnapshot` exists only when safely derived
 - artifact content does not return to `content_text`
+- shipped consumers keep excerpt priority:
+  - `markdownSnapshot`
+  - `plainText`
+  - `normalizedHtmlSnapshot`
 
 ### `DOM_YUANBAO_W2_001`
 
@@ -92,3 +104,9 @@ When a Week 4 change touches artifact capture or artifact-aware consumers, revie
 2. artifact summaries come from sidecars, not body-tail reconstruction
 3. code/table/math/citation adjacency behavior did not regress while artifact fidelity improved
 4. no shipped consumer silently invents a second artifact contract
+
+## Explicit defers
+
+- artifact replay / interactive preview
+- weekly digest rewrite
+- overseas three-platform live sampling expansion

@@ -387,6 +387,16 @@ Rules:
   - conversation summary
   - insight generation
 
+Frozen gate implications:
+- `SEARCH_CITATION_001`
+  - citation summary lines may appear in `transcriptText`, but citation text must stay out of `bodyText`
+- `CLAUDE_ARTIFACT_001`
+  - artifact summary lines are sidecar-only and do not authorize body-tail reconstruction
+- `TABLE_FIDELITY_001`
+  - `bodyText` must remain AST-aware and free of renderer-polluted math/table/code noise
+- `CLAUDE_TITLE_001`
+  - upstream title provenance remains app-shell metadata, not body-heading inference
+
 ## 2026-03 artifact-first shipped note
 
 Week 4 does not introduce a new artifact schema version. It tightens the shipped interpretation of
@@ -406,3 +416,4 @@ Still deferred:
 - artifact replay
 - iframe / executable artifact rendering
 - full package-native weekly digest consumption
+- weekly rewrite; current weekly path remains a package-aware summary-to-weekly bridge
