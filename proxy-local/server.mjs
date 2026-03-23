@@ -14,6 +14,10 @@ const CHAT_PRIMARY_MODEL =
   "moonshotai/Kimi-K2.5";
 const CHAT_BACKUP_MODEL =
   (process.env.VESTI_CHAT_BACKUP_MODEL || "").trim() || "stepfun-ai/Step-3.5-Flash";
+const CHAT_MAX_TOKENS = Number.parseInt(
+  process.env.VESTI_CHAT_MAX_TOKENS || "1600",
+  10
+);
 const LEGACY_CHAT_MODELS = new Set([
   "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
   "Qwen/Qwen3-14B",
@@ -108,7 +112,7 @@ function setCorsHeaders(res, origin, allowedOrigin) {
   );
   res.setHeader(
     "Access-Control-Expose-Headers",
-    "x-request-id, x-proxy-model-used, x-proxy-attempt"
+    "x-request-id, x-proxy-model-used, x-proxy-attempt, x-proxy-requested-max-tokens, x-proxy-effective-max-tokens, x-proxy-max-tokens-limit"
   );
 }
 
@@ -162,9 +166,9 @@ function buildErrorPayload(code, message, requestId, extras = {}) {
 
 function clampMaxTokens(value) {
   if (typeof value !== "number" || Number.isNaN(value)) {
-    return 800;
+    return CHAT_MAX_TOKENS;
   }
-  return Math.max(1, Math.min(Math.floor(value), 800));
+  return Math.max(1, Math.min(Math.floor(value), CHAT_MAX_TOKENS));
 }
 
 function purgeExpiredNotionOAuthRecords() {
@@ -484,6 +488,9 @@ async function handleChat(req, res, requestId, origin, allowedOrigin) {
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.setHeader("x-proxy-model-used", finalModel);
   res.setHeader("x-proxy-attempt", String(finalAttempt));
+  res.setHeader("x-proxy-requested-max-tokens", String(body?.max_tokens ?? ""));
+  res.setHeader("x-proxy-effective-max-tokens", String(payload.max_tokens));
+  res.setHeader("x-proxy-max-tokens-limit", String(CHAT_MAX_TOKENS));
   setCommonHeaders(res, requestId);
   setCorsHeaders(res, origin, allowedOrigin);
   res.end(finalBody);
