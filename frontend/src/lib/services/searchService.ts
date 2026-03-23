@@ -35,6 +35,10 @@ import {
   generateConversationSummary,
   generateWeeklyReport,
 } from "./insightGenerationService";
+import type {
+  CallModelScopeOptions,
+  InferenceCallResult,
+} from "./llmService";
 import { callInference } from "./llmService";
 import { getEffectiveModelId, getLlmAccessMode } from "./llmConfig";
 import { getLlmSettings } from "./llmSettingsService";
@@ -47,6 +51,9 @@ const MAX_EMBEDDING_CHARS = 2048;
 const AGENT_SUMMARY_SOURCE_LIMIT = 3;
 const MAX_WEEKLY_CANDIDATES = 12;
 const MAX_WEEKLY_SOURCE_CHIPS = 8;
+const EXPLORE_CONTINUATION_MAX_ROUNDS = 2;
+const EXPLORE_CONTINUATION_TAIL_CHARS = 1200;
+const EXPLORE_CONTINUATION_MIN_EXTENSION = 24;
 
 type SummaryToolResult = {
   snippets: Map<number, string>;
@@ -72,6 +79,11 @@ type RagRetrievalResult = {
   sources: RelatedConversation[];
   context: string;
   items: RagRetrievalItem[];
+};
+
+type ExploreCompletionResult = {
+  content: string;
+  continuationCount: number;
 };
 
 const TOOL_DESCRIPTIONS: Record<ExploreToolName, string> = {
@@ -675,7 +687,155 @@ Instructions:
 2. Answer based primarily on the retrieved conversations.
 3. If information is insufficient, say so clearly.
 4. Cite specific conversations when possible.
-5. Be concise but comprehensive.`;
+5. Prefer a complete answer over an ultra-short answer.
+6. Use short sections or bullets when they improve clarity.`;
+}
+
+function normalizeFinishReason(value: string | null | undefined): string {
+  return (value || "").trim().toLowerCase();
+}
+
+function isLengthFinishReason(result: InferenceCallResult): boolean {
+  const finishReason = normalizeFinishReason(result.finishReason);
+  return finishReason.includes("length") || finishReason.includes("max");
+}
+
+function isNearTokenLimit(
+  result: InferenceCallResult,
+  settings: LlmConfig
+): boolean {
+  const completionTokens = result.usage?.completionTokens;
+  const effectiveMaxTokens =
+    result.proxyTokenMetrics?.effectiveMaxTokens ??
+    result.proxyTokenMetrics?.requestedMaxTokens ??
+    settings.maxTokens;
+
+  if (
+    typeof completionTokens !== "number" ||
+    !Number.isFinite(completionTokens) ||
+    typeof effectiveMaxTokens !== "number" ||
+    !Number.isFinite(effectiveMaxTokens)
+  ) {
+    return false;
+  }
+
+  return completionTokens >= Math.max(64, effectiveMaxTokens - 32);
+}
+
+function buildContinuationPrompt(originalPrompt: string, partialAnswer: string): string {
+  const answerTail =
+    partialAnswer.length <= EXPLORE_CONTINUATION_TAIL_CHARS
+      ? partialAnswer
+      : partialAnswer.slice(-EXPLORE_CONTINUATION_TAIL_CHARS);
+
+  return [
+    "The previous answer was cut off by the output limit.",
+    "Continue the same answer from exactly where it stopped.",
+    "Rules:",
+    "- Do not restart the answer.",
+    "- Do not repeat earlier text unless a few bridge words are unavoidable.",
+    "- Preserve the same language, tone, and formatting style.",
+    "- Return only the continuation.",
+    "",
+    "Original request:",
+    originalPrompt,
+    "",
+    "Already returned (tail):",
+    answerTail,
+  ].join("\n");
+}
+
+function findOverlapSize(previous: string, next: string): number {
+  const maxOverlap = Math.min(previous.length, next.length, 220);
+  for (let size = maxOverlap; size >= 24; size -= 1) {
+    if (previous.slice(-size) === next.slice(0, size)) {
+      return size;
+    }
+  }
+  return 0;
+}
+
+function mergeContinuationText(previous: string, next: string): string {
+  const trimmedNext = next.trimStart();
+  if (!trimmedNext) {
+    return previous;
+  }
+
+  const overlapSize = findOverlapSize(previous, trimmedNext);
+  if (overlapSize > 0) {
+    return `${previous}${trimmedNext.slice(overlapSize)}`;
+  }
+
+  if (!previous) {
+    return trimmedNext;
+  }
+
+  if (previous.endsWith("\n") || trimmedNext.startsWith("\n")) {
+    return `${previous}${trimmedNext}`;
+  }
+
+  if (
+    /[A-Za-z0-9\u3400-\u9FFF]$/.test(previous) &&
+    /^[A-Za-z0-9\u3400-\u9FFF]/.test(trimmedNext)
+  ) {
+    return `${previous}\n${trimmedNext}`;
+  }
+
+  return `${previous}${trimmedNext}`;
+}
+
+async function callExploreInference(
+  settings: LlmConfig,
+  prompt: string,
+  options: CallModelScopeOptions
+): Promise<ExploreCompletionResult> {
+  let combined = "";
+  let continuationCount = 0;
+  let currentPrompt = prompt;
+  let result = await callInference(settings, currentPrompt, options);
+  let currentContent = result.content?.trim() || "";
+
+  if (!currentContent) {
+    return {
+      content: "",
+      continuationCount: 0,
+    };
+  }
+
+  combined = currentContent;
+
+  while (
+    (isLengthFinishReason(result) || isNearTokenLimit(result, settings)) &&
+    continuationCount < EXPLORE_CONTINUATION_MAX_ROUNDS
+  ) {
+    continuationCount += 1;
+    currentPrompt = buildContinuationPrompt(prompt, combined);
+    result = await callInference(settings, currentPrompt, options);
+    currentContent = result.content?.trim() || "";
+
+    if (!currentContent) {
+      break;
+    }
+
+    const previousLength = combined.length;
+    combined = mergeContinuationText(combined, currentContent);
+    if (combined.length - previousLength < EXPLORE_CONTINUATION_MIN_EXTENSION) {
+      break;
+    }
+  }
+
+  if (continuationCount > 0) {
+    logger.info("service", "Explore answer extended with continuation", {
+      continuationCount,
+      finishReason: result.finishReason ?? null,
+      modelId: getEffectiveModelId(settings),
+    });
+  }
+
+  return {
+    content: combined,
+    continuationCount,
+  };
 }
 
 function extractExcerpt(messages: Array<{ content_text: string }>): string {
@@ -940,8 +1100,8 @@ async function buildCustomWeeklySummary(params: {
     evidence,
   ].join("\n");
 
-  const result = await callInference(params.settings, userPrompt, { systemPrompt });
-  return result.content?.trim() || "";
+  const result = await callExploreInference(params.settings, userPrompt, { systemPrompt });
+  return result.content.trim();
 }
 
 function buildWeeklyLocalFallbackAnswer(params: {
@@ -1253,8 +1413,8 @@ async function runClassicKnowledgeBase(
 
   try {
     const systemPrompt = buildContextualRagPrompt(retrieval.context, historyContext);
-    const result = await callInference(settings, query, { systemPrompt });
-    const answer = result.content?.trim();
+    const result = await callExploreInference(settings, query, { systemPrompt });
+    const answer = result.content.trim();
     return {
       answer: answer || buildLocalFallbackAnswer(query, retrieval.sources),
       sources: retrieval.sources,
@@ -1286,8 +1446,8 @@ async function synthesizeAgentAnswer(params: {
   );
 
   try {
-    const result = await callInference(settings, query, { systemPrompt });
-    const answer = result.content?.trim();
+    const result = await callExploreInference(settings, query, { systemPrompt });
+    const answer = result.content.trim();
     if (!answer) {
       return buildLocalFallbackAnswer(query, retrieval.sources);
     }
@@ -1339,11 +1499,12 @@ async function synthesizeWeeklyAnswer(params: {
     "2. If evidence is partial, say that clearly.",
     "3. Tell the user which source conversations to open when deeper verification is needed.",
     "4. Keep the answer grounded in the selected time window.",
+    "5. Prefer a complete answer over an ultra-short one.",
   ].join("\n");
 
   try {
-    const result = await callInference(settings, query, { systemPrompt });
-    const answer = result.content?.trim();
+    const result = await callExploreInference(settings, query, { systemPrompt });
+    const answer = result.content.trim();
     if (!answer) {
       return buildWeeklyLocalFallbackAnswer({
         query,

@@ -42,21 +42,202 @@ import type {
 
 const MODE_STAGES: Record<ExploreMode, string[]> = {
   agent: [
-    "Planning with model...",
-    "Resolving scope and route...",
-    "Collecting evidence...",
+    "Planning the route...",
+    "Scanning lightweight library cues...",
+    "Collecting source evidence...",
     "Compiling context draft...",
-    "Synthesizing answer...",
+    "Synthesizing a longer answer...",
   ],
-  classic: ["Understanding query...", "Searching conversations...", "Synthesizing answer..."],
+  classic: [
+    "Understanding your question...",
+    "Searching indexed context...",
+    "Synthesizing a longer answer...",
+  ],
 };
 
-const sampleQuestions = [
-  "What did I do this week?",
-  "What React performance optimization techniques have I discussed?",
-  "Summarize all conversations about database architecture",
-  "Find all discussions involving TypeScript type system",
+const STARTER_DECKS: StarterDeck[] = [
+  {
+    eyebrow: "Start with a task",
+    title: "Explore your library with a lighter touch.",
+    description:
+      "Ask a focused question, then let Explore search, summarize, and stitch together the minimal context needed.",
+    privacyTip:
+      "Keep prompts narrow. Ask for themes, decisions, or one time window instead of raw transcripts.",
+    capabilityHint:
+      "Summaries, weekly digests, and source-grounded answers are all available here.",
+    prompts: [
+      {
+        title: "Summarize this week",
+        prompt: "Summarize what I worked on this week and highlight the main decisions.",
+        detail:
+          "Great for rolling up a recent batch of conversations into a concise review.",
+      },
+      {
+        title: "Find the decision trail",
+        prompt:
+          "Show the conversations that explain how we reached the final decision.",
+        detail:
+          "Use this when you want the context behind a conclusion, not just the conclusion.",
+      },
+      {
+        title: "Group related threads",
+        prompt:
+          "Group the most related conversations about this topic and explain why they belong together.",
+        detail:
+          "Useful for clustering a topic without exposing the full raw conversation history.",
+      },
+      {
+        title: "Build a quick brief",
+        prompt:
+          "Create a short brief from the most relevant conversations and keep it source-grounded.",
+        detail: "A compact starting point when you want a clean handoff or a summary note.",
+      },
+    ],
+  },
+  {
+    eyebrow: "Private by default",
+    title: "Ask for the shape of the work, not the whole transcript.",
+    description:
+      "Explore is most useful when it compresses a library into a narrow, trustworthy answer you can inspect.",
+    privacyTip:
+      "Favor descriptors like themes, blockers, or outcomes. Avoid asking for everything at once.",
+    capabilityHint:
+      "You can search across all conversations or a selected subset, then refine sources afterward.",
+    prompts: [
+      {
+        title: "What changed?",
+        prompt: "What changed across my conversations over the last week?",
+        detail:
+          "A safe way to surface progress without pulling in more than you need.",
+      },
+      {
+        title: "Cluster the blockers",
+        prompt: "Cluster the repeated blockers or open questions across my conversations.",
+        detail:
+          "Helps reveal recurring pain points and where the discussion kept circling back.",
+      },
+      {
+        title: "Trace one topic",
+        prompt: "Trace the main discussion around privacy or search and summarize the arc.",
+        detail:
+          "Good for following a single thread through multiple conversations.",
+      },
+      {
+        title: "Surface next steps",
+        prompt: "Surface the next actions implied by the most relevant conversations.",
+        detail:
+          "Turns scattered discussion into a practical follow-up list.",
+      },
+    ],
+  },
+  {
+    eyebrow: "Work in layers",
+    title: "Start broad, then narrow to the sources that matter.",
+    description:
+      "Use a starter prompt to get a compact answer, then inspect the source conversations if you need verification.",
+    privacyTip:
+      "Short prompts usually reveal less than a fully detailed request, which helps keep exploration focused.",
+    capabilityHint:
+      "Ask for weekly summaries, cross-conversation themes, or a source list you can inspect manually.",
+    prompts: [
+      {
+        title: "Weekly recap",
+        prompt: "Give me a compact weekly recap with the main themes and follow-ups.",
+        detail:
+          "Designed for a weekly digest that stays concise but still useful.",
+      },
+      {
+        title: "Theme map",
+        prompt:
+          "Map the main themes across my conversations about architecture and tooling.",
+        detail:
+          "Useful when the goal is to understand the library at a higher level first.",
+      },
+      {
+        title: "Evidence first",
+        prompt:
+          "List the most relevant conversations for this topic and summarize each one briefly.",
+        detail:
+          "A good bridge between search and review when you want a source-backed answer.",
+      },
+      {
+        title: "Decision summary",
+        prompt: "Summarize the decision and the evidence that led to it.",
+        detail:
+          "Short, inspectable, and suitable for quick handoff notes.",
+      },
+    ],
+  },
 ];
+
+function rotateArray<T>(items: T[], offset: number): T[] {
+  if (items.length === 0) return items;
+  const normalized = ((offset % items.length) + items.length) % items.length;
+  if (normalized === 0) return items;
+  return [...items.slice(normalized), ...items.slice(0, normalized)];
+}
+
+function getStarterDeck(seed: number): StarterDeck {
+  return STARTER_DECKS[((seed % STARTER_DECKS.length) + STARTER_DECKS.length) % STARTER_DECKS.length];
+}
+
+function normalizeStarterSeed(text: string, max = 44): string {
+  const normalized = text
+    .replace(/\s+/g, " ")
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
+    .trim();
+  if (!normalized) return "";
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, max).trim()}...`;
+}
+
+function extractConversationCue(conversation: Conversation): string {
+  const title = normalizeStarterSeed(conversation.title || "");
+  if (title && title.toLowerCase() !== "untitled") {
+    return title;
+  }
+
+  return normalizeStarterSeed(conversation.snippet || "");
+}
+
+function buildLibraryStarterPrompts(
+  conversations: Conversation[],
+  fallbackPrompts: StarterPromptCard[],
+  revision: number
+): StarterPromptCard[] {
+  const rotatedConversations = rotateArray(conversations, revision);
+  const prompts: StarterPromptCard[] = [];
+  const seen = new Set<string>();
+
+  for (const conversation of rotatedConversations) {
+    const cue = extractConversationCue(conversation);
+    if (!cue) continue;
+
+    const key = cue.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    prompts.push({
+      title: `Continue "${cue}"`,
+      prompt: `Continue "${cue}" and search the related context before summarizing the key points.`,
+      detail:
+        "Built from recent library cues using only lightweight title and snippet context.",
+    });
+
+    if (prompts.length >= 2) {
+      break;
+    }
+  }
+
+  for (const fallback of fallbackPrompts) {
+    prompts.push(fallback);
+    if (prompts.length >= 4) {
+      break;
+    }
+  }
+
+  return prompts;
+}
 
 type ExploreTabProps = {
   storage: StorageApi;
@@ -66,6 +247,22 @@ type ExploreTabProps = {
 
 type DrawerTab = "plan" | "tool_calls" | "sources" | "context_draft";
 type ContextSaveStatus = "idle" | "saving" | "saved" | "error";
+type StarterDeckStatus = "loading" | "ready";
+
+interface StarterPromptCard {
+  title: string;
+  prompt: string;
+  detail: string;
+}
+
+interface StarterDeck {
+  eyebrow: string;
+  title: string;
+  description: string;
+  privacyTip: string;
+  capabilityHint: string;
+  prompts: StarterPromptCard[];
+}
 
 const TOOL_LABELS: Record<ExploreToolName, string> = {
   intent_planner: "Intent Planner",
@@ -196,7 +393,7 @@ function getResolvedTimeScopeLabel(plan?: ExploreAgentPlan): string | null {
     plan?.requestedTimeScope?.preset &&
     plan.requestedTimeScope.preset !== "none"
   ) {
-    return plan.requestedTimeScope.preset.replaceAll("_", " ");
+    return plan.requestedTimeScope.preset.replace(/_/g, " ");
   }
   return null;
 }
@@ -239,6 +436,7 @@ export function ExploreTab({
   const [messages, setMessages] = useState<ExploreMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const justCreatedSessionRef = useRef<string | null>(null);
+  const starterDeckTimerRef = useRef<number | null>(null);
 
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -265,6 +463,9 @@ export function ExploreTab({
   >([]);
   const [contextSaveStatus, setContextSaveStatus] = useState<ContextSaveStatus>("idle");
   const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
+  const [starterDeckRevision, setStarterDeckRevision] = useState(0);
+  const [starterDeckStatus, setStarterDeckStatus] = useState<StarterDeckStatus>("loading");
+  const [starterCards, setStarterCards] = useState<StarterPromptCard[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -280,7 +481,14 @@ export function ExploreTab({
   const drawerPlan = drawerMessage?.agentMeta?.plan;
   const drawerCandidates = drawerMessage?.agentMeta?.contextCandidates ?? [];
   const drawerToolCalls = drawerMessage?.agentMeta?.toolCalls ?? [];
-
+  const starterDeck = useMemo(
+    () => getStarterDeck(starterDeckRevision),
+    [starterDeckRevision]
+  );
+  const starterPrompts = useMemo(
+    () => rotateArray(starterDeck.prompts, starterDeckRevision),
+    [starterDeck.prompts, starterDeckRevision]
+  );
   useEffect(() => {
     loadSessions();
   }, []);
@@ -302,6 +510,49 @@ export function ExploreTab({
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (currentSessionId) {
+      setStarterDeckStatus("ready");
+      return;
+    }
+
+    setStarterDeckStatus("loading");
+    if (starterDeckTimerRef.current !== null) {
+      window.clearTimeout(starterDeckTimerRef.current);
+    }
+    let cancelled = false;
+
+    const minDelay = new Promise<void>((resolve) => {
+      starterDeckTimerRef.current = window.setTimeout(() => {
+        starterDeckTimerRef.current = null;
+        resolve();
+      }, 320);
+    });
+
+    void (async () => {
+      let nextCards = starterPrompts;
+      try {
+        const conversations = await storage.getConversations();
+        nextCards = buildLibraryStarterPrompts(conversations, starterPrompts, starterDeckRevision);
+      } catch {
+        nextCards = starterPrompts;
+      }
+
+      await minDelay;
+      if (cancelled) return;
+      setStarterCards(nextCards);
+      setStarterDeckStatus("ready");
+    })();
+
+    return () => {
+      cancelled = true;
+      if (starterDeckTimerRef.current !== null) {
+        window.clearTimeout(starterDeckTimerRef.current);
+        starterDeckTimerRef.current = null;
+      }
+    };
+  }, [currentSessionId, starterDeckRevision, starterPrompts, storage.getConversations]);
 
   useEffect(() => {
     if (renameTarget && renameInputRef.current) {
@@ -428,6 +679,8 @@ export function ExploreTab({
     setError(null);
     setDrawerMessageId(null);
     setDrawerNotice(null);
+    setStarterDeckRevision((prev) => prev + 1);
+    setStarterDeckStatus("loading");
   };
 
   const openDrawer = (message: ExploreMessage, tab: DrawerTab) => {
@@ -957,36 +1210,135 @@ export function ExploreTab({
     [onOpenConversation]
   );
 
-  const renderEmptyState = () => (
-    <div className="flex flex-1 items-center justify-center p-8">
-      <div className="w-full max-w-2xl text-center">
-        <h1 className="mb-4 text-[32px] font-serif font-normal text-text-primary">
-          What do you want to explore?
-        </h1>
-        <p className="mb-8 font-sans text-text-secondary">
-          Ask questions about your conversation history
-        </p>
+  const renderEmptyState = () => {
+    const loadingStarterDeck = starterDeckStatus === "loading";
+    const visibleStarterCards = starterCards.length > 0 ? starterCards : starterPrompts;
+    const cardCount = loadingStarterDeck ? 4 : visibleStarterCards.length;
 
-        <div className="mx-auto max-w-lg space-y-3 text-left">
-          {sampleQuestions.map((question) => (
-            <button
-              key={question}
-              onClick={() => {
-                setInputValue(question);
-                textareaRef.current?.focus();
-              }}
-              className="w-full rounded-lg bg-bg-surface-card px-4 py-3 text-left text-[14px] font-sans text-text-secondary transition-all hover:bg-bg-surface-card-hover hover:text-text-primary"
-            >
-              <div className="flex items-center gap-2">
-                <ChevronRight className="h-4 w-4 text-accent-primary" />
-                {question}
+    return (
+      <div className="flex flex-1 items-start px-4 py-6 md:px-6 md:py-8">
+        <div className="w-full space-y-4">
+          <section className="relative overflow-hidden rounded-[28px] border border-border-subtle bg-bg-tertiary shadow-[0_18px_70px_rgba(0,0,0,0.08)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.16),transparent_24%)]" />
+            <div className="relative p-5 md:p-8">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <div className="min-w-0 lg:pr-10">
+                  <p className="text-[10px] font-sans uppercase tracking-[0.4em] text-text-tertiary">
+                    {starterDeck.eyebrow}
+                  </p>
+                  <h1 className="mt-3 text-3xl font-[family-name:var(--font-lora)] font-normal leading-tight text-text-primary md:text-[40px]">
+                    {starterDeck.title}
+                  </h1>
+                  <p className="mt-3 max-w-[920px] text-sm leading-6 text-text-secondary md:text-[15px]">
+                    {starterDeck.description}
+                  </p>
+                </div>
+
+                <div className="inline-flex items-center gap-2 justify-self-start rounded-full border border-border-subtle bg-bg-primary/80 px-3 py-1.5 text-xs font-sans text-text-secondary shadow-sm backdrop-blur lg:justify-self-end">
+                  {loadingStarterDeck ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-primary" />
+                  ) : (
+                    <span className="h-2.5 w-2.5 rounded-full bg-accent-primary" />
+                  )}
+                  <span>{loadingStarterDeck ? "Loading starter ideas" : "Starter deck ready"}</span>
+                </div>
               </div>
-            </button>
-          ))}
+
+              <div className="mt-6">
+                <div className="rounded-[24px] border border-border-subtle bg-bg-primary/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.05)] backdrop-blur">
+                  <div className="relative overflow-hidden rounded-[22px] border border-border-default bg-bg-primary">
+                    <textarea
+                      ref={textareaRef}
+                      value={inputValue}
+                      onChange={(event) => setInputValue(event.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Ask your knowledge base, summarize a week, or trace a decision trail..."
+                      rows={5}
+                      className="min-h-[168px] w-full resize-none bg-transparent px-5 py-5 pr-24 text-base font-sans text-text-primary placeholder:text-text-tertiary focus:outline-none"
+                    />
+                    <div className="absolute bottom-4 right-4">
+                      <button
+                        onClick={handleSubmit}
+                        disabled={!inputValue.trim() || isSubmitting}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-2 text-xs font-sans font-medium text-white transition-colors hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-end justify-between gap-3 px-1">
+              <div>
+                <p className="text-xs font-sans uppercase tracking-wider text-text-tertiary">
+                  Starter prompts
+                </p>
+                <p className="mt-1 text-sm font-sans text-text-secondary">
+                  Choose one to populate the composer, then edit it before sending.
+                </p>
+              </div>
+              <p className="text-xs font-sans text-text-tertiary">
+                {loadingStarterDeck ? "Refreshing suggestions..." : "Cards update on every new chat."}
+              </p>
+            </div>
+
+            {loadingStarterDeck ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: cardCount }).map((_, index) => (
+                  <div
+                    key={`starter-skeleton-${index}`}
+                    className="h-full rounded-[24px] border border-border-subtle bg-bg-surface-card p-4"
+                  >
+                    <div className="h-9 w-9 animate-pulse rounded-xl bg-bg-secondary" />
+                    <div className="mt-5 h-5 w-4/5 animate-pulse rounded-full bg-bg-secondary" />
+                    <div className="mt-3 h-4 w-full animate-pulse rounded-full bg-bg-secondary" />
+                    <div className="mt-2 h-4 w-11/12 animate-pulse rounded-full bg-bg-secondary" />
+                    <div className="mt-4 h-3 w-2/3 animate-pulse rounded-full bg-bg-secondary" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {visibleStarterCards.map((card, index) => (
+                  <button
+                    key={`${card.title}-${index}`}
+                    type="button"
+                    onClick={() => {
+                      setInputValue(card.prompt);
+                      setError(null);
+                      textareaRef.current?.focus();
+                    }}
+                    className="group flex h-full flex-col rounded-[24px] border border-border-subtle bg-bg-surface-card p-4 text-left font-sans shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-primary/30 hover:bg-bg-surface-card-hover hover:shadow-[0_18px_34px_rgba(15,23,42,0.12)]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-primary/10 text-accent-primary">
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                      <span className="text-[11px] font-sans uppercase tracking-wider text-text-tertiary">
+                        Fill composer
+                      </span>
+                    </div>
+                    <p className="mt-5 text-[15px] font-sans font-medium text-text-primary">{card.title}</p>
+                    <p className="mt-2 text-sm font-sans leading-6 text-text-secondary">{card.detail}</p>
+                    <p className="mt-4 text-xs font-sans text-text-tertiary">{card.prompt}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="relative flex h-full">
@@ -1195,47 +1547,51 @@ export function ExploreTab({
             </>
           )}
         </div>
-        <div className="border-t border-border-subtle p-4">
-          <div className="mx-auto max-w-3xl">
-            <div className="relative flex items-end gap-2 rounded-lg border border-border-default bg-bg-primary transition-all focus-within:border-accent-primary focus-within:ring-2 focus-within:ring-accent-primary/20">
-              <textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(event) => setInputValue(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  mode === "agent"
-                    ? "Ask your knowledge base (Agent mode)..."
-                    : "Ask your knowledge base (Classic mode)..."
-                }
-                rows={1}
-                className="max-h-32 flex-1 resize-none bg-transparent px-4 py-3 text-base font-sans text-text-primary placeholder:text-text-tertiary focus:outline-none"
-                style={{ minHeight: "48px" }}
-              />
-              <div className="p-2">
-                <button
-                  onClick={handleSubmit}
-                  disabled={!inputValue.trim() || isSubmitting}
-                  className="rounded-md bg-accent-primary p-2 text-white transition-all hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" strokeWidth={1.5} />
-                  )}
-                </button>
+        {!(messages.length === 0 && !currentSessionId) && (
+          <div className="border-t border-border-subtle p-4">
+            <div className="mx-auto max-w-3xl">
+              <div className="relative flex items-end gap-2 rounded-lg border border-border-default bg-bg-primary transition-all focus-within:border-accent-primary focus-within:ring-2 focus-within:ring-accent-primary/20">
+                <textarea
+                  ref={textareaRef}
+                  value={inputValue}
+                  onChange={(event) => setInputValue(event.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    mode === "agent"
+                      ? "Ask your knowledge base (Agent mode)..."
+                      : "Ask your knowledge base (Classic mode)..."
+                  }
+                  rows={1}
+                  className="max-h-32 flex-1 resize-none bg-transparent px-4 py-3 text-base font-sans text-text-primary placeholder:text-text-tertiary focus:outline-none"
+                  style={{ minHeight: "48px" }}
+                />
+                <div className="p-2">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!inputValue.trim() || isSubmitting}
+                    className="rounded-md bg-accent-primary p-2 text-white transition-all hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" strokeWidth={1.5} />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 text-center text-xs font-sans text-text-tertiary">
+                <p>
+                  {mode === "agent"
+                    ? "Agent mode shows the planner route, tool calls, source controls, and editable context drafts."
+                    : "Classic mode searches your history and returns concise source-grounded answers."}
+                </p>
+                <p className="mt-1">
+                  Current scope: {getSearchScopeSummary(activeSearchScope)}
+                </p>
               </div>
             </div>
-            <div className="mt-2 text-center text-xs font-sans text-text-tertiary">
-              <p>
-                {mode === "agent"
-                  ? "Agent mode shows the planner route, tool calls, source controls, and editable context drafts."
-                  : "Classic mode searches your history and returns concise source-grounded answers."}
-              </p>
-              <p className="mt-1">Current scope: {getSearchScopeSummary(activeSearchScope)}</p>
-            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {drawerMessage && (

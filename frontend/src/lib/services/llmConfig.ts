@@ -16,6 +16,9 @@ export const DEFAULT_PROXY_URL = `${DEFAULT_PROXY_BASE_URL}/chat`;
 export const DEFAULT_PROXY_EMBEDDINGS_URL = `${DEFAULT_PROXY_BASE_URL}/embeddings`;
 export const DEFAULT_STABLE_MODEL = KIMI_K2_5_MODEL;
 export const DEFAULT_BACKUP_MODEL = STEP_3_5_FLASH_MODEL;
+export const DEFAULT_MAX_TOKENS = 1600;
+const LEGACY_DEFAULT_MAX_TOKENS = 800;
+const MAX_TOKENS_CAP = 1600;
 export const BYOK_MODEL_WHITELIST = [
   DEFAULT_STABLE_MODEL,
   DEFAULT_BACKUP_MODEL,
@@ -78,6 +81,19 @@ function normalizeProxyBaseCandidate(value: string | undefined): string {
   }
 }
 
+function normalizeMaxTokens(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_MAX_TOKENS;
+  }
+
+  const normalized = Math.max(1, Math.min(Math.floor(value), MAX_TOKENS_CAP));
+  if (normalized === LEGACY_DEFAULT_MAX_TOKENS) {
+    return DEFAULT_MAX_TOKENS;
+  }
+
+  return normalized;
+}
+
 function resolveProxyBaseUrl(
   settings: Pick<LlmConfig, "proxyBaseUrl" | "proxyUrl">
 ): string {
@@ -124,7 +140,7 @@ export function buildDefaultLlmSettings(now = Date.now()): LlmConfig {
     apiKey: "",
     modelId: DEFAULT_STABLE_MODEL,
     temperature: 0.3,
-    maxTokens: 800,
+    maxTokens: DEFAULT_MAX_TOKENS,
     updatedAt: now,
     mode: "demo_proxy",
     proxyBaseUrl: DEFAULT_PROXY_BASE_URL,
@@ -153,6 +169,7 @@ export function normalizeLlmSettings(
   const proxyBaseUrl = getProxyBaseUrl(settings);
   const proxyUrl = getProxyRouteUrl({ proxyBaseUrl, proxyUrl: settings.proxyUrl }, "chat");
   const proxyServiceToken = (settings.proxyServiceToken || "").trim();
+  const maxTokens = normalizeMaxTokens(settings.maxTokens);
 
   if (mode === "demo_proxy") {
     return {
@@ -161,6 +178,7 @@ export function normalizeLlmSettings(
       provider: "modelscope",
       baseUrl: MODELSCOPE_BASE_URL,
       modelId: DEFAULT_STABLE_MODEL,
+      maxTokens,
       mode,
       proxyBaseUrl,
       proxyUrl,
@@ -186,6 +204,7 @@ export function normalizeLlmSettings(
     provider: "modelscope",
     baseUrl: MODELSCOPE_BASE_URL,
     modelId: byokModelId,
+    maxTokens,
     mode,
     proxyBaseUrl,
     proxyUrl,
