@@ -55,7 +55,10 @@ function signaturesMatch(a: string[], b: string[]): boolean {
 }
 
 function sanitizeIncomingMessages(messages: ParsedMessage[]): ParsedMessage[] {
-  return messages.filter((message) => normalizeText(message.textContent).length > 0);
+  return messages.filter(
+    (message) =>
+      normalizeText(message.textContent).length > 0 || (message.artifacts?.length ?? 0) > 0,
+  );
 }
 
 function normalizeDegradedNodesCount(value: number | undefined): number {
