@@ -204,7 +204,7 @@ const EXPERIMENTAL_COMPACT_MAX_TOKENS = {
   fallback: 4200,
 } as const;
 const MIN_VALID_OUTPUT_LENGTH = 48;
-const COMPACT_MIN_VALID_OUTPUT_LENGTH = 300;
+const COMPACT_MIN_VALID_OUTPUT_LENGTH = 200;
 const COMPACT_SOFT_MIN_RATIO = 0.08;
 const EXPERIMENTAL_PACKING = {
   keepFirstMessages: 4,
@@ -445,17 +445,31 @@ function findIncompleteTerminalLine(value: string): string | null {
     if (!hasMeaningfulText(candidate)) {
       return null;
     }
+    // Proper sentence-ending punctuation
     if (/[。！？.!?][)"'`]*$/.test(candidate)) {
       return null;
     }
+    // A line ending with a colon is clearly incomplete
     if (/[:：]$/.test(candidate)) {
       return trimmed;
     }
 
+    // For short fragments, check if they look truly incomplete.
+    // Previously any line with ≥12 CJK chars was flagged as incomplete,
+    // but Chinese sentences frequently omit terminal punctuation.
+    // Only flag genuinely short fragments that look cut off.
     const cjkCount = countCjkChars(candidate);
     const asciiWordCount = countAsciiWords(candidate);
     const compactLen = candidate.replace(/\s+/g, " ").trim().length;
-    if (cjkCount >= 12 || asciiWordCount >= 6 || compactLen >= 45) {
+
+    // If the line has substantial content, assume the LLM simply omitted
+    // terminal punctuation — not a structural incompleteness.
+    if (cjkCount >= 8 || asciiWordCount >= 4 || compactLen >= 30) {
+      return null;
+    }
+
+    // Very short last line without proper ending — likely truncated
+    if (compactLen < 12) {
       return trimmed;
     }
 
@@ -2142,16 +2156,22 @@ function extractSections(
 ): Record<string, string> | null {
   const headings = EXPECTED_HEADINGS[mode];
   const sections: Record<string, string> = {};
+  const presentHeadings = headings.filter((h) => value.indexOf(h) >= 0);
 
-  for (let index = 0; index < headings.length; index += 1) {
-    const heading = headings[index];
+  // Require at least half the headings to be present (rounded up).
+  // LLMs sometimes skip 1-2 headings for sparse conversations.
+  // Previously, a single missing heading rejected the entire output.
+  const minRequired = Math.ceil(headings.length / 2);
+  if (presentHeadings.length < minRequired) {
+    return null;
+  }
+
+  for (let index = 0; index < presentHeadings.length; index += 1) {
+    const heading = presentHeadings[index];
     const start = value.indexOf(heading);
-    if (start < 0) {
-      return null;
-    }
 
     const bodyStart = start + heading.length;
-    const nextHeading = headings
+    const nextHeading = presentHeadings
       .slice(index + 1)
       .map((candidate) => ({
         candidate,
@@ -2224,10 +2244,16 @@ function extractConditionalHandoff(
 
     if (trimmed.startsWith("## ")) {
       if (!CONDITIONAL_HANDOFF_ALLOWED_HEADINGS.includes(trimmed)) {
-        return null;
+        // Skip non-whitelist headings instead of rejecting entire output.
+        // LLMs sometimes add extra headings; silently ignore them.
+        currentHeading = null;
+        continue;
       }
       if (rawSections[trimmed] !== undefined) {
-        return null;
+        // Duplicate heading: skip instead of rejecting entire output.
+        // LLMs occasionally repeat a heading. Append content to first.
+        currentHeading = trimmed;
+        continue;
       }
       if (
         sectionOrder.length === 0 &&
@@ -2248,7 +2274,9 @@ function extractConditionalHandoff(
     }
 
     if (!currentHeading) {
-      return null;
+      // Tolerate preamble text before the first heading.
+      // LLMs sometimes output reasoning or context before ## State Overview.
+      continue;
     }
 
     rawSections[currentHeading] = rawSections[currentHeading]
@@ -2281,13 +2309,9 @@ function extractConditionalHandoff(
     return null;
   }
 
-  const observedOrder = conditionalHeadings.map((heading) =>
-    CONDITIONAL_HANDOFF_SECTION_ORDER.indexOf(heading)
-  );
-  const sortedOrder = [...observedOrder].sort((a, b) => a - b);
-  if (observedOrder.some((value, index) => value !== sortedOrder[index])) {
-    return null;
-  }
+  // Tolerate sections slightly out of whitelist order.
+  // LLMs sometimes reorder sections. Accept them as-is since the content
+  // is grounded and the structural contract is otherwise intact.
 
   const sections: Record<string, string> = {};
   for (const heading of conditionalHeadings) {
@@ -2504,7 +2528,13 @@ function validateCompressionOutput(
   options?: ExportCompressionOptions
 ): ExportCompressionValidationResult {
   const normalized = sanitizeSummaryText(value);
-  const runtimeMetrics = buildRuntimeMetrics(item, normalized.length, mode);
+  // Use raw body length for the absolute minimum check. sanitizeSummaryText
+  // aggressively strips markdown headings, bullets, bold markers, etc.
+  // A well-structured 400-char markdown output with 5 headings can easily
+  // drop below 300 chars after stripping, causing false rejections.
+  // The markdown structure IS valid output — penalizing it is incorrect.
+  const rawBodyLength = value.replace(/\r\n/g, "\n").trim().length;
+  const runtimeMetrics = buildRuntimeMetrics(item, rawBodyLength, mode);
   const integrityWarnings = isExperimentalCompact(mode, options)
     ? buildIntegrityWarnings(normalized)
     : [];
@@ -2521,7 +2551,7 @@ function validateCompressionOutput(
 
   if (isExperimentalCompact(mode, options)) {
     const parsed = extractConditionalHandoff(value);
-    if (!parsed || integrityWarnings.length > 0) {
+    if (!parsed) {
       return {
         valid: false,
         issueCode: "export_missing_required_headings",
@@ -2532,6 +2562,9 @@ function validateCompressionOutput(
         ),
       };
     }
+    // Integrity warnings (unclosed code blocks, dangling cues, incomplete
+    // terminal lines) are common in LLM output and rarely indicate
+    // structural failure. Demote them to soft warnings instead of rejecting.
 
     const groundedSectionCount = countGroundedSections(parsed.sections);
     if (groundedSectionCount < 1) {
@@ -2604,7 +2637,12 @@ function validateCompressionOutput(
   }
 
   const groundedSectionCount = countGroundedSections(sections);
-  const minimumGroundedSections = mode === "compact" ? 3 : 4;
+  // Adaptive minimum: require at least half the present sections to be
+  // grounded, with a floor of 1. Previously: hard 3 for compact, 4 for
+  // summary — which rejected outputs where the LLM correctly skipped
+  // headings that had no evidence.
+  const presentSectionCount = Object.keys(sections).length;
+  const minimumGroundedSections = Math.max(1, Math.ceil(presentSectionCount / 2));
   if (groundedSectionCount < minimumGroundedSections) {
     return {
       valid: false,
@@ -2615,21 +2653,23 @@ function validateCompressionOutput(
     };
   }
 
-  if (!preservesArtifactSignal(value, getPromptMessages(item))) {
-    return {
-      valid: false,
-      issueCode: "export_artifact_signal_missing",
-      runtimeMetrics,
-      integrityWarnings,
-      softCompressionWarning: buildSoftCompressionWarning(runtimeMetrics),
-    };
-  }
+  // Artifact signal preservation: demote to soft warning.
+  // Previously, if the transcript had code/commands but the LLM summary
+  // didn't explicitly mention them, the entire output was rejected.
+  // For conversational threads (non-technical), artifact signals are often
+  // false positives from backtick formatting or inline code mentions.
+  const artifactPreserved = preservesArtifactSignal(value, getPromptMessages(item));
+  const baseWarning = buildSoftCompressionWarning(runtimeMetrics);
+  const artifactNote = artifactPreserved
+    ? undefined
+    : "Artifact signals detected in transcript but not preserved in output.";
+  const combinedWarning = [baseWarning, artifactNote].filter(Boolean).join(" ") || undefined;
 
   return {
     valid: true,
     runtimeMetrics,
     integrityWarnings,
-    softCompressionWarning: buildSoftCompressionWarning(runtimeMetrics),
+    softCompressionWarning: combinedWarning,
   };
 }
 
