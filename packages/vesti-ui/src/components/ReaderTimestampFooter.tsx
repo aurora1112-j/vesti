@@ -1,6 +1,5 @@
 "use client";
 
-import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { ReaderTimestampFooterModel } from "../lib/reader-timestamps";
 
@@ -13,18 +12,9 @@ export function ReaderTimestampFooter({
   model,
   className,
 }: ReaderTimestampFooterProps) {
-  const [open, setOpen] = useState(false);
-  const detailsId = useId();
-
   return (
-    <div className={className}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={detailsId}
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-3 text-left text-[13px] font-sans text-text-secondary transition-colors duration-150 hover:text-text-primary"
-      >
+    <details className={className ? `group ${className}` : "group"}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-left text-[13px] font-sans text-text-secondary transition-colors duration-150 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus marker:content-none [&::-webkit-details-marker]:hidden">
         <span className="min-w-0 flex-1 truncate">
           Started {model.summaryStarted}
           <span className="px-1 text-text-tertiary" aria-hidden="true">
@@ -33,18 +23,12 @@ export function ReaderTimestampFooter({
           last updated {model.summaryUpdated}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
+          className="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-180"
           strokeWidth={1.75}
         />
-      </button>
+      </summary>
 
-      <div
-        id={detailsId}
-        hidden={!open}
-        className="mt-3 grid gap-2 text-[12px] font-sans text-text-secondary sm:grid-cols-2"
-      >
+      <div className="mt-3 grid gap-2 text-[12px] font-sans text-text-secondary sm:grid-cols-2">
         {model.details.map((detail) => (
           <div
             key={detail.key}
@@ -57,6 +41,6 @@ export function ReaderTimestampFooter({
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }

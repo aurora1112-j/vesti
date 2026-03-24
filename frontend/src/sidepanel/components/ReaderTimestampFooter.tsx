@@ -1,4 +1,3 @@
-import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { ReaderTimestampFooterModel } from "~lib/conversations/timestamps";
 
@@ -7,18 +6,9 @@ interface ReaderTimestampFooterProps {
 }
 
 export function ReaderTimestampFooter({ model }: ReaderTimestampFooterProps) {
-  const [open, setOpen] = useState(false);
-  const detailsId = useId();
-
   return (
-    <div className="border-t border-border-subtle px-4 py-3">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={detailsId}
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-3 text-left text-vesti-xs text-text-tertiary transition-colors hover:text-text-secondary"
-      >
+    <details className="group border-t border-border-subtle px-4 py-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-left text-vesti-xs text-text-tertiary transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus marker:content-none [&::-webkit-details-marker]:hidden">
         <span className="min-w-0 flex-1 truncate">
           Started {model.summaryStarted}
           <span className="px-1 text-text-quaternary" aria-hidden="true">
@@ -27,18 +17,12 @@ export function ReaderTimestampFooter({ model }: ReaderTimestampFooterProps) {
           last updated {model.summaryUpdated}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
+          className="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-180"
           strokeWidth={1.75}
         />
-      </button>
+      </summary>
 
-      <div
-        id={detailsId}
-        hidden={!open}
-        className="mt-3 grid gap-2 text-vesti-xs text-text-secondary sm:grid-cols-2"
-      >
+      <div className="mt-3 grid gap-2 text-vesti-xs text-text-secondary sm:grid-cols-2">
         {model.details.map((detail) => (
           <div
             key={detail.key}
@@ -51,6 +35,6 @@ export function ReaderTimestampFooter({ model }: ReaderTimestampFooterProps) {
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }

@@ -2517,14 +2517,15 @@ export function LibraryTab({
                         </div>
                       )}
 
-                    {timestampFooter && (
-                      <ReaderTimestampFooter
-                        model={timestampFooter}
-                        className="mt-6 border-t border-border-subtle pt-4"
-                      />
-                    )}
                   </div>
                 </div>
+
+                {timestampFooter && (
+                  <ReaderTimestampFooter
+                    model={timestampFooter}
+                    className="mt-4 border-t border-border-subtle pt-4"
+                  />
+                )}
               </div>
             </div>
 
