@@ -57,7 +57,8 @@ Dormant `E1` draft artifacts now exist for review and decomposition prep, but th
 Handoff-only offline prototype artifacts now also exist for distillation work, but they are not runtime-active:
 - `frontend/src/lib/prompts/export/e2HandoffEvidenceCompactor.ts`
 - `frontend/src/lib/prompts/export/e3HandoffComposerFromEvidence.ts`
-- maintainer-local offline prototype helpers and runner
+- `frontend/src/lib/prompts/export/distillPrototype.ts`
+- `scripts/export-distill-prototype.ts`
 
 Legacy compatibility re-export files remain temporarily:
 - `frontend/src/lib/prompts/exportCompact.ts`
@@ -98,7 +99,7 @@ The long-term export contract now distinguishes between:
 - mode: `handoff`
 - input: dataset + `HandoffPlanningNotes`
 - output: `HandoffEvidenceSkeleton`
-- status: draft prompt artifact, currently used only by the maintainer-local offline handoff distillation prototype
+- status: draft prompt artifact, currently used only by the offline handoff distillation prototype
 
 ### `export_e2_knowledge_evidence_compactor`
 - stage: `E2`
@@ -134,7 +135,7 @@ The long-term export contract now distinguishes between:
 - mode: `handoff`
 - input: `CompactComposerInput` backed by `HandoffEvidenceSkeleton`
 - output: compact markdown under the shipping headings
-- status: offline-only prototype composer used by a maintainer-local validation chain to confirm that `E3` can consume evidence instead of raw transcript
+- status: offline-only prototype composer used to validate that `E3` can consume evidence instead of raw transcript
 
 ### `export_compact_repair`
 - stage: repair path after invalid structured compact output
@@ -198,7 +199,7 @@ The current handoff-only distillation prototype exists to answer one question: c
 
 Prototype scope:
 - handoff only
-- maintainer-local offline runner and helper modules
+- TypeScript / Node runner under `scripts/export-distill-prototype.ts`
 - heuristic `P1`, not LLM-assisted annotation
 - one-shot repair only, never recursive
 
