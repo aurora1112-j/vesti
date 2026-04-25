@@ -17,7 +17,7 @@ export function Hero() {
         <div className="mx-auto max-w-[760px] text-center">
           <p className="section-kicker">Local-first AI memory</p>
           <h1 className="mt-4 text-balance text-[clamp(2.8rem,6vw,5.2rem)] font-semibold leading-[1.02] tracking-[-0.07em] text-text-primary">
-            Keep the AI threads you will want back.
+            Every thought deserves a home.
           </h1>
           <p className="mx-auto mt-5 max-w-[32ch] text-balance text-[1.05rem] leading-7 text-text-secondary">
             Vesti saves your browser conversations into one searchable local library.
