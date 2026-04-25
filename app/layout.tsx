@@ -1,13 +1,18 @@
 import React from "react"
 import type { Metadata } from "next"
-import { Lora } from "next/font/google"
+import { IBM_Plex_Mono, Manrope } from "next/font/google"
 
 import "./globals.css"
 
-const lora = Lora({
+const manrope = Manrope({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-lora",
+  variable: "--font-manrope",
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-ibm-plex-mono",
 })
 
 export const metadata: Metadata = {
@@ -15,6 +20,11 @@ export const metadata: Metadata = {
   description:
     "Auto-capture your chatbot (ChatGPT, Claude, Gemini & DeepSeek) conversations. Searchable, quantified, and stored entirely in your browser.",
   generator: "v0.app",
+  icons: {
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
+  },
 }
 
 export default function RootLayout({
@@ -23,8 +33,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={lora.variable}>
-      <body className="font-serif antialiased">{children}</body>
+    <html
+      lang="en"
+      className={`${manrope.variable} ${ibmPlexMono.variable}`}
+    >
+      <body className="font-sans antialiased">{children}</body>
     </html>
   )
 }

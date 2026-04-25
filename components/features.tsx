@@ -1,47 +1,61 @@
+import { Lock, Search, TimerReset, WandSparkles } from "lucide-react"
+
 const features = [
   {
-    overline: "CAPTURE",
-    title: "It records so you don\u2019t have to.",
-    description:
-      "Vesti watches for new messages on your chatbot (ChatGPT, Claude, Gemini, and DeepSeek). When a conversation finishes, it\u2019s saved \u2014 automatically, silently, with no manual steps.",
+    icon: TimerReset,
+    title: "Auto-capture",
+    description: "Save finished conversations without exporting anything.",
   },
   {
-    overline: "TIMELINE",
-    title: "Every conversation, one scroll away.",
-    description:
-      "A unified feed sorted by time. Platform tags tell you where each conversation happened. Hover to preview, click to read the full thread.",
+    icon: Search,
+    title: "Fast search",
+    description: "Find past prompts, notes, and decisions in seconds.",
   },
   {
-    overline: "SEARCH",
-    title: "Find anything you\u2019ve ever asked.",
-    description:
-      "Full-text search across all your saved conversations. Filter by platform or date range. Results are instant \u2014 everything runs locally in your browser.",
+    icon: Lock,
+    title: "Local-first",
+    description: "Keep your conversation history on your own machine.",
   },
   {
-    overline: "PRIVACY",
-    title: "Your data never leaves your machine.",
-    description:
-      "No servers. No accounts. No cloud sync. Vesti stores everything in your browser\u2019s local IndexedDB. Export anytime. Delete anytime. It\u2019s your data.",
+    icon: WandSparkles,
+    title: "Clear recall",
+    description: "Reopen the exact thread instead of starting over.",
   },
 ]
 
 export function Features() {
   return (
-    <section className="px-6 py-24 md:px-12 md:py-[100px]">
-      <div className="mx-auto max-w-[720px] space-y-20">
-        {features.map((feature) => (
-          <div key={feature.overline}>
-            <p className="mb-2 text-[13px] font-medium uppercase tracking-[0.06em] text-text-tertiary">
-              {feature.overline}
-            </p>
-            <h2 className="mb-3 text-2xl font-semibold leading-snug text-text-primary">
-              {feature.title}
-            </h2>
-            <p className="max-w-[600px] text-base leading-[1.65] text-text-secondary">
-              {feature.description}
-            </p>
-          </div>
-        ))}
+    <section
+      id="features"
+      className="scroll-mt-24 px-6 py-12 md:px-8 md:py-14"
+    >
+      <div className="page-shell">
+        <div className="mx-auto mb-8 max-w-[620px] text-center">
+          <p className="section-kicker">Features</p>
+          <h2 className="mt-4 text-balance text-[clamp(2.1rem,4.5vw,3.6rem)] font-semibold leading-[1.03] tracking-[-0.06em] text-text-primary">
+            Short on ceremony, strong on recall.
+          </h2>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {features.map((feature) => {
+            const Icon = feature.icon
+
+            return (
+              <article key={feature.title} className="lovable-card p-6">
+                <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border-subtle bg-[rgba(252,251,248,0.92)]">
+                  <Icon className="h-4 w-4 text-text-primary" />
+                </div>
+                <h3 className="text-[1.15rem] font-medium leading-7 tracking-[-0.03em] text-text-primary">
+                  {feature.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-text-secondary">
+                  {feature.description}
+                </p>
+              </article>
+            )
+          })}
+        </div>
       </div>
     </section>
   )

@@ -1,46 +1,59 @@
-"use client"
+import Image from "next/image"
+import { ArrowRight, Play } from "lucide-react"
+
+import {
+  getPrimaryInstallHref,
+  isExternalPrimaryInstall,
+  marketingLinks,
+} from "@/lib/marketing-config"
 
 export function Hero() {
+  const installHref = getPrimaryInstallHref()
+  const isExternal = isExternalPrimaryInstall()
+
   return (
-    <section className="px-6 pb-20 pt-36 text-center md:px-12 md:pt-[140px]">
-      <div className="mx-auto max-w-[720px]">
-        <p className="mb-4 text-[13px] font-medium uppercase tracking-[0.08em] text-text-tertiary">
-          Local-first AI memory
-        </p>
-        <h1 className="mx-auto mb-6 whitespace-nowrap text-4xl font-semibold leading-[1.15] tracking-tight text-text-primary md:text-[48px]">
-          Every thought deserves a home.
-        </h1>
-        <p className="mx-auto mb-10 max-w-[520px] text-base leading-relaxed text-text-secondary md:text-lg">
-          Vesti auto-captures your chatbot (ChatGPT, Claude, Gemini, and
-          DeepSeek) conversations — searchable, quantified, and stored entirely
-          in your browser.
-        </p>
-        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-          {/* DOWNLOAD: Replace href with Chrome Web Store URL */}
-          <a
-            href="#download"
-            className="inline-flex items-center justify-center rounded-md bg-vesti-accent px-7 py-3 text-[15px] font-medium text-white transition-colors duration-150 hover:bg-vesti-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vesti-accent focus-visible:ring-offset-2"
-            onClick={(e) => {
-              e.preventDefault()
-              document
-                .getElementById("download")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }}
-          >
-            Download
-          </a>
-          <a
-            href="#demo"
-            className="inline-flex items-center justify-center rounded-md border border-border-default bg-transparent px-7 py-3 text-[15px] font-medium text-text-secondary transition-all duration-150 hover:border-vesti-accent hover:bg-[rgba(50,102,173,0.08)] hover:text-vesti-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vesti-accent focus-visible:ring-offset-2"
-            onClick={(e) => {
-              e.preventDefault()
-              document
-                .getElementById("demo")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }}
-          >
-            Watch Demo
-          </a>
+    <section className="px-6 pb-14 pt-16 md:px-8 md:pb-16 md:pt-20">
+      <div className="page-shell">
+        <div className="mx-auto max-w-[760px] text-center">
+          <p className="section-kicker">Local-first AI memory</p>
+          <h1 className="mt-4 text-balance text-[clamp(2.8rem,6vw,5.2rem)] font-semibold leading-[1.02] tracking-[-0.07em] text-text-primary">
+            Keep the AI threads you will want back.
+          </h1>
+          <p className="mx-auto mt-5 max-w-[32ch] text-balance text-[1.05rem] leading-7 text-text-secondary">
+            Vesti saves your browser conversations into one searchable local library.
+          </p>
+
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a
+              href={installHref}
+              {...(isExternal
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
+              className="lovable-button-primary min-w-[148px] gap-2"
+            >
+              Install
+              <ArrowRight className="h-4 w-4" />
+            </a>
+            <a href="#demo" className="lovable-button-secondary min-w-[148px] gap-2">
+              <Play className="h-4 w-4" />
+              Watch demo
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-10 lovable-media-frame p-3 md:mt-12 md:p-4">
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-border-subtle bg-[rgba(252,251,248,0.9)] px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">Vesti library</p>
+            <p className="text-sm text-text-tertiary">Search and reopen</p>
+          </div>
+          <Image
+            src={marketingLinks.libraryScreenshotUrl}
+            alt="Vesti side panel showing saved AI conversations in a searchable timeline."
+            width={1388}
+            height={868}
+            className="w-full rounded-[1.1rem] border border-border-subtle"
+            priority
+          />
         </div>
       </div>
     </section>

@@ -63,8 +63,8 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        serif: ['var(--font-lora)', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
-        mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace'],
+        sans: ['var(--font-manrope)', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: ['var(--font-ibm-plex-mono)', 'SF Mono', 'Menlo', 'monospace'],
       },
       keyframes: {
         'accordion-down': {
@@ -75,10 +75,26 @@ const config: Config = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        shimmer: {
+          '0%': { opacity: '0.45', transform: 'translateX(-12px)' },
+          '50%': { opacity: '1', transform: 'translateX(0px)' },
+          '100%': { opacity: '0.45', transform: 'translateX(12px)' },
+        },
+        'marquee-slow': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        float: 'float 8s ease-in-out infinite',
+        shimmer: 'shimmer 5s ease-in-out infinite',
+        'marquee-slow': 'marquee-slow 38s linear infinite',
       },
     },
   },

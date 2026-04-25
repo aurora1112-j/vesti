@@ -1,40 +1,39 @@
 import Image from "next/image"
 
+import { marketingLinks } from "@/lib/marketing-config"
+
 export function Footer() {
   return (
-    <footer className="border-t border-border-subtle bg-bg-page px-6 py-12 md:px-12">
-      <div className="mx-auto flex max-w-[720px] flex-col items-center gap-3 text-center md:flex-row md:justify-between md:text-left">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/logo.svg"
-            alt="Vesti logo"
-            width={20}
-            height={20}
-            className="h-5 w-5"
-          />
-          <span className="text-sm font-semibold text-text-primary">
-            Vesti
-          </span>
-          <span className="text-text-tertiary" aria-hidden="true">
-            ·
-          </span>
-          <span className="text-[13px] text-text-tertiary">v0.1.0</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <a
-            href="https://github.com/abraxas914/VESTI"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[13px] text-text-secondary transition-colors duration-150 hover:text-text-primary"
-          >
-            GitHub
-          </a>
-          <span className="text-text-tertiary" aria-hidden="true">
-            ·
-          </span>
-          <span className="text-[13px] text-text-tertiary">
-            Built for those who think with AI.
-          </span>
+    <footer className="px-6 pb-10 pt-2 md:px-8 md:pb-12">
+      <div className="page-shell">
+        <div className="flex flex-col gap-4 border-t border-border-subtle pt-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/logo.svg"
+              alt="Vesti logo"
+              width={20}
+              height={20}
+              className="h-5 w-5"
+            />
+            <span className="text-sm font-medium text-text-primary">Vesti</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+            <a
+              href={marketingLinks.githubRepoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors duration-150 hover:text-text-primary"
+            >
+              GitHub
+            </a>
+            <a
+              href="#download"
+              className="transition-colors duration-150 hover:text-text-primary"
+            >
+              Install
+            </a>
+          </div>
         </div>
       </div>
     </footer>

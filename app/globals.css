@@ -4,25 +4,27 @@
 
 @layer base {
   :root {
-    --bg-page: 42 33% 97%;
-    --bg-surface: 42 20% 92%;
-    --bg-surface-hover: 42 17% 89%;
+    --bg-page: 38 33% 95%;
+    --bg-surface: 36 27% 98%;
+    --bg-surface-hover: 38 18% 95%;
 
-    --text-primary: 0 0% 10%;
-    --text-secondary: 0 0% 42%;
-    --text-tertiary: 0 0% 61%;
+    --text-primary: 0 0% 11%;
+    --text-secondary: 40 1% 37%;
+    --text-tertiary: 0 0% 44%;
+    --text-inverse: 36 27% 98%;
 
-    --vesti-accent: 214 55% 43%;
-    --vesti-accent-hover: 214 57% 38%;
+    --vesti-accent: 221 83% 53%;
+    --vesti-accent-hover: 221 80% 48%;
+    --vesti-accent-soft: 221 100% 97%;
 
-    --border-default: 42 14% 88%;
-    --border-subtle: 42 17% 92%;
+    --border-default: 45 15% 89%;
+    --border-subtle: 45 12% 92%;
 
     --background: var(--bg-page);
     --foreground: var(--text-primary);
     --card: var(--bg-surface);
     --card-foreground: var(--text-primary);
-    --popover: var(--bg-page);
+    --popover: var(--bg-surface);
     --popover-foreground: var(--text-primary);
     --primary: var(--vesti-accent);
     --primary-foreground: 0 0% 100%;
@@ -32,26 +34,81 @@
     --muted-foreground: var(--text-secondary);
     --accent: var(--bg-surface);
     --accent-foreground: var(--text-primary);
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: var(--border-default);
     --input: var(--border-default);
-    --ring: var(--vesti-accent);
-    --radius: 0.375rem;
+    --ring: 217 91% 60%;
+    --radius: 1rem;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(
+        circle at top center,
+        rgba(255, 255, 255, 0.9),
+        rgba(255, 255, 255, 0) 34%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.4),
+        rgba(247, 244, 237, 0.96) 48%
+      );
+  }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.2);
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-[1140px];
+  }
+
+  .section-kicker {
+    @apply text-[12px] font-medium tracking-[-0.01em] text-text-tertiary;
+  }
+
+  .lovable-panel {
+    @apply rounded-2xl border bg-[rgba(252,251,248,0.86)];
+    border-color: hsl(var(--border-default));
+    box-shadow: 0 1px 0 rgba(28, 28, 28, 0.04);
+  }
+
+  .lovable-card {
+    @apply rounded-2xl border bg-[rgba(252,251,248,0.9)];
+    border-color: hsl(var(--border-default));
+    box-shadow: 0 1px 0 rgba(28, 28, 28, 0.04);
+  }
+
+  .lovable-button-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-text-primary px-5 py-3 text-sm font-medium text-[hsl(var(--text-inverse))] transition-colors duration-150 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  .lovable-button-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-border-default bg-[rgba(252,251,248,0.88)] px-5 py-3 text-sm font-medium text-text-primary transition-colors duration-150 hover:bg-[rgba(28,28,28,0.03)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  .lovable-media-frame {
+    @apply overflow-hidden rounded-2xl border bg-[rgba(252,251,248,0.94)];
+    border-color: hsl(var(--border-default));
+    box-shadow:
+      0 1px 0 rgba(28, 28, 28, 0.04),
+      0 16px 48px rgba(28, 28, 28, 0.05);
   }
 }
