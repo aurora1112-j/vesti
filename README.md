@@ -283,27 +283,35 @@ Gardener 是在所有捕获对话的后台异步运行的轻量级智能体，�
 
 ## 🚀 快速开始
 
-我们提供两种安装方式：离线安装包（适合快速体验）和开发者构建（适合贡献代码）。
+我们提供三种安装方式：Chrome Web Store（推荐）、离线安装包（适合手动安装）和开发者构建（适合贡献代码）。
 
-### 方式一：离线安装包（推荐）
+### 方式一：Chrome Web Store（推荐）
+
+通过 Chrome Web Store 安装可获得最简单、稳定的安装与更新体验：
+
+<div align="center">
+  <a href="https://chromewebstore.google.com/detail/ofbdkflponkdfpdipfikdchepngakblo?utm_source=item-share-cb">
+    <img src="https://img.shields.io/badge/Chrome%20Web%20Store-安装%20Vesti-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="从 Chrome Web Store 安装 Vesti" style="margin: 0 4px;">
+  </a>
+</div>
+
+### 方式二：离线安装包
 
 无需配置编程环境，三步即可体验心迹。请优先从 GitHub Release 下载官方安装包（推荐）；如遇网络或访问限制，可在本仓库 `vesti-release/` 目录使用镜像安装包（应急备用）。
 <br>
 官方发布源：GitHub Release（唯一正式附件）；备用源：`vesti-release/`（镜像/兜底，不作为官方发布依据）。
 
-：
-
 <div align="center">
-  <a href="https://github.com/abraxas914/VESTI/releases/latest">
-    <img src="https://img.shields.io/badge/官方发布-GitHub%20Release-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Release 官方下载" style="margin: 0 4px;">
+  <a href="https://github.com/aurora1112-j/vesti/releases/tag/v1.2.0-rc.9">
+    <img src="https://img.shields.io/badge/手动安装-v1.2.0--rc.9-181717?style=for-the-badge&logo=github&logoColor=white" alt="下载 Vesti v1.2.0-rc.9" style="margin: 0 4px;">
   </a>
-  <a href="https://vesti-landing-page0211.vercel.app/">
-    <img src="https://img.shields.io/badge/官网下载-Vercel-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel 官网下载" style="margin: 0 4px;">
+  <a href="https://vesti.rth3.xyz/">
+    <img src="https://img.shields.io/badge/产品主页-Vesti-black?style=for-the-badge" alt="访问 Vesti 产品主页" style="margin: 0 4px;">
   </a>
   <a href="https://modelscope.cn/studios/aurorasein/Vesti2/summary">
     <img src="https://img.shields.io/badge/国内加速-ModelScope-624AFF?style=for-the-badge&logo=modelscope&logoColor=white" alt="ModelScope 下载" style="margin: 0 4px;">
   </a>
-  <a href="https://github.com/abraxas914/VESTI/tree/main/vesti-release">
+  <a href="https://github.com/aurora1112-j/vesti/tree/main/vesti-release">
     <img src="https://img.shields.io/badge/本仓备用-vesti--release-181717?style=for-the-badge&logo=github&logoColor=white" alt="本仓备用下载" style="margin: 0 4px;">
   </a>
 </div>
@@ -311,20 +319,20 @@ Gardener 是在所有捕获对话的后台异步运行的轻量级智能体，�
 
 <br>
 
-**安装步骤：**
+**手动安装步骤：**
 1. 解压安装包到本地任意位置，确保能直接看到 `manifest.json` 文件。注意安装完成后请勿删除或移动该文件夹。
 2. 在 Chrome 浏览器地址栏输入 `chrome://extensions/` 进入扩展管理页，开启右上角的"开发者模式"开关。
 3. 点击左上角的"加载已解压的扩展程序"按钮，选择解压后的文件夹。
 
 > 安装成功后，Vesti 图标将出现在浏览器工具栏中（深色猫头鹰加浅色描边，浅色与深色工具栏均可辨认）。现在打开 ChatGPT 或 Claude 网页开始对话，心迹会自动捕获并开始建立你的本地知识库。
 
-### 方式二：开发者构建
+### 方式三：开发者构建
 
 如果你想贡献代码或深度定制，可以从源码构建。**环境要求**：Node.js 18 或更高版本，pnpm 包管理器。
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/vesti.git
+git clone https://github.com/aurora1112-j/vesti.git
 cd vesti
 
 # 安装依赖
@@ -337,7 +345,7 @@ pnpm -C frontend dev
 pnpm -C frontend build
 ```
 
-开发模式下，扩展文件在 `frontend/build/chrome-mv3-dev` 目录。生产构建在 `frontend/build/chrome-mv3-prod` 目录。按照方式一的步骤 2-3 加载对应目录即可。
+开发模式下，扩展文件在 `frontend/build/chrome-mv3-dev` 目录。生产构建在 `frontend/build/chrome-mv3-prod` 目录。按照方式二的步骤 2-3 加载对应目录即可。
 
 ### ⚙️ 配置 ModelScope API
 
